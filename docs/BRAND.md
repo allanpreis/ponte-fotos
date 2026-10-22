@@ -1,7 +1,9 @@
-# Identidade do Ponte Fotos
+# 🌸 Identidade do Ponte Fotos
 
-O símbolo combina seis pétalas coloridas e uma ponte branca: memórias em formatos diferentes conectadas ao seu servidor. As cores fazem referência à ideia de biblioteca fotográfica; a ponte mantém o propósito e a identidade próprios do app. Não é um logotipo oficial da Apple ou do Immich.
+A logo oficial do Ponte Fotos é a **imagem gerada escolhida pelo usuário**, com pétalas coloridas e uma ponte branca sobre um ícone claro. Ela reúne a ideia de biblioteca fotográfica com a conexão entre o Fotos da Apple, pastas e o Immich. Não é um logotipo oficial da Apple ou do Immich.
 
-A arte final é vetorial, em `Assets/AppLogo.svg`. `AppLogo.png` é a exportação de 1024 pixels; `AppIcon.icns` contém as resoluções de 16 a 1024 pixels para o macOS. O ícone não inclui fontes, fotos, caminhos locais ou metadados do ambiente.
+`Assets/AppLogo.png` preserva a imagem anexada e aprovada, sem redesenho vetorial. `AppIcon.icns` é exportado dessa mesma imagem nas resoluções de16 a1024 pixels. O aplicativo carrega esse PNG para a interface e o ícone em execução; o vídeo usa uma cópia idêntica em `promo/assets/logo.png`.
 
-O conceito foi explorado com geração de imagem e redesenhado em SVG para manter bordas nítidas. O vídeo de apresentação usa somente gráficos sintéticos e textos sobre recursos existentes. Nenhuma foto, chave de API ou endereço de servidor pessoal é usado.
+O desenho vetorial simplificado usado na versão0.8.0 foi substituído. Mudanças futuras na identidade devem preservar esta arte aprovada, salvo novo pedido do usuário.
+
+O logo do Immich aparece somente para identificar o destino na apresentação. Seu arquivo foi obtido do [repositório oficial](https://github.com/immich-app/immich/blob/main/design/immich-logo.svg), sem alterações no desenho; atribuição e licença acompanham a composição em `promo/assets/`. O projeto Ponte Fotos é independente e não representa endosso de terceiros.
