@@ -10,7 +10,7 @@ O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não de
 
 ## Apresentação
 
-https://github.com/user-attachments/assets/832a12bc-61b9-4ca6-b412-0fba7b27784b
+https://github.com/user-attachments/assets/e5f2059a-b226-4cff-93a3-d166cbb0f6cb
 
 [Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 36 segundos · sem áudio · 1080p.
 
