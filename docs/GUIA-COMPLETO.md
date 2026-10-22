@@ -1,6 +1,6 @@
 # 🌸 Ponte Fotos — guia completo
 
-**Versão 0.8.1 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
+**Versão 0.8.2 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
 
 O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. Você escolhe, revisa data e localização, define o destino e acompanha o envio. Também pode consultar duplicatas entre contas e organizar álbuns do servidor.
 
@@ -14,7 +14,7 @@ O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. 
 2. Confira o SHA-256 do ZIP com o arquivo de checksums anexado à mesma release:
 
    ```sh
-   shasum -a 256 Ponte-Fotos-0.8.1-arm64.zip
+   shasum -a 256 Ponte-Fotos-0.8.2-arm64.zip
    ```
 
 3. Extraia o ZIP e mova **Ponte Fotos.app** para Aplicativos ou para a pasta local `~/Applications`.
@@ -213,3 +213,15 @@ Validação automatizada não substitui testes reais de PhotoKit, permissões, t
 | Assinatura inválida | Recompilar e instalar fora de sincronizadores; verificar `codesign` |
 
 O projeto é independente, sem vínculo oficial com Apple ou Immich. Uma licença de redistribuição ainda não foi definida. Consulte [como publicamos versões](RELEASING.md) para o processo de commits, documentação e releases.
+
+
+## 🛠️ Correções visuais da 0.8.2
+
+O ícone usa a área inteira do enquadramento fornecido pelo macOS, sem a imagem reduzida dentro de uma segunda base. A logo da barra lateral usa o bitmap em alta resolução, com tamanho lógico correto para telas Retina.
+
+Ao selecionar **Configurações → Aparência → Sistema**, a janela passa imediatamente a seguir o macOS. Não é necessário reiniciar. Janelas e painéis herdam a aparência do aplicativo.
+
+![Tema escuro na prévia isolada](media/appearance-dark-082.png)
+![Sistema adotando o tema claro sem reiniciar](media/appearance-system-082.png)
+
+Prints de prévia isolada, sem chaves, fotos ou endereços reais. Testes AppKit também cobrem retorno de Claro para Sistema; a troca global do macOS não foi alterada durante o teste visual.
