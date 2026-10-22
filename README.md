@@ -4,7 +4,7 @@
 
 Aplicativo nativo para macOS que envia originais do Fotos da Apple e de pastas para o Immich, permite revisar data e localização e oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.8.1 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.8.2 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para os recursos de conexão, upload e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
@@ -14,13 +14,13 @@ https://github.com/user-attachments/assets/e5f2059a-b226-4cff-93a3-d166cbb0f6cb
 
 [Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 36 segundos · sem áudio · 1080p.
 
-A versão 0.8.1 usa a arte gerada aprovada no app, no ícone e no vídeo. A apresentação mostra a foto atravessando o Ponte Fotos até o logo oficial do Immich e a troca automática de URLs conforme a rede. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
+A versão 0.8.2 corrige o enquadramento do ícone no macOS, melhora a nitidez da logo e aplica o tema Sistema imediatamente. A arte gerada aprovada permanece no app, no ícone e no vídeo. A apresentação mostra a foto atravessando o Ponte Fotos até o logo oficial do Immich e a troca automática de URLs conforme a rede. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.8.1 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.8.1/Ponte-Fotos-0.8.1-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.8.2 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.8.2/Ponte-Fotos-0.8.2-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.8.1) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.8.2) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
 
 ## 📸 Uma biblioteca, conectada
 

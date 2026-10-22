@@ -2,6 +2,20 @@
 
 As mudanças são agrupadas por versão. [Releases e downloads](https://github.com/allanpreis/ponte-fotos/releases) · [Guia completo](docs/GUIA-COMPLETO.md)
 
+## 0.8.2 — 2026-10-22
+
+### 🖼️ Ícone e nitidez
+
+- Exportação opaca e sem a margem transparente da imagem gerada para evitar a segunda base que o macOS acrescentava ao ícone.
+- Ícone nativo com todas as resoluções de 16 a 1024 pixels; o app deixa de sobrescrevê-lo com o PNG ao abrir.
+- Logo interna carregada do bitmap de alta resolução com tamanho lógico de 38 pontos e interpolação de alta qualidade.
+- Fonte aprovada preservada; exportação reproduzível com ferramentas nativas em `tools/export-icons.swift`.
+
+### 🌓 Tema automático
+
+- Selecionar Sistema remove imediatamente a aparência forçada do aplicativo, incluindo janelas e painéis existentes.
+- Regressões cobrem Escuro → Sistema e Claro → Sistema. Nenhuma preferência global do macOS é modificada.
+
 ## 0.8.1 — 2026-10-22
 
 ### 🎨 Identidade consistente
