@@ -4,17 +4,29 @@
 
 Aplicativo nativo para macOS que envia originais do Fotos da Apple e de pastas para o Immich, permite revisar data e localização e oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.8.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.8.1 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para os recursos de conexão, upload e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
 ## Apresentação
 
-https://github.com/user-attachments/assets/543787ec-5e2b-403c-a2c5-b262ab38498f
+https://github.com/user-attachments/assets/832a12bc-61b9-4ca6-b412-0fba7b27784b
 
-[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 32 segundos · sem áudio · 1080p.
+[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 36 segundos · sem áudio · 1080p.
 
-A versão 0.8 inclui a nova identidade de pétalas e ponte, além das melhorias de configurações, temas e gestão. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
+A versão 0.8.1 usa a arte gerada aprovada no app, no ícone e no vídeo. A apresentação mostra a foto atravessando o Ponte Fotos até o logo oficial do Immich e a troca automática de URLs conforme a rede. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
+
+## 📦 Instalar pela release
+
+Baixe o [Ponte Fotos 0.8.1 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.8.1/Ponte-Fotos-0.8.1-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.8.1) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
+
+## 📸 Uma biblioteca, conectada
+
+![Biblioteca com a logo aprovada e arquivos de demonstração](docs/media/library-v081.png)
+
+Os prints usam uma prévia isolada e dados de demonstração. Veja também [temas e vidro](docs/media/settings-v081.png) e [Live Photo/estática na gestão](docs/media/duplicates-v081.png).
 
 ## Visual e configurações
 
@@ -243,3 +255,7 @@ build.sh                      Compilação e assinatura local
 Aplicativo em evolução, com assinatura local e testes automatizados. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Uma licença de redistribuição ainda não foi definida neste repositório.
+
+## 🚀 Publicação de versões
+
+Cada nova versão deve ser entregue com commit, tag e GitHub Release, incluindo pacote, checksum, notas e documentação atualizada. O procedimento está em [docs/RELEASING.md](docs/RELEASING.md).
