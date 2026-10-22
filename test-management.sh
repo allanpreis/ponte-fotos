@@ -7,7 +7,9 @@ swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Sour
 /private/tmp/ponte-native-duplicate-final
 swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Sources/ImmichOrganization.swift Tests/ImmichOrganizationTests.swift -o /private/tmp/ponte-native-organization-final
 /private/tmp/ponte-native-organization-final
-swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Sources/ConnectionHistory.swift Sources/ImmichDuplicates.swift Sources/ImmichOrganization.swift Sources/ImmichWorkspace.swift Tests/ImmichWorkspaceTests.swift -o /private/tmp/ponte-native-workspace-final
+swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Sources/ConnectionHistory.swift Sources/ImmichDuplicates.swift Sources/ImmichOrganization.swift Sources/DesignSystem.swift Sources/ImmichWorkspace.swift Tests/ImmichWorkspaceTests.swift -o /private/tmp/ponte-native-workspace-final
 /private/tmp/ponte-native-workspace-final
 swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Tests/ImmichManagementAPITests.swift -o /private/tmp/ponte-native-api-final
 /private/tmp/ponte-native-api-final
+swiftc -module-cache-path "$CACHE" -swift-version 5 -parse-as-library $BASE Sources/ConnectionHistory.swift Sources/ImmichDuplicates.swift Sources/ImmichOrganization.swift Sources/DesignSystem.swift Sources/ImmichWorkspace.swift Tests/WorkspaceSessionTests.swift -o /private/tmp/ponte-workspace-session-tests
+/private/tmp/ponte-workspace-session-tests

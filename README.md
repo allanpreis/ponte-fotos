@@ -1,16 +1,34 @@
-
-
-https://github.com/user-attachments/assets/543787ec-5e2b-403c-a2c5-b262ab38498f
-
 <p align="center"><img src="Assets/AppLogo.png" alt="Ponte Fotos" width="112"></p>
 
 # Ponte Fotos
 
 Aplicativo nativo para macOS que envia originais do Fotos da Apple e de pastas para o Immich, permite revisar data e localização e oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.5.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.8.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para os recursos de conexão, upload e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
+
+## Apresentação
+
+https://github.com/user-attachments/assets/543787ec-5e2b-403c-a2c5-b262ab38498f
+
+[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 32 segundos · sem áudio · 1080p.
+
+A versão 0.8 inclui a nova identidade de pétalas e ponte, além das melhorias de configurações, temas e gestão. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
+
+## Visual e configurações
+
+A versão 0.7 separa as configurações da tela de fotos. Abra **Configurações** na barra lateral ou use **⌘,**:
+
+- **Conexão**: endereços local/remoto, modo Automático/Local/Remoto, Wi-Fi doméstico e chave principal.
+- **Contas e API**: contas adicionais usadas pela gestão; exige conexão validada e mantém chaves no Chaves do macOS.
+- **Aparência**: Claro, Escuro ou Sistema. A escolha é salva e aplicada também às janelas de revisão e gestão.
+
+A tela principal mantém origem, destino, lista de mídia e ações sem um painel rolável de conexão. Em janelas menores, a lista conserva sua própria rolagem; formulários extensos rolam somente dentro de Configurações.
+
+A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
+
+O contrato visual e as referências oficiais da Apple estão em [DESIGN.md](DESIGN.md). As regras de envio e proteção de Live Photos permanecem preservadas.
 
 ## Recursos
 
@@ -58,10 +76,10 @@ Não execute o bundle diretamente de uma pasta sincronizada que modifique seus a
 
 ## Primeira conexão
 
-1. Abra as configurações de conexão no app.
+1. Abra **Configurações → Conexão** no app (ou **⌘,**).
 2. Informe a URL do seu Immich e a chave de API da conta de destino. Use a URL base, sem credenciais ou parâmetros embutidos.
 3. Escolha o modo **Local** ou **Remoto** e clique em **Testar conexão**.
-4. Se quiser persistir os dados, use **Salvar URL e chave**. Eles são armazenados no Chaves do macOS.
+4. Se quiser persistir os dados, use **Salvar configuração**. Eles são armazenados no Chaves do macOS.
 
 A configuração inicial do código publicado fica vazia. Exemplos de preenchimento: URL local `http://immich.local:2283`, URL remota `https://photos.example.com`, Wi-Fi `MinhaRede`. São exemplos fictícios; substitua pelos seus dados na interface.
 
@@ -173,6 +191,7 @@ zsh build.sh
 zsh test-connection.sh
 zsh test-management.sh
 zsh test-media.sh
+zsh test-appearance.sh
 plutil -lint Info.plist
 codesign --verify --deep --strict "build/Ponte Fotos.app"
 ```
@@ -186,6 +205,8 @@ A fixture `Tests/api_fixture.py` é opcional, escuta somente em `127.0.0.1:18761
 ```text
 Sources/
   App.swift                   Interface principal e fluxo de envio
+  DesignSystem.swift          Temas, política de vidro e componentes visuais
+  SettingsView.swift          Conexão, contas e aparência
   Metadata.swift              Metadados e modelos de mídia
   ExternalMedia.swift         Leitura de pastas, imagens, vídeos e XMP
   Review.swift                Revisão de data/GPS

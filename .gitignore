@@ -47,3 +47,8 @@ __pycache__/
 *.swp
 *.xcuserstate
 xcuserdata/
+
+# Prévia e renderização do vídeo
+node_modules/
+.hyperframes/
+renders/
