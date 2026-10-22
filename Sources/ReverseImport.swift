@@ -1,0 +1,325 @@
+import Foundation
+import SwiftUI
+import Photos
+import AppKit
+import CoreLocation
+import CryptoKit
+
+struct PFReverseItem: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let typeLabel: String
+    let captureDate: Date?
+    let latitude: Double?
+    let longitude: Double?
+    let isLive: Bool
+    var isImported = false
+    var issue: String?
+    var selectable: Bool { issue == nil && !isImported }
+}
+
+struct PFReverseAsset: Decodable {
+    let id: String
+    let ownerId: String
+    let originalFileName: String
+    let checksum: String
+    let type: String
+    let fileCreatedAt: String?
+    let livePhotoVideoId: String?
+    let isOffline: Bool?
+    let isTrashed: Bool?
+    struct Exif: Decodable { let dateTimeOriginal: String?; let latitude: Double?; let longitude: Double? }
+    let exifInfo: Exif?
+    var item: PFReverseItem {
+        let date = Self.date(exifInfo?.dateTimeOriginal ?? fileCreatedAt)
+        let lat = exifInfo?.latitude, lon = exifInfo?.longitude
+        var issue: String?
+        if !["IMAGE", "VIDEO"].contains(type) { issue = "Formato não suportado." }
+        else if isOffline == true || isTrashed == true { issue = "Original indisponível ou na lixeira." }
+        else if date == nil { issue = "Data de captura ausente ou inválida. Corrija no Immich antes de importar." }
+        else if !Self.validCoordinates(lat, lon) { issue = "Localização incompleta ou inválida." }
+        else if !Self.validChecksum(checksum) { issue = "Checksum original ausente ou inválido." }
+        return PFReverseItem(id: id, name: Self.safeName(originalFileName), typeLabel: livePhotoVideoId != nil ? "Live Photo" : type == "VIDEO" ? "Vídeo" : "Foto estática", captureDate: date, latitude: lat, longitude: lon, isLive: livePhotoVideoId != nil, issue: issue)
+    }
+    static func date(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        // Require an explicit timezone: never reinterpret a wall-clock timestamp in the Mac's zone.
+        guard value.range(of: "(Z|[+-][0-9]{2}:[0-9]{2})$", options: .regularExpression) != nil else { return nil }
+        let parser = ISO8601DateFormatter(); parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = parser.date(from: value) { return date }
+        parser.formatOptions = [.withInternetDateTime]; return parser.date(from: value)
+    }
+    static func validCoordinates(_ latitude: Double?, _ longitude: Double?) -> Bool {
+        if latitude == nil && longitude == nil { return true }
+        guard let latitude, let longitude else { return false }
+        return latitude.isFinite && longitude.isFinite && (-90...90).contains(latitude) && (-180...180).contains(longitude)
+    }
+    static func safeName(_ name: String) -> String {
+        let leaf = name.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last.map(String.init) ?? "original"
+        let clean = leaf.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }.map(String.init).joined()
+        return clean.isEmpty || clean == "." || clean == ".." ? "original" : String(clean.prefix(180))
+    }
+    static func validChecksum(_ value: String) -> Bool { Data(base64Encoded: value)?.count == 20 || (value.count == 40 && value.allSatisfy { $0.isHexDigit }) }
+    static func verify(_ file: URL, checksum: String) throws {
+        let handle = try FileHandle(forReadingFrom: file); defer { try? handle.close() }
+        var digest = Insecure.SHA1()
+        while let bytes = try handle.read(upToCount: 1024 * 1024), !bytes.isEmpty { digest.update(data: bytes) }
+        let actual = Data(digest.finalize())
+        guard validChecksum(checksum), actual.base64EncodedString() == checksum || actual.map({ String(format: "%02x", $0) }).joined() == checksum.lowercased() else { throw BridgeError(message: "O original baixado não corresponde ao checksum do Immich. Nada foi importado.") }
+    }
+}
+
+protocol PFReverseRemote {
+    var scope: String { get }
+    func albums() async throws -> [IMAlbum]
+    func ids(album: String) async throws -> [String]
+    func asset(_ id: String) async throws -> PFReverseAsset
+    func download(_ asset: PFReverseAsset, directory: URL) async throws -> URL
+}
+struct PFReverseHTTP: PFReverseRemote {
+    let client: IMClient
+    let profileID: String
+    var scope: String { // No key, URL, account name or private environment data in history filenames.
+        return SHA256.hash(data: Data((profileID + "|" + client.credential.account.id).utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    func albums() async throws -> [IMAlbum] { try await client.albums() }
+    func ids(album: String) async throws -> [String] { try await client.albumIDs(album).sorted() }
+    func asset(_ id: String) async throws -> PFReverseAsset {
+        guard UUID(uuidString: id) != nil else { throw BridgeError(message: "Identificador do arquivo inválido.") }
+        return try JSONDecoder().decode(PFReverseAsset.self, from: await client.data("assets/" + id))
+    }
+    func download(_ asset: PFReverseAsset, directory: URL) async throws -> URL {
+        guard UUID(uuidString: asset.id) != nil else { throw BridgeError(message: "Identificador do original inválido.") }
+        let api = try ImmichClient(address: client.address, key: client.credential.key)
+        // A separate ephemeral, no-redirect session prevents API credentials from following a redirect.
+        let config = URLSessionConfiguration.ephemeral
+        let session = URLSession(configuration: config, delegate: NoRedirect(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let (temporary, response) = try await session.download(for: api.request("assets/" + asset.id + "/original"))
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try api.check(response)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        let destination = directory.appendingPathComponent(UUID().uuidString + "-" + PFReverseAsset.safeName(asset.originalFileName))
+        try FileManager.default.moveItem(at: temporary, to: destination)
+        do { try PFReverseAsset.verify(destination, checksum: asset.checksum) }
+        catch { try? FileManager.default.removeItem(at: destination); throw error }
+        return destination
+    }
+}
+
+struct PFReverseRecord: Codable, Equatable {
+    let assetID: String
+    let checksum: String
+    var photosID: String?
+    var pending: Bool
+}
+protocol PFReverseHistory {
+    func load(scope: String) throws -> [PFReverseRecord]
+    func save(_ records: [PFReverseRecord], scope: String) throws
+}
+struct PFReverseDiskHistory: PFReverseHistory {
+    private func url(_ scope: String) throws -> URL {
+        guard scope.count == 64, scope.allSatisfy({ $0.isHexDigit }) else { throw BridgeError(message: "Identidade de histórico inválida.") }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos/reverse-import", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return dir.appendingPathComponent(scope + ".json")
+    }
+    func load(scope: String) throws -> [PFReverseRecord] {
+        let file = try url(scope)
+        guard FileManager.default.fileExists(atPath: file.path) else { return [] }
+        return try JSONDecoder().decode([PFReverseRecord].self, from: Data(contentsOf: file))
+    }
+    func save(_ records: [PFReverseRecord], scope: String) throws {
+        let file = try url(scope)
+        try JSONEncoder().encode(records).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
+}
+
+@MainActor protocol PFReversePhotos {
+    var canRead: Bool { get }
+    func authorize() async throws
+    func exists(_ id: String) -> Bool
+    func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws
+    func create(asset: PFReverseAsset, original: URL, paired: URL?, album: String) async throws -> String
+}
+@MainActor final class PFReversePhotoLibrary: PFReversePhotos {
+    var canRead: Bool { PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized }
+    func authorize() async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard status == .authorized else { throw BridgeError(message: "Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.") }
+    }
+    func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
+    func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws {
+        if let paired {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let lock = NSLock(); var resumed = false
+                PHLivePhoto.request(withResourceFileURLs: [original, paired], placeholderImage: nil, targetSize: .zero, contentMode: .aspectFit) { photo, info in
+                    if (info[PHLivePhotoInfoIsDegradedKey] as? Bool) == true { return }
+                    lock.lock(); guard !resumed else { lock.unlock(); return }; resumed = true; lock.unlock()
+                    if photo != nil { continuation.resume() }
+                    else { continuation.resume(throwing: BridgeError(message: "O par Live Photo não é compatível com o Fotos. Nenhum item estático foi criado em seu lugar.")) }
+                }
+            }
+        }
+        let resourceTypes: [PHAssetResourceType] = paired != nil ? [.photo, .pairedVideo] : [asset.type == "VIDEO" ? .video : .photo]
+        guard PHAssetCreationRequest.supportsAssetResourceTypes(resourceTypes.map { NSNumber(value: $0.rawValue) }) else { throw BridgeError(message: "Os recursos deste original não são compatíveis com o Fotos.") }
+    }
+    func create(asset: PFReverseAsset, original: URL, paired: URL?, album: String) async throws -> String {
+        let options = PHFetchOptions(); options.predicate = NSPredicate(format: "title = %@", album)
+        let existing = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: options).firstObject
+        var createdID: String?
+        try await PHPhotoLibrary.shared().performChanges {
+            let request = PHAssetCreationRequest.forAsset()
+            request.creationDate = asset.item.captureDate
+            // Explicit nil also applies the current absence of GPS reported by Immich.
+            if let lat = asset.item.latitude, let lon = asset.item.longitude {
+                request.location = CLLocation(latitude: lat, longitude: lon)
+            } else {
+                request.location = nil
+            }
+            let resourceOptions = PHAssetResourceCreationOptions(); resourceOptions.originalFilename = PFReverseAsset.safeName(asset.originalFileName); resourceOptions.shouldMoveFile = false
+            request.addResource(with: asset.type == "VIDEO" ? .video : .photo, fileURL: original, options: resourceOptions)
+            if let paired { request.addResource(with: .pairedVideo, fileURL: paired, options: nil) }
+            guard let placeholder = request.placeholderForCreatedAsset else { return }
+            createdID = placeholder.localIdentifier
+            let albumRequest = existing.map { PHAssetCollectionChangeRequest(for: $0) } ?? PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: album)
+            albumRequest?.addAssets([placeholder] as NSArray)
+        }
+        guard let createdID else { throw BridgeError(message: "Resultado do Fotos sem identificador. Confira a biblioteca antes de repetir.") }
+        return createdID
+    }
+}
+
+@MainActor final class PFReverseImportModel: ObservableObject {
+    @Published var albums: [IMAlbum] = []
+    @Published var items: [PFReverseItem] = []
+    @Published var selection = Set<String>()
+    @Published var albumID = "" {
+        didSet {
+            if albumID != oldValue && !importing { generation = UUID(); items = []; selection = []; assets = [:] }
+        }
+    }
+    @Published var destinationAlbumName = "Importadas do Immich"
+    @Published var busy = false
+    @Published var importing = false
+    @Published var status = "Conecte o Immich para escolher um álbum."
+    @Published var showConfirmation = false
+    @Published var done = 0
+    @Published var total = 0
+    private var remote: PFReverseRemote?
+    private let history: PFReverseHistory
+    private let photos: PFReversePhotos
+    private var assets: [String: PFReverseAsset] = [:]
+    private var cancellationRequested = false
+    private var generation = UUID()
+    init(history: PFReverseHistory = PFReverseDiskHistory(), photos: PFReversePhotos? = nil) { self.history = history; self.photos = photos ?? PFReversePhotoLibrary() }
+    func load(address: String, key: String, profileID: String) async {
+        guard !importing && !busy else { return }
+        busy = true; defer { busy = false }
+        invalidateConnection()
+        let token = generation
+        do {
+            let credential = try await IMManagementStore.verify(address: address, key: key)
+            guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: "Salve o perfil de conexão antes de importar.") }
+            let value = PFReverseHTTP(client: IMClient(address: address, credential: credential), profileID: profileID)
+            let rows = try await value.albums()
+            guard token == generation else { return }
+            remote = value; albums = rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }; albumID = albums.first?.id ?? ""
+            status = "Escolha um álbum para revisar os originais."
+        } catch { if token == generation { status = error.localizedDescription } }
+    }
+    func loadAlbum() async {
+        guard !busy && !importing, let remote else { return }
+        busy = true; defer { busy = false }; selection = []; items = []; assets = [:]
+        let token = generation, album = albumID
+        do {
+            let ids = try await remote.ids(album: album)
+            var rows: [PFReverseItem] = [], loaded: [String: PFReverseAsset] = [:]
+            let records = try history.load(scope: remote.scope)
+            for id in ids {
+                try Task.checkCancellation(); guard generation == token else { return }
+                let asset = try await remote.asset(id)
+                var item = asset.item
+                if records.contains(where: { $0.assetID == id && $0.pending }) { item.issue = "Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente." }
+                if photos.canRead, let record = records.last(where: { $0.assetID == id && $0.checksum == asset.checksum && !$0.pending }), let photosID = record.photosID {
+                    item.isImported = photos.exists(photosID)
+                }
+                // No permission prompt occurs while browsing.
+                loaded[id] = asset; rows.append(item)
+                status = "Revisando \(rows.count) de \(ids.count)…"
+            }
+            guard generation == token, albumID == album else { return }
+            let pairedIDs = Set(loaded.values.compactMap(\.livePhotoVideoId))
+            rows = rows.filter { !pairedIDs.contains($0.id) }
+            assets = loaded; items = rows; status = "\(rows.count) originais encontrados. Selecione os itens para importar."
+        } catch { if generation == token { status = error.localizedDescription } }
+    }
+    func thumbnail(id: String) async -> NSImage? {
+        guard let remote = remote as? PFReverseHTTP, assets[id] != nil else { return nil }
+        let token = generation
+        guard let data = try? await remote.client.thumbnail(id), token == generation, !Task.isCancelled else { return nil }
+        return NSImage(data: data)
+    }
+    func cancel() {
+        cancellationRequested = true; showConfirmation = false
+        if !importing { generation = UUID(); items = []; selection = []; assets = [:] }
+    }
+    func invalidate() { invalidateConnection() }
+    func invalidateConnection() {
+        generation = UUID(); cancellationRequested = true; showConfirmation = false
+        if !importing { remote = nil; albums = []; items = []; selection = []; assets = [:] }
+    }
+    // Dependency injection keeps tests entirely outside the user's Photos library and network.
+    func use(remote: PFReverseRemote, assets: [PFReverseAsset]) {
+        guard !importing else { return }; self.remote = remote; self.assets = Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) }); items = assets.map(\.item)
+    }
+    func importSelected() async {
+        guard !busy && !importing, let remote else { return }
+        let selected = items.filter { selection.contains($0.id) && $0.selectable }.compactMap { assets[$0.id] }
+        let album = destinationAlbumName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selected.isEmpty, !album.isEmpty else { status = "Selecione originais válidos e informe o álbum de destino."; return }
+        importing = true; cancellationRequested = false; showConfirmation = false; done = 0; total = selected.count
+        let token = generation
+        defer { importing = false; if token != generation { self.remote = nil; items = []; albums = []; assets = [:]; selection = [] } }
+        do {
+            try await photos.authorize()
+            var records = try history.load(scope: remote.scope)
+            for originalAsset in selected {
+                if cancellationRequested || generation != token { status = "Importação interrompida entre itens. \(done) concluídos."; return }
+                let asset = try await remote.asset(originalAsset.id)
+                guard asset.item.selectable, asset.checksum == originalAsset.checksum, asset.livePhotoVideoId == originalAsset.livePhotoVideoId,
+                      asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: "O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.") }
+                if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: "Há um resultado pendente para este item. Confira o Fotos antes de repetir.") }
+                if let previous = records.last(where: { $0.assetID == asset.id && $0.checksum == asset.checksum }), let id = previous.photosID, photos.exists(id) {
+                    markImported(asset.id); done += 1; continue
+                }
+                let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ponte-reverse-" + UUID().uuidString, isDirectory: true)
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+                defer { try? FileManager.default.removeItem(at: dir) }
+                status = "Baixando e verificando \(asset.item.name)…"
+                let file = try await remote.download(asset, directory: dir)
+                var paired: URL?
+                if let videoID = asset.livePhotoVideoId {
+                    guard asset.type == "IMAGE" else { throw BridgeError(message: "Par Live Photo inválido.") }
+                    let video = try await remote.asset(videoID)
+                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true else { throw BridgeError(message: "Vídeo da Live Photo indisponível.") }
+                    paired = try await remote.download(video, directory: dir)
+                }
+                if cancellationRequested || generation != token { status = "Importação interrompida antes de gravar no Fotos."; return }
+                try await photos.validate(asset: asset, original: file, paired: paired)
+                if cancellationRequested || generation != token { status = "Importação interrompida antes de gravar no Fotos."; return }
+                // Persist intent BEFORE PhotoKit. Crashes/ambiguous errors must never trigger blind retries.
+                records.removeAll { $0.assetID == asset.id }
+                records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true))
+                try history.save(records, scope: remote.scope)
+                let photosID = try await photos.create(asset: asset, original: file, paired: paired, album: album)
+                records[records.count - 1].photosID = photosID; records[records.count - 1].pending = false
+                try history.save(records, scope: remote.scope)
+                markImported(asset.id); done += 1
+            }
+            status = "\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados."
+        } catch { status = error.localizedDescription + " Importação interrompida; confira os itens e o histórico antes de repetir." }
+    }
+    private func markImported(_ id: String) { if let index = items.firstIndex(where: { $0.id == id }) { items[index].isImported = true }; selection.remove(id) }
+}

@@ -447,16 +447,20 @@ enum AppBrand {
     }()
 }
 extension Notification.Name { static let pfOpenSettings = Notification.Name("PonteFotos.openSettings") }
-@MainActor final class PFNavigationState: ObservableObject { @Published var settings = false }
+@MainActor final class PFNavigationState: ObservableObject {
+    @Published var settings = false
+    @Published var reverse = false
+}
 
 struct ContentView: View {
     @StateObject private var model = LibraryModel()
     @StateObject private var volumes = VolumeMonitor()
     @StateObject private var navigation = PFNavigationState()
+    @StateObject private var reverseImport = PFReverseImportModel()
     @AppStorage(PFAppearance.themeKey) private var themeRaw = PFColorTheme.system.rawValue
     @AppStorage(PFAppearance.glassKey) private var glassEnabled = true
     private var selectedTheme: PFColorTheme { PFColorTheme(rawValue: themeRaw) ?? .system }
-    var body: some View {
+    private var workspace: some View {
         HStack(spacing: 0) {
             sidebar
             Divider()
@@ -464,6 +468,8 @@ struct ContentView: View {
                 pageHeader.padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 18)
                 if navigation.settings {
                     PFSettingsView(model: model, themeRaw: $themeRaw, glassEnabled: $glassEnabled)
+                } else if navigation.reverse {
+                    PFReverseImportView(model: reverseImport, address: model.address, key: model.apiKey, profileID: model.profile.id, connectionReady: model.serverReady, configure: { navigation.settings = true })
                 } else {
                     HStack(alignment: .top, spacing: 16) { sourcePanel; destinationPanel }
                         .fixedSize(horizontal: false, vertical: true)
@@ -473,16 +479,27 @@ struct ContentView: View {
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    var body: some View {
+        workspace
         .background(PFTheme.background).tint(PFTheme.accent)
         .environment(\.pfGlassEnabled, glassEnabled)
         .onAppear { PFAppearanceController.apply(selectedTheme) }
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
-        .onChange(of: model.profile) { previous, _ in model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
-        .onChange(of: model.apiKey) { _, _ in model.prepareManagementSession() }
-        .onChange(of: model.address) { _, _ in model.prepareManagementSession() }
-        .onChange(of: model.serverReady) { _, _ in model.prepareManagementSession() }
+        .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
+        .onChange(of: model.apiKey) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
+        .onChange(of: model.address) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
+        .onChange(of: model.serverReady) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
         .onChange(of: model.busy) { _, busy in if !busy { model.prepareManagementSession() } }
+        .onChange(of: reverseImport.busy || reverseImport.importing) { _, active in model.busy = active }
+        .onChange(of: navigation.settings) { _, open in
+            if open { navigation.reverse = false; reverseImport.invalidate() }
+        }
+        .onChange(of: navigation.reverse) { _, open in
+            if !open { reverseImport.invalidate() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .pfOpenSettings)) { _ in
             if !model.busy { navigation.settings = true }
         }
@@ -516,10 +533,14 @@ struct ContentView: View {
                 }
             }.padding(.bottom, 28)
             Text("BIBLIOTECA").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
-            sidebarAction("Fotos da Apple", icon: "photo.stack", selected: !navigation.settings && model.connected && model.sourceName == nil) { navigation.settings = false; Task { await model.connectLibrary() } }.disabled(model.busy)
-            sidebarAction("Discos e pastas", icon: "folder", selected: !navigation.settings && model.sourceName != nil) { navigation.settings = false; Task { await model.chooseFolder() } }.disabled(model.busy)
+            sidebarAction("Fotos da Apple", icon: "photo.stack", selected: !navigation.settings && !navigation.reverse && model.connected && model.sourceName == nil) { navigation.settings = false; navigation.reverse = false; Task { await model.connectLibrary() } }.disabled(model.busy)
+            sidebarAction("Discos e pastas", icon: "folder", selected: !navigation.settings && !navigation.reverse && model.sourceName != nil) { navigation.settings = false; navigation.reverse = false; Task { await model.chooseFolder() } }.disabled(model.busy)
             Divider().padding(.vertical, 18)
             Text("IMMICH").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
+            sidebarAction("Immich → Fotos", icon: "square.and.arrow.down", selected: navigation.reverse && !navigation.settings) {
+                navigation.settings = false; navigation.reverse = true
+            }.disabled(model.busy)
+                .help("Trazer originais do Immich para a biblioteca do Fotos da Apple")
             sidebarAction("Gerenciar biblioteca", icon: "square.grid.2x2") { model.openManagement() }
                 .disabled(model.busy || !model.serverReady)
                 .help(model.serverReady ? "Duplicatas, álbuns, pessoas e histórico" : "Teste a conexão para gerenciar o Immich")
@@ -534,7 +555,7 @@ struct ContentView: View {
                         Text("Os discos conectados\naparecem aqui.").font(.caption).foregroundStyle(.secondary).padding(10)
                     }
                     ForEach(volumes.volumes) { volume in
-                        sidebarAction(volume.name, icon: "externaldrive") { navigation.settings = false; Task { await model.chooseFolder(on: volume) } }.disabled(model.busy)
+                        sidebarAction(volume.name, icon: "externaldrive") { navigation.settings = false; navigation.reverse = false; Task { await model.chooseFolder(on: volume) } }.disabled(model.busy)
                     }
                 }
             }
@@ -544,7 +565,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.8.2").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.9.0").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
@@ -563,8 +584,8 @@ struct ContentView: View {
     private var pageHeader: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(navigation.settings ? "Configurações" : "Sua biblioteca").font(.system(size: 27, weight: .semibold))
-                Text(navigation.settings ? "Conexão, contas e aparência em um só lugar." : "Escolha, revise e envie suas fotos para o Immich.").font(.callout).foregroundStyle(.secondary)
+                Text(navigation.settings ? "Configurações" : navigation.reverse ? "Importar para o Fotos" : "Sua biblioteca").font(.system(size: 27, weight: .semibold))
+                Text(navigation.settings ? "Conexão, contas e aparência em um só lugar." : navigation.reverse ? "Do Immich para a biblioteca da Apple, com os originais." : "Escolha, revise e envie suas fotos para o Immich.").font(.callout).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             if navigation.settings {
