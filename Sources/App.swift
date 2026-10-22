@@ -32,6 +32,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
     @Published var showManagement = false
     @Published var managementBusy = false
     @Published var managementModel: IMWorkspaceModel?
+    private let managementSession = IMWorkspaceSessionCache()
     @Published var busy = false {
         didSet {
             if !busy && pendingNetworkChange {
@@ -211,11 +212,17 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         }
         offset = end; status = "\(items.count) de \(fetched.count) itens carregados. Selecione um lote pequeno para o primeiro teste."
     }
-    func openManagement() {
-        guard serverReady, !busy else { return }
-        managementModel = IMWorkspaceModel(address: address, primaryKey: apiKey, profileID: profile.id, connectionReady: serverReady, onBusyChanged: { [weak self] active in
+    @discardableResult func prepareManagementSession() -> IMWorkspaceModel? {
+        guard !busy else { return nil }
+        let readyModel = managementSession.prepare(address: address, primaryKey: apiKey, profileID: profile.id, ready: serverReady, onBusyChanged: { [weak self] active in
             self?.managementBusy = active; self?.busy = active
         })
+        managementModel = managementSession.current
+        readyModel?.load()
+        return readyModel
+    }
+    func openManagement() {
+        guard prepareManagementSession() != nil else { return }
         showManagement = true
     }
     func requestWifiPermission() { network.requestLocationPermission() }
@@ -434,174 +441,57 @@ enum AppBrand {
         return NSImage(systemSymbolName: "photo.on.rectangle", accessibilityDescription: "Ponte Fotos")!
     }
 }
+extension Notification.Name { static let pfOpenSettings = Notification.Name("PonteFotos.openSettings") }
+@MainActor final class PFNavigationState: ObservableObject { @Published var settings = false }
+
 struct ContentView: View {
     @StateObject private var model = LibraryModel()
     @StateObject private var volumes = VolumeMonitor()
+    @StateObject private var navigation = PFNavigationState()
+    @AppStorage(PFAppearance.themeKey) private var themeRaw = PFColorTheme.system.rawValue
+    @AppStorage(PFAppearance.glassKey) private var glassEnabled = true
+    private var selectedTheme: PFColorTheme { PFColorTheme(rawValue: themeRaw) ?? .system }
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack(spacing: 12) { Image(nsImage: AppBrand.logo).resizable().scaledToFit().frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 12)); Text("Ponte Fotos").font(.title2.bold()) }
-                Text("Suas memórias, com a história inteira.").font(.title3).foregroundStyle(.secondary)
-                Divider()
-                Button { model.openManagement() } label: { Label("Gerenciar Immich", systemImage: "photo.on.rectangle.angled") }.buttonStyle(.plain).disabled(model.busy || !model.serverReady)
-                Button { Task { await model.connectLibrary() } } label: { Label("Biblioteca Apple", systemImage: "photo.stack") }.buttonStyle(.plain).disabled(model.busy)
-                Divider()
-                HStack { Text("DISCOS E PASTAS").font(.caption.bold()).foregroundStyle(.secondary); Spacer(); Button { volumes.refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain) }
-                if volumes.volumes.isEmpty { Text("Nenhum disco externo conectado").font(.caption).foregroundStyle(.secondary) }
-                ForEach(volumes.volumes) { volume in
-                    Button { Task { await model.chooseFolder(on: volume) } } label: { Label(volume.name, systemImage: "externaldrive.fill").lineLimit(1) }.buttonStyle(.plain).disabled(model.busy)
+            sidebar
+            Divider()
+            VStack(alignment: .leading, spacing: 0) {
+                pageHeader.padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 18)
+                if navigation.settings {
+                    PFSettingsView(model: model, themeRaw: $themeRaw, glassEnabled: $glassEnabled)
+                } else {
+                    HStack(alignment: .top, spacing: 16) { sourcePanel; destinationPanel }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 24).padding(.bottom, 18)
+                    libraryPanel.padding(.horizontal, 24).padding(.bottom, 16)
+                    footer
                 }
-                Button("Escolher pasta…", systemImage: "folder") { Task { await model.chooseFolder() } }.disabled(model.busy)
-                if let source = model.sourceName { Text("Origem: \(source)").font(.caption).foregroundStyle(.teal).lineLimit(2) }
-                Label("2  Originais + metadados", systemImage: "doc.badge.gearshape")
-                Label("3  Immich", systemImage: "externaldrive.badge.checkmark")
-                Spacer()
-                Text("Originais preservados\nLive Photos e RAW\nXMP com data e GPS").font(.callout).foregroundStyle(.secondary)
-                Text("Versão 0.5 · gestão Immich").font(.caption).foregroundStyle(.secondary)
-            }.padding(28).frame(width: 260).frame(maxHeight: .infinity).background(.regularMaterial)
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Suas fotos para o Immich").font(.largeTitle.bold())
-                        Text("Escolha, revise e acompanhe cada envio.").foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Abrir biblioteca", systemImage: "photo") { Task { await model.connectLibrary() } }.disabled(model.busy)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack {
-                            Picker("Conexão", selection: $model.profile.mode) {
-                                ForEach(ConnectionMode.allCases) { Text($0.label).tag($0) }
-                            }.frame(maxWidth: 320)
-                            Label(model.connectionLabel, systemImage: "network").font(.callout)
-                            Spacer()
-                            Button("Testar conexão") { Task { await model.testConnection() } }
-                        }
-                        VStack(alignment: .leading) {
-                            Picker("Conexão", selection: $model.profile.mode) {
-                                ForEach(ConnectionMode.allCases) { Text($0.label).tag($0) }
-                            }
-                            Label(model.connectionLabel, systemImage: "network").font(.callout)
-                            Button("Testar conexão") { Task { await model.testConnection() } }
-                        }
-                    }.disabled(model.busy)
-                    Text(model.serverReady ? "Endereço em uso: \(model.address)" : "Escolha o modo e teste a conexão.")
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                    DisclosureGroup("Configurar URLs, Wi-Fi e chave", isExpanded: $model.showConnectionSettings) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            LabeledContent("URL local") { TextField("http://immich.local:2283", text: $model.profile.localAddress) }
-                            LabeledContent("URL remota") { TextField("http://servidor:porta", text: $model.profile.remoteAddress) }
-                            LabeledContent("Wi-Fi de casa") { TextField("Nome exato da rede", text: $model.profile.homeSSID) }
-                            HStack {
-                                Text(model.wifiName.map { "Wi-Fi atual: \($0)" } ?? model.wifiStatus).font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Button("Permitir identificar Wi-Fi") { model.requestWifiPermission() }
-                            }
-                            Text("No Automático, o Wi-Fi de casa usa a URL local e recorre à remota se ela não responder. Em outras redes ou sem identificar o Wi-Fi, usa a remota. Uma mudança durante o envio pausa o lote após o item atual.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                            LabeledContent("Chave de API") { SecureField("Chave da sua conta Immich", text: $model.apiKey) }
-                            ViewThatFits(in: .horizontal) {
-                                HStack {
-                                    Button("Salvar configuração", systemImage: "key.fill") { model.saveConnection() }.disabled(model.apiKey.isEmpty)
-                                    if model.connectionSaved { Button("Esquecer conexão salva") { model.forgetConnection() } }
-                                    Text("Protegida pelo Chaves do macOS").font(.caption).foregroundStyle(.secondary)
-                                }
-                                VStack(alignment: .leading) {
-                                    Button("Salvar configuração", systemImage: "key.fill") { model.saveConnection() }.disabled(model.apiKey.isEmpty)
-                                    if model.connectionSaved { Button("Esquecer conexão salva") { model.forgetConnection() } }
-                                }
-                            }
-                        }.padding(.top, 8).textFieldStyle(.roundedBorder).disabled(model.busy)
-                    }
-                }
-                .onChange(of: model.profile) { previous, _ in model.connectionSettingsChanged(previous: previous) }
-                HStack {
-                    if let source = model.sourceName { Label(source, systemImage: "externaldrive").lineLimit(1) }
-                    else { Picker("Origem · Fotos", selection: $model.album) { ForEach(model.albums) { Text($0.title).tag($0.id) } }.frame(maxWidth: 340) }
-                    Toggle("Baixar originais do iCloud", isOn: $model.allowCloud).disabled(model.sourceName != nil)
-                    Spacer()
-                    Text("\(model.selection.count) selecionados").monospacedDigit()
-                }.disabled(model.busy).onChange(of: model.album) { model.loadAlbum() }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Picker("Destino · Immich", selection: $model.destination) {
-                            ForEach(UploadDestination.allCases) { Text($0.label).tag($0) }
-                        }.frame(maxWidth: 360)
-                        if model.destination == .existing {
-                            Picker("Álbum", selection: $model.remoteAlbumID) {
-                                if model.remoteAlbums.isEmpty { Text("Nenhum álbum").tag("") }
-                                ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? " · compartilhado" : "")).tag($0.id) }
-                            }
-                            Button("Atualizar", systemImage: "arrow.clockwise") { Task { await model.refreshAlbums() } }.disabled(!model.serverReady)
-                        }
-                        if model.destination == .new { TextField("Nome do novo álbum", text: $model.newAlbumName).textFieldStyle(.roundedBorder) }
-                    }
-                    if model.destination == .existing { Text(model.albumStatus).font(.caption).foregroundStyle(.secondary) }
-                    if model.destination == .timeline { Text("Os itens ficam na linha do tempo. Vínculos existentes com outros álbuns são mantidos.").font(.caption).foregroundStyle(.secondary) }
-                }.disabled(model.busy)
-                HStack {
-                    Text("Selecione uma foto para completar data e localização.").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Revisar selecionada", systemImage: "pencil") { model.reviewSelection() }.disabled(model.busy || model.selection.isEmpty)
-                }
-                List(model.items, selection: $model.selection) { item in
-                    let metadata = model.metadata(for: item)
-                    HStack(spacing: 14) {
-                        PhotoThumbnail(item: item)
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack {
-                                Text(item.title).fontWeight(.semibold).lineLimit(1)
-                                if item.live { Text("LIVE").font(.caption.bold()).foregroundStyle(.teal) }
-                                if item.raw { Text("RAW").font(.caption.bold()).foregroundStyle(.orange) }
-                            }
-                            Text(metadata.date?.formatted(date: .abbreviated, time: .standard) ?? "SEM DATA DE CAPTURA · preencha na revisão").font(.callout).foregroundStyle(metadata.date == nil ? Color.orange : Color.primary)
-                            if metadata.date == nil && metadata.latitude == nil { Text("Sem data/GPS de captura detectáveis").font(.caption.bold()).foregroundStyle(.orange) }
-                            if let external = item.external, !external.note.isEmpty { Text(external.note).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                            Text(item.fileNames).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 5) {
-                            if let lat = metadata.latitude, let lon = metadata.longitude {
-                                Text(String(format: "%.5f, %.5f", lat, lon)).font(.caption.monospaced())
-                            } else { Text("Adicionar localização").font(.caption).foregroundStyle(.orange) }
-                            Text(model.results[item.id] ?? "Pronto para revisar").font(.caption).foregroundStyle(.secondary).frame(maxWidth: 240, alignment: .trailing)
-                        }
-                        Button("Revisar", systemImage: "pencil") { model.editing = item }.buttonStyle(.bordered).help("Preencher data, hora e localização")
-                    }.padding(.vertical, 5).tag(item.id)
-                    .contextMenu { Button("Revisar data e localização") { model.editing = item } }
-                }.overlay {
-                    if model.items.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "photo.stack").font(.system(size: 38)).foregroundStyle(.teal)
-                            Text(model.sourceName != nil ? "Nenhuma mídia encontrada" : model.connected ? "Nenhuma foto neste álbum" : "Escolha sua origem").font(.title2.bold())
-                            Text(model.sourceName != nil ? "Escolha outra pasta ou confira as permissões do disco." : model.connected ? "Escolha outro álbum para continuar." : "Abra o Fotos ou escolha um disco/pasta na lateral.").foregroundStyle(.secondary)
-                        }.allowsHitTesting(false)
-                    }
-                }.listStyle(.inset).clipShape(RoundedRectangle(cornerRadius: 14)).disabled(model.busy)
-                if model.busy { ProgressView(value: model.progress).tint(.teal); HStack { ProgressView().controlSize(.small); Text(model.status).font(.callout) } }
-                else { Text(model.status).font(.callout).foregroundStyle(.secondary).textSelection(.enabled) }
-                HStack {
-                    Button("Carregar mais") { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy)
-                    Button("Selecionar visíveis") { model.selection = Set(model.items.map(\.id)) }.disabled(model.busy)
-                    Spacer()
-                    if model.busy {
-                        Button(model.scanning ? "Parar análise" : "Pausar após este item") { model.stopRequested = true; model.cancelScan() }
-                    } else {
-                        Button("Exportar com XMP…") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
-                        Button("Enviar selecionados", systemImage: "arrow.up.circle.fill") { model.showUpload = true }.buttonStyle(.borderedProminent).tint(.teal).disabled(!model.canSend)
-                    }
-                }
-            }.padding(28).frame(minWidth: 720)
-        }.frame(minWidth: 1050, minHeight: 700)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(PFTheme.background).tint(PFTheme.accent)
+        .environment(\.pfGlassEnabled, glassEnabled)
+        .preferredColorScheme(selectedTheme.colorScheme)
+        .frame(minWidth: 900, minHeight: 650)
+        .onChange(of: model.profile) { previous, _ in model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
+        .onChange(of: model.apiKey) { _, _ in model.prepareManagementSession() }
+        .onChange(of: model.address) { _, _ in model.prepareManagementSession() }
+        .onChange(of: model.serverReady) { _, _ in model.prepareManagementSession() }
+        .onChange(of: model.busy) { _, busy in if !busy { model.prepareManagementSession() } }
+        .onReceive(NotificationCenter.default.publisher(for: .pfOpenSettings)) { _ in
+            if !model.busy { navigation.settings = true }
+        }
         .sheet(item: $model.editing) { item in
             ReviewEditor(item: item, metadata: model.metadata(for: item), save: { try model.saveReview($0, id: item.id) }, restore: { try model.saveReview(nil, id: item.id) }, dismiss: { model.editing = nil })
+                .preferredColorScheme(selectedTheme.colorScheme)
+                .environment(\.pfGlassEnabled, glassEnabled)
         }
-        .sheet(isPresented: $model.showManagement, onDismiss: { model.managementModel = nil }) {
+        .sheet(isPresented: $model.showManagement, onDismiss: { model.managementModel?.endReview() }) {
             if let workspace = model.managementModel {
                 ImmichWorkspaceView(model: workspace, address: model.address, connectionReady: model.serverReady)
                     .disabled(model.busy && !model.managementBusy)
                     .interactiveDismissDisabled(model.managementBusy)
+                    .preferredColorScheme(selectedTheme.colorScheme)
+                    .environment(\.pfGlassEnabled, glassEnabled)
             }
         }
         .confirmationDialog("Enviar \(model.selection.count) itens para o Immich?", isPresented: $model.showUpload, titleVisibility: .visible) {
@@ -610,8 +500,195 @@ struct ContentView: View {
             Text("Destino: \(model.address) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação.")
         }
     }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(nsImage: AppBrand.logo).resizable().scaledToFit().frame(width: 38, height: 38)
+                    .clipShape(RoundedRectangle(cornerRadius: 10)).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ponte Fotos").font(.system(size: 16, weight: .semibold))
+                    Text("Sua biblioteca, conectada.").font(.caption).foregroundStyle(.secondary)
+                }
+            }.padding(.bottom, 28)
+            Text("BIBLIOTECA").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
+            sidebarAction("Fotos da Apple", icon: "photo.stack", selected: !navigation.settings && model.connected && model.sourceName == nil) { navigation.settings = false; Task { await model.connectLibrary() } }.disabled(model.busy)
+            sidebarAction("Discos e pastas", icon: "folder", selected: !navigation.settings && model.sourceName != nil) { navigation.settings = false; Task { await model.chooseFolder() } }.disabled(model.busy)
+            Divider().padding(.vertical, 18)
+            Text("IMMICH").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
+            sidebarAction("Gerenciar biblioteca", icon: "square.grid.2x2") { model.openManagement() }
+                .disabled(model.busy || !model.serverReady)
+                .help(model.serverReady ? "Duplicatas, álbuns, pessoas e histórico" : "Teste a conexão para gerenciar o Immich")
+            HStack {
+                Text("DISPOSITIVOS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button { volumes.refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("Atualizar dispositivos").accessibilityLabel("Atualizar dispositivos")
+            }.padding(.horizontal, 10).padding(.top, 28).padding(.bottom, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 5) {
+                    if volumes.volumes.isEmpty {
+                        Text("Os discos conectados\naparecem aqui.").font(.caption).foregroundStyle(.secondary).padding(10)
+                    }
+                    ForEach(volumes.volumes) { volume in
+                        sidebarAction(volume.name, icon: "externaldrive") { navigation.settings = false; Task { await model.chooseFolder(on: volume) } }.disabled(model.busy)
+                    }
+                }
+            }
+            Spacer(minLength: 16)
+            sidebarAction("Configurações", icon: "gearshape", selected: navigation.settings) { navigation.settings = true }.disabled(model.busy)
+            Divider().padding(.vertical, 12)
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
+                Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
+                Text("Ponte Fotos 0.8").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+            }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+        }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
+    }
+    private func sidebarAction(_ title: String, icon: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 15, weight: .medium)).frame(width: 20)
+                Text(title).font(.system(size: 13, weight: selected ? .semibold : .regular)).lineLimit(1)
+                Spacer(minLength: 0)
+            }.foregroundStyle(selected ? PFTheme.accent : Color.primary)
+                .padding(.horizontal, 10).padding(.vertical, 10).contentShape(RoundedRectangle(cornerRadius: 9))
+                .background(selected ? PFTheme.accent.opacity(0.1) : Color.clear, in: RoundedRectangle(cornerRadius: 9))
+        }.buttonStyle(.plain)
+    }
+    private var pageHeader: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(navigation.settings ? "Configurações" : "Sua biblioteca").font(.system(size: 27, weight: .semibold))
+                Text(navigation.settings ? "Conexão, contas e aparência em um só lugar." : "Escolha, revise e envie suas fotos para o Immich.").font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if navigation.settings {
+                Button("Voltar às fotos", systemImage: "arrow.left") { navigation.settings = false }.controlSize(.large).disabled(model.busy)
+            } else {
+                Button { navigation.settings = true } label: {
+                    Label(model.serverReady ? model.connectionLabel : "Configurar conexão", systemImage: model.serverReady ? "checkmark.icloud" : "network")
+                        .lineLimit(1)
+                }.disabled(model.busy).help("Abrir configurações de conexão")
+            }
+        }
+    }
+    private var sourcePanel: some View {
+        PFCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PFSectionHeading("Origem", systemImage: model.sourceName == nil ? "photo.stack" : "folder")
+                if let source = model.sourceName { Text(source).font(.callout.weight(.medium)).lineLimit(2) }
+                else {
+                    Picker("Álbum do Fotos", selection: $model.album) { ForEach(model.albums) { Text($0.title).tag($0.id) } }.labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
+                }
+                Toggle("Baixar originais do iCloud", isOn: $model.allowCloud).font(.caption).disabled(model.sourceName != nil)
+            }
+        }.disabled(model.busy).onChange(of: model.album) { model.loadAlbum() }
+    }
+    private var destinationPanel: some View {
+        PFCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PFSectionHeading("Destino", systemImage: "externaldrive.badge.icloud")
+                Picker("Destino no Immich", selection: $model.destination) { ForEach(UploadDestination.allCases) { Text($0.label).tag($0) } }.labelsHidden().controlSize(.large)
+                if model.destination == .existing {
+                    HStack {
+                        Picker("Álbum de destino", selection: $model.remoteAlbumID) {
+                            if model.remoteAlbums.isEmpty { Text("Nenhum álbum").tag("") }
+                            ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? " · compartilhado" : "")).tag($0.id) }
+                        }.labelsHidden()
+                        Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help("Atualizar álbuns").accessibilityLabel("Atualizar álbuns").disabled(!model.serverReady)
+                    }
+                    Text(model.albumStatus).font(.caption).foregroundStyle(.secondary)
+                }
+                if model.destination == .new { TextField("Nome do novo álbum", text: $model.newAlbumName).textFieldStyle(.roundedBorder) }
+                if model.destination == .timeline { Text("Na linha do tempo, preservando os álbuns existentes.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            }
+        }.disabled(model.busy)
+    }
+    private var libraryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Fotos e vídeos").font(.headline)
+                PFBadge("\(model.selection.count) selecionados")
+                Spacer()
+                Button("Revisar", systemImage: "slider.horizontal.3") { model.reviewSelection() }.disabled(model.busy || model.selection.isEmpty)
+            }
+            List(model.items, selection: $model.selection) { item in
+                photoRow(item).tag(item.id).contextMenu { Button("Revisar data e localização") { model.editing = item } }
+            }.listStyle(.inset).scrollContentBackground(.hidden)
+                .background(PFTheme.surface, in: RoundedRectangle(cornerRadius: PFTheme.corner))
+                .overlay(RoundedRectangle(cornerRadius: PFTheme.corner).strokeBorder(PFTheme.separator, lineWidth: 0.5))
+                .overlay {
+                    if model.items.isEmpty {
+                        PFEmptyState(model.sourceName != nil ? "Nenhuma mídia encontrada" : model.connected ? "Nenhuma foto neste álbum" : "Suas memórias começam aqui", detail: model.sourceName != nil ? "Escolha outra pasta ou confira o acesso ao disco." : model.connected ? "Escolha outro álbum para continuar." : "Abra a biblioteca do Fotos ou escolha uma pasta na barra lateral.", systemImage: "photo.on.rectangle.angled").allowsHitTesting(false)
+                    }
+                }.frame(minHeight: 180).disabled(model.busy)
+            HStack(spacing: 14) {
+                Button("Carregar mais") { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy)
+                Button("Selecionar visíveis") { model.selection = Set(model.items.map(\.id)) }.disabled(model.busy)
+                Spacer()
+                Text("\(model.items.count) itens carregados").font(.caption).foregroundStyle(.secondary)
+            }.buttonStyle(.borderless)
+        }
+    }
+    private func photoRow(_ item: PhotoItem) -> some View {
+        let metadata = model.metadata(for: item)
+        return HStack(spacing: 14) {
+            PhotoThumbnail(item: item)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(item.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    if item.live { PFBadge("Live", systemImage: "livephoto") }
+                    if item.raw { PFBadge("RAW", color: .orange) }
+                }
+                Text(metadata.date?.formatted(date: .abbreviated, time: .shortened) ?? "Complete a data de captura").font(.caption).foregroundStyle(metadata.date == nil ? Color.orange : Color.secondary)
+                Text(item.fileNames).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                if let external = item.external, !external.note.isEmpty { Text(external.note).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 5) {
+                if let lat = metadata.latitude, let lon = metadata.longitude { Label(String(format: "%.4f, %.4f", lat, lon), systemImage: "location").font(.caption.monospaced()).foregroundStyle(.secondary) }
+                else { Label("Sem localização", systemImage: "location.slash").font(.caption).foregroundStyle(.orange) }
+                Text(model.results[item.id] ?? "Pronto para revisar").font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth: 170, alignment: .trailing)
+            }
+            Button { model.editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help("Revisar data e localização").accessibilityLabel("Revisar \(item.title)")
+        }.padding(.vertical, 8)
+    }
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if model.busy { ProgressView(value: model.progress).tint(PFTheme.accent) }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 20) { status; Spacer(minLength: 20); footerActions }
+                VStack(alignment: .leading, spacing: 12) { status; HStack { Spacer(); footerActions } }
+            }
+        }.padding(.horizontal, 24).padding(.vertical, 16).modifier(PFNavigationSurface())
+            .overlay(alignment: .top) { Rectangle().fill(PFTheme.separator).frame(height: 0.5) }
+    }
+    private var status: some View {
+        HStack(alignment: .top, spacing: 8) {
+            if model.busy { ProgressView().controlSize(.small) }
+            else { Image(systemName: "info.circle").foregroundStyle(.secondary).accessibilityHidden(true) }
+            Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled)
+        }
+    }
+    private var footerActions: some View {
+        HStack(spacing: 10) {
+            if model.busy {
+                Button(model.scanning ? "Parar análise" : "Pausar após este item") { model.stopRequested = true; model.cancelScan() }
+            } else {
+                Button("Exportar XMP…", systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
+                Button("Enviar selecionados", systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.borderedProminent).disabled(!model.canSend)
+            }
+        }.controlSize(.large)
+    }
 }
 @main struct PonteFotosApp: App {
     init() { NSApplication.shared.setActivationPolicy(.regular); NSApplication.shared.applicationIconImage = AppBrand.logo }
-    var body: some Scene { WindowGroup { ContentView() }.defaultSize(width: 1150, height: 780) }
+    var body: some Scene { WindowGroup { ContentView() }.defaultSize(width: 1180, height: 800)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Configurações…") { NotificationCenter.default.post(name: .pfOpenSettings, object: nil) }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+        } }
 }

@@ -42,6 +42,12 @@ final class IMWorkspaceModel: ObservableObject {
         }
         connectionReady = ready
     }
+    func endReview() {
+        guard !busy else { return }
+        duplicates = nil; comparison = nil; age = nil
+        duplicateChoices = [:]; comparisonChoices = [:]; ageChoices = []
+        ui.reviewKind = nil; ui.reviewAccepted = false; error = nil
+    }
     var session: IMSession { IMSession(address: address, profileID: profileID, credentials: credentials) }
     func name(_ id: String) -> String {
         if let account = credentials.first(where: { $0.account.id == id }) { return account.account.name }
@@ -229,11 +235,11 @@ struct ImmichWorkspaceView: View {
         currentAddress = address; currentReady = connectionReady
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             header
             Picker("Área", selection: $ui.tab) {
                 ForEach(["Álbuns", "Comparar álbuns", "Pessoa e idade", "Contas e API", "Histórico"], id: \.self) { Text($0).tag($0) }
-            }.pickerStyle(.segmented).disabled(model.busy)
+            }.pickerStyle(.segmented).controlSize(.large).disabled(model.busy)
             if model.busy { HStack { ProgressView().controlSize(.small); Text(model.progress).font(.callout); Spacer(); if model.canCancel { Button("Cancelar consulta") { model.cancelQuery() } } } }
             if let error = model.error {
                 HStack(alignment: .top) { Image(systemName: "exclamationmark.triangle.fill"); Text(error).textSelection(.enabled); Spacer(); Button("Dispensar") { model.error = nil } }.foregroundStyle(.red).padding(12).background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -246,10 +252,11 @@ struct ImmichWorkspaceView: View {
                     case "Pessoa e idade": ageView
                     default: albumSelector; if ui.tab == "Álbuns" { duplicatesView } else { comparisonView }
                     }
-                }.padding(.bottom, 12)
+                }.padding(.bottom, 20).padding(.horizontal, 2)
             }.disabled(model.busy)
         }
-        .padding(24).frame(minWidth: 820, idealWidth: 1060, minHeight: 660, idealHeight: 820)
+        .padding(24).frame(minWidth: 760, idealWidth: 1060, minHeight: 660, idealHeight: 820)
+        .background(PFTheme.background).tint(PFTheme.accent)
         .onAppear { model.updateConnection(address: currentAddress, ready: currentReady); model.load() }
         .onChange(of: currentAddress) { _, value in model.updateConnection(address: value, ready: currentReady) }
         .onChange(of: currentReady) { _, value in model.updateConnection(address: currentAddress, ready: value) }
@@ -257,52 +264,89 @@ struct ImmichWorkspaceView: View {
         .sheet(isPresented: Binding(get: { ui.reviewKind != nil }, set: { if !$0 { ui.reviewKind = nil } })) { reviewView }
     }
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Gerenciar Immich").font(.title2.bold())
-                Text("Revise suas fotos, preserve os originais e organize seus álbuns.").foregroundStyle(.secondary)
-                Text(model.address).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: "photo.stack.fill")
+                .font(.system(size: 25, weight: .medium)).foregroundStyle(PFTheme.accent)
+                .frame(width: 52, height: 52).background(PFTheme.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Gerenciar Immich").font(.system(size: 26, weight: .bold))
+                Text("Suas memórias, organizadas com cuidado.").foregroundStyle(.secondary)
+                Label(model.address, systemImage: model.connectionReady ? "checkmark.circle.fill" : "network")
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled).lineLimit(2)
             }
-            Spacer()
-            Button("Concluir") { dismiss() }.disabled(model.busy)
+            Spacer(minLength: 8)
+            Button("Concluir") { dismiss() }.controlSize(.large).disabled(model.busy)
         }
     }
     private var filteredAlbums: [IMAlbum] {
         model.albums.filter { (ui.owner.isEmpty || $0.ownerID == ui.owner) && (ui.albumSearch.isEmpty || $0.name.localizedCaseInsensitiveContains(ui.albumSearch)) }
     }
     private var albumSelector: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TextField("Buscar álbum", text: $ui.albumSearch)
-                    Picker("Proprietário", selection: $ui.owner) {
-                        Text("Todos").tag("")
-                        ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) }
-                    }.frame(maxWidth: 270)
-                    Button("Atualizar álbuns") { model.refresh() }.disabled(model.credentials.isEmpty || !model.connectionReady)
+        PFCard {
+            VStack(alignment: .leading, spacing: 16) {
+                PFSectionHeading("Seus álbuns", subtitle: "Escolha os álbuns que deseja revisar.", systemImage: "rectangle.stack")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { albumSearch; ownerPicker; refreshAlbums }
+                    VStack(alignment: .leading, spacing: 12) { albumSearch; HStack { ownerPicker; Spacer(); refreshAlbums } }
                 }
-                if model.credentials.isEmpty { Text("Conecte as contas proprietárias em Contas e API para comparar suas cópias.").foregroundStyle(.secondary) }
-                ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(filteredAlbums) { album in
-                    Toggle(isOn: Binding(get: { ui.selectedAlbums.contains(album.id) }, set: { if $0 { ui.selectedAlbums.insert(album.id) } else { ui.selectedAlbums.remove(album.id) } })) {
-                        HStack { Text(album.name).bold(); Text("\(model.name(album.ownerID)) · \(album.count) itens").foregroundStyle(.secondary); Spacer(); if album.shared { Text("Compartilhado").font(.caption) } }
-                    }
+                if model.credentials.isEmpty {
+                    Label("Conecte as contas em Contas e API para comparar suas cópias.", systemImage: "person.crop.circle.badge.plus").font(.callout).foregroundStyle(.secondary)
                 }
+                if !filteredAlbums.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(filteredAlbums) { album in
+                                Toggle(isOn: Binding(get: { ui.selectedAlbums.contains(album.id) }, set: { if $0 { ui.selectedAlbums.insert(album.id) } else { ui.selectedAlbums.remove(album.id) } })) {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: album.shared ? "person.2.crop.square.stack" : "rectangle.stack").foregroundStyle(PFTheme.accent).frame(width: 24)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(album.name).fontWeight(.semibold)
+                                            Text("\(model.name(album.ownerID)) · \(album.count) itens").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer(minLength: 4)
+                                        if album.shared { PFBadge("Compartilhado", systemImage: "person.2") }
+                                    }.padding(.vertical, 10)
+                                }.toggleStyle(.checkbox)
+                                if album.id != filteredAlbums.last?.id { Divider() }
+                            }
+                        }
+                    }.frame(height: min(CGFloat(filteredAlbums.count) * 66, 240))
                 }
-                }.frame(maxHeight: 250)
-                HStack {
-                    Button("Selecionar visíveis") { ui.selectedAlbums.formUnion(filteredAlbums.map(\.id)) }
-                    Button("Limpar seleção") { ui.selectedAlbums = [] }
-                    Spacer()
-                    Button(ui.tab == "Álbuns" ? "Consultar duplicatas · \(ui.selectedAlbums.count) álbuns" : "Comparar seleção") {
-                        ui.duplicatePage = 0; ui.comparisonPage = 0
-                        if ui.tab == "Álbuns" { model.scanDuplicates(ui.selectedAlbums) } else { model.scanComparison(ui.selectedAlbums) }
-                    }.buttonStyle(.borderedProminent).disabled(!model.connectionReady || ui.selectedAlbums.isEmpty || (ui.tab != "Álbuns" && ui.selectedAlbums.count != 2))
+                Divider()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { albumSelectionButtons; Spacer(minLength: 12); scanAlbumsButton }
+                    VStack(alignment: .leading, spacing: 12) { albumSelectionButtons; scanAlbumsButton }
                 }
-                Text(ui.tab == "Álbuns" ? "Arquivos idênticos por checksum, entre todas as contas conectadas. Live Photos são identificadas e protegidas." : "Selecione exatamente dois álbuns. A organização altera apenas os vínculos com os álbuns; os arquivos permanecem na biblioteca.").font(.caption).foregroundStyle(.secondary)
-            }.padding(8)
+                Text(ui.tab == "Álbuns" ? "Arquivos idênticos por checksum, entre todas as contas conectadas. Live Photos são identificadas e protegidas." : "Selecione exatamente dois álbuns. A organização altera apenas os vínculos com os álbuns; os arquivos permanecem na biblioteca.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+    private var albumSearch: some View {
+        HStack(spacing: 8) { Image(systemName: "magnifyingglass").foregroundStyle(.secondary); TextField("Buscar álbum", text: $ui.albumSearch).textFieldStyle(.plain) }
+            .padding(9).background(PFTheme.background, in: RoundedRectangle(cornerRadius: 9)).frame(minWidth: 180)
+    }
+    private var ownerPicker: some View {
+        Picker("Proprietário", selection: $ui.owner) {
+            Text("Todos").tag("")
+            ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) }
+        }.frame(maxWidth: 270)
+    }
+    private var refreshAlbums: some View {
+        Button { model.refresh() } label: { Label("Atualizar álbuns", systemImage: "arrow.clockwise") }.disabled(model.credentials.isEmpty || !model.connectionReady)
+    }
+    private var albumSelectionButtons: some View {
+        HStack(spacing: 12) {
+            Button("Selecionar visíveis") { ui.selectedAlbums.formUnion(filteredAlbums.map(\.id)) }
+            Button("Limpar seleção") { ui.selectedAlbums = [] }.foregroundStyle(.secondary)
+        }
+    }
+    private var scanAlbumsButton: some View {
+        Button {
+            ui.duplicatePage = 0; ui.comparisonPage = 0
+            if ui.tab == "Álbuns" { model.scanDuplicates(ui.selectedAlbums) } else { model.scanComparison(ui.selectedAlbums) }
+        } label: {
+            Label(ui.tab == "Álbuns" ? "Consultar duplicatas · \(ui.selectedAlbums.count) álbuns" : "Comparar seleção", systemImage: ui.tab == "Álbuns" ? "square.on.square" : "rectangle.on.rectangle")
+        }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!model.connectionReady || ui.selectedAlbums.isEmpty || (ui.tab != "Álbuns" && ui.selectedAlbums.count != 2))
     }
     private var duplicatesView: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -323,21 +367,23 @@ struct ImmichWorkspaceView: View {
         }
     }
     private func duplicateGroup(_ group: IMDuplicateGroup) -> some View {
-        GroupBox {
+        PFCard {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Revisar grupo · \(group.assets.count) cópias", isOn: Binding(get: { model.duplicateChoices[group.id] != nil }, set: { model.duplicateChoices[group.id] = $0 ? group.keepID : nil })).font(.headline).disabled(!group.unavailableOwnerIDs.isEmpty)
                 if !group.unavailableOwnerIDs.isEmpty { Text("Conecte em Contas e API: " + group.unavailableOwnerIDs.map { model.name($0) }.joined(separator: ", ") + ". Depois, refaça a consulta para alterar este grupo.").font(.caption).foregroundStyle(.orange) }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), alignment: .top)], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
                     ForEach(group.assets) { asset in
                         VStack(alignment: .leading, spacing: 10) {
                             assetCard(asset)
                             Button {
                                 model.duplicateChoices[group.id] = asset.id
                             } label: { Label(model.duplicateChoices[group.id] == asset.id ? "Manter esta cópia" : "Escolher para manter", systemImage: model.duplicateChoices[group.id] == asset.id ? "largecircle.fill.circle" : "circle") }
-                        }.disabled(!group.unavailableOwnerIDs.isEmpty).padding(10).background(RoundedRectangle(cornerRadius: 10).stroke(model.duplicateChoices[group.id] == asset.id ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: 1))
+                        }.disabled(!group.unavailableOwnerIDs.isEmpty).padding(10)
+                            .background(model.duplicateChoices[group.id] == asset.id ? PFTheme.accent.opacity(0.05) : PFTheme.background, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(model.duplicateChoices[group.id] == asset.id ? PFTheme.accent : PFTheme.separator, lineWidth: model.duplicateChoices[group.id] == asset.id ? 2 : 1))
                     }
                 }
-            }.padding(8)
+            }
         }
     }
     private var comparisonGroups: [IMComparisonGroup] { model.comparison?.groups.filter { ui.allComparison || $0.common } ?? [] }
@@ -348,15 +394,15 @@ struct ImmichWorkspaceView: View {
                 Text("\(comparisonGroups.count) grupos visíveis · \(result.skipped) itens fora da análise").font(.headline)
                 Text("Cada grupo começa sem alteração. Escolha um destino para reunir as cópias nesse álbum ou manter nos dois. Live Photos, pilhas, arquivos offline e editados ficam fora da análise.").foregroundStyle(.secondary)
                 ForEach(page(comparisonGroups, ui.comparisonPage)) { group in
-                    GroupBox {
+                    PFCard {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(group.common ? "Presente nos dois álbuns" : "Item exclusivo").font(.headline)
                             Picker("Ação", selection: Binding(get: { model.comparisonChoices[group.id] ?? "" }, set: { model.comparisonChoices[group.id] = $0.isEmpty ? nil : $0 })) {
                                 Text("Sem alteração").tag(""); Text("Manter nos dois álbuns").tag("both")
                                 ForEach(result.albums) { Text("Reunir em \($0.name)").tag($0.id) }
                             }
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))]) { ForEach(group.assets) { assetCard($0) } }
-                        }.padding(8)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250))]) { ForEach(group.assets) { assetCard($0) } }
+                        }
                     }
                 }
                 pager(count: comparisonGroups.count, index: $ui.comparisonPage)
@@ -366,55 +412,38 @@ struct ImmichWorkspaceView: View {
     }
     private var ageView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Organizar por pessoa e idade").font(.headline)
+            PFSectionHeading("Pessoa e idade", subtitle: "Reúna cada fase da vida em um álbum.", systemImage: "person.crop.rectangle")
             Text("A idade considera a data da captura e o aniversário registrado no Immich. Os limites são inclusivos. Live Photos, pilhas, arquivos offline e editados ficam fora da análise.").foregroundStyle(.secondary)
             Button("Atualizar álbuns e pessoas") { model.refresh() }.disabled(model.credentials.isEmpty || !model.connectionReady)
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 12) {
+            PFCard {
+            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 16) {
                 GridRow { Text("Conta"); Picker("Conta", selection: $ui.ageAccount) { Text("Todas as contas").tag(""); ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) } }.labelsHidden().onChange(of: ui.ageAccount) { ui.personKey = "" } }
                 GridRow { Text("Pessoa"); Picker("Pessoa", selection: $ui.personKey) { Text("Selecione uma pessoa").tag(""); ForEach(model.people.filter { ui.ageAccount.isEmpty || $0.accountID == ui.ageAccount }, id: \.key) { Text("\($0.name) · \(model.name($0.accountID))").tag($0.key) } }.labelsHidden() }
                 GridRow { Text("Aniversário"); Text(model.people.first { $0.key == ui.personKey }?.birthDate ?? "Cadastre a data de nascimento no Immich.").foregroundStyle(.secondary) }
                 GridRow { Text("Origem"); Picker("Origem", selection: $ui.sourceID) { Text("Todos os álbuns acessíveis").tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.labelsHidden() }
                 GridRow { Text("Destino"); Picker("Destino", selection: $ui.destinationID) { Text("Selecione um álbum").tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.labelsHidden() }
-                GridRow { Text("Idade em anos"); HStack { Stepper("De \(ui.minAge)", value: $ui.minAge, in: 0...150); Stepper("Até \(ui.maxAge)", value: $ui.maxAge, in: 0...150) } }
+                GridRow { Text("Idade em anos"); HStack { Stepper("De \(ui.minAge)", value: $ui.minAge, in: 0...150).frame(maxWidth: 180); Spacer(minLength: 20); Stepper("Até \(ui.maxAge)", value: $ui.maxAge, in: 0...150).frame(maxWidth: 180) } }
+            }
             }
             Button("Buscar fotos") { ui.agePage = 0; model.searchAge(personKey: ui.personKey, sourceID: ui.sourceID, destinationID: ui.destinationID, min: ui.minAge, max: ui.maxAge) }.buttonStyle(.borderedProminent).disabled(!model.connectionReady || ui.personKey.isEmpty || ui.destinationID.isEmpty || ui.sourceID == ui.destinationID || ui.minAge > ui.maxAge || model.people.first { $0.key == ui.personKey }?.birthDate == nil)
             if let result = model.age {
                 Text("\(result.assets.count) fotos · \(result.skipped) itens fora da análise · destino: \(result.destination.name)").font(.headline)
                 HStack { Button("Selecionar todas") { model.ageChoices = Set(result.assets.map(\.id)) }; Button("Desmarcar todas") { model.ageChoices = [] }; Spacer(); Button("Revisar movimentação") { openReview("age") }.disabled(!model.connectionReady || model.ageChoices.isEmpty) }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280))]) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250))]) {
                     ForEach(page(result.assets, ui.agePage)) { asset in VStack(alignment: .leading) { Toggle("Mover para \(result.destination.name)", isOn: Binding(get: { model.ageChoices.contains(asset.id) }, set: { if $0 { model.ageChoices.insert(asset.id) } else { model.ageChoices.remove(asset.id) } })); assetCard(asset) } }
                 }
                 pager(count: result.assets.count, index: $ui.agePage)
             }
         }
     }
-    private var accountsView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Contas conectadas a este servidor").font(.headline)
-            Text("As chaves adicionais ficam no Chaves do macOS. Conecte cada proprietário para analisar suas fotos e executar ações em sua conta.").foregroundStyle(.secondary)
-            Button("Usar conta da conexão atual") { model.connect(key: model.primaryKey, persist: false) }.disabled(!model.connectionReady || model.primaryKey.isEmpty)
-            Text("A conta atual é verificada e usada apenas nesta sessão. Use o campo abaixo para salvar uma conta neste perfil.").font(.caption).foregroundStyle(.secondary)
-            ForEach(model.credentials.map(\.account)) { account in
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack { Label(account.name, systemImage: "person.crop.circle").font(.headline); Spacer(); Button("Desconectar") { model.disconnect(account.id) } }
-                        if let scopes = model.scopes[account.id] { Text("Permissões: " + scopes.sorted().joined(separator: ", ")).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-                        else { Text("Conta salva. As permissões são verificadas novamente antes das ações.").font(.caption).foregroundStyle(.secondary) }
-                    }.padding(8)
-                }
-            }
-            Divider()
-            SecureField("Chave de API do Immich", text: $ui.accountKey).textFieldStyle(.roundedBorder)
-            Button("Verificar e salvar conta") { let key = ui.accountKey; ui.accountKey = ""; model.connect(key: key, persist: true) }.disabled(!model.connectionReady || ui.accountKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Text("Permissões: user.read, album.read, asset.read e asset.view para consultar; person.read para pessoas; albumAsset.create e albumAsset.delete para organizar; asset.delete para enviar duplicatas à lixeira. Permissões ausentes bloqueiam a ação e são informadas antes de alterações.").font(.caption).foregroundStyle(.secondary)
-        }
-    }
+    private var accountsView: some View { IMAccountSettingsView(model: model) }
     private var historyView: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Últimas 20 operações").font(.headline)
+            PFSectionHeading("Histórico de organização", subtitle: "Acompanhe as últimas 20 operações deste perfil.", systemImage: "clock.arrow.circlepath")
             Text("Operações interrompidas ou incertas exigem conferência no Immich. Nenhuma operação é repetida automaticamente.").foregroundStyle(.secondary)
             if model.history.isEmpty { empty("Nenhuma operação executada neste perfil.") }
             ForEach(model.history) { entry in
+                PFCard {
                 DisclosureGroup {
                     ForEach(entry.records) { record in
                         VStack(alignment: .leading, spacing: 4) {
@@ -425,7 +454,17 @@ struct ImmichWorkspaceView: View {
                         }.padding(.vertical, 5)
                     }
                     DisclosureGroup("Prévia dos arquivos revisados (\(entry.assets.count))") { IMHistoryPreviews(assets: entry.assets, model: model) }
-                } label: { HStack { Text(entry.title).bold(); Spacer(); Text(entry.date, style: .date); Text(entry.date, style: .time); Text(statusName(entry.status)).foregroundStyle(.secondary) } }.padding(12).background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(entry.title).font(.headline)
+                            HStack(spacing: 6) { Text(entry.date, style: .date); Text(entry.date, style: .time) }.font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        PFBadge(statusName(entry.status), systemImage: entry.status == "completed" ? "checkmark.circle" : "clock", color: entry.status == "completed" ? .green : .orange)
+                    }
+                }
+                }
             }
         }
     }
@@ -451,16 +490,16 @@ struct ImmichWorkspaceView: View {
     }
     private var reviewView: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Confirmar alterações").font(.title2.bold())
+            PFSectionHeading("Revisar alterações", subtitle: "Confira cada cópia e destino antes de continuar.", systemImage: "checklist")
             Text("\(reviewItems.count) grupos ou fotos selecionados. Revise todas as páginas antes de confirmar.").foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(page(reviewItems, ui.reviewPage)) { item in
-                        GroupBox {
+                        PFCard {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(item.title).font(.headline); Text(item.note).font(.caption).foregroundStyle(.secondary)
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260))]) {
-                                    ForEach(item.assets) { asset in VStack(alignment: .leading, spacing: 8) { if let keep = item.keepID { Text(keep == asset.id ? "MANTER" : "ENVIAR À LIXEIRA").font(.caption.bold()).foregroundStyle(keep == asset.id ? Color.green : Color.orange) }; assetCard(asset) } }
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250))]) {
+                                    ForEach(item.assets) { asset in VStack(alignment: .leading, spacing: 8) { if let keep = item.keepID { PFBadge(keep == asset.id ? "Manter esta cópia" : "Enviar à lixeira", systemImage: keep == asset.id ? "checkmark.circle.fill" : "trash", color: keep == asset.id ? .green : .orange) }; assetCard(asset) } }
                                 }
                             }.padding(8)
                         }
@@ -468,26 +507,32 @@ struct ImmichWorkspaceView: View {
                 }
             }
             pager(count: reviewItems.count, index: $ui.reviewPage)
-            Toggle("Conferi as cópias, os destinos e os álbuns envolvidos e autorizo estas alterações.", isOn: $ui.reviewAccepted)
-            HStack { Button("Cancelar") { ui.reviewKind = nil }; Spacer(); Button("Confirmar alterações") { guard let kind = ui.reviewKind else { return }; ui.reviewKind = nil; model.execute(kind) }.buttonStyle(.borderedProminent).disabled(!ui.reviewAccepted || reviewItems.isEmpty || (ui.reviewKind == "duplicates" && model.unsafeLiveRemoval)) }
-        }.padding(24).frame(minWidth: 760, idealWidth: 940, minHeight: 620, idealHeight: 780)
+            Divider()
+            Toggle("Conferi as cópias, os destinos e os álbuns envolvidos e autorizo estas alterações.", isOn: $ui.reviewAccepted).toggleStyle(.checkbox).fixedSize(horizontal: false, vertical: true)
+            HStack { Button("Cancelar") { ui.reviewKind = nil }; Spacer(); Button("Confirmar alterações") { guard let kind = ui.reviewKind else { return }; ui.reviewKind = nil; model.execute(kind) }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!ui.reviewAccepted || reviewItems.isEmpty || (ui.reviewKind == "duplicates" && model.unsafeLiveRemoval)) }
+        }.padding(24).frame(minWidth: 760, idealWidth: 940, minHeight: 620, idealHeight: 780).background(PFTheme.background).tint(PFTheme.accent)
     }
     private func assetCard(_ asset: IMAsset) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            IMAssetThumbnail(asset: asset, model: model).frame(height: 155).frame(maxWidth: .infinity).background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            IMAssetThumbnail(asset: asset, model: model).frame(height: 180).frame(maxWidth: .infinity).background(PFTheme.background, in: RoundedRectangle(cornerRadius: 10)).clipShape(RoundedRectangle(cornerRadius: 10))
             Text(model.name(asset.ownerId)).font(.headline)
             Text(asset.originalFileName).font(.callout).textSelection(.enabled).lineLimit(2)
-            Text(mediaLabel(asset)).font(.caption.bold()).padding(.horizontal, 9).padding(.vertical, 5).background(asset.isLive ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.1), in: Capsule()).fixedSize(horizontal: false, vertical: true)
+            PFBadge(mediaLabel(asset), systemImage: asset.isLive ? "livephoto" : asset.type.uppercased() == "VIDEO" ? "video" : "photo", color: asset.isLive ? PFTheme.accent : .secondary).fixedSize(horizontal: false, vertical: true)
             if let w = asset.width, let h = asset.height { Text("\(w) × \(h)\(asset.fileSize.map { " · " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "")").font(.caption).foregroundStyle(.secondary) }
             Text("Captura: \(asset.localDateTime ?? asset.fileCreatedAt)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
             Text("Enviada: \(asset.createdAt)").font(.caption).foregroundStyle(.secondary).lineLimit(2)
             Text("Álbuns: " + (asset.albums.isEmpty ? "nenhum" : asset.albums.map(\.name).joined(separator: ", "))).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
     }
-    private func mediaLabel(_ asset: IMAsset) -> String { asset.type.uppercased() == "VIDEO" ? "Vídeo" : asset.isLive ? "◉ Live Photo · com movimento" : "Foto estática" }
+    private func mediaLabel(_ asset: IMAsset) -> String { asset.type.uppercased() == "VIDEO" ? "Vídeo" : asset.isLive ? "Live Photo · com movimento" : "Foto estática" }
     private func actionName(_ value: String) -> String { ["add": "Adicionar ao álbum", "unlink": "Remover do álbum", "trash": "Enviar à lixeira"][value] ?? value }
     private func statusName(_ value: String) -> String { ["running": "Em andamento", "completed": "Concluída", "failed": "Interrompida por erro", "interrupted": "Interrompida", "confirmed": "Confirmado", "uncertain": "Resultado incerto — confira o Immich", "preparing": "Preparado — resultado a conferir"][value] ?? value }
-    private func empty(_ text: String) -> some View { Text(text).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 100).background(.quaternary, in: RoundedRectangle(cornerRadius: 12)) }
+    private func empty(_ text: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: ui.tab == "Histórico" ? "clock" : "photo.on.rectangle.angled").font(.system(size: 32, weight: .light)).foregroundStyle(PFTheme.accent.opacity(0.85))
+            Text(text).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 430)
+        }.frame(maxWidth: .infinity, minHeight: 160).padding(20).background(PFTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+    }
     private func page<T>(_ items: [T], _ index: Int) -> [T] { let start = min(max(0, index) * pageSize, items.count); return Array(items[start..<min(start + pageSize, items.count)]) }
     private func pager(count: Int, index: Binding<Int>) -> some View {
         HStack { Button("Anterior") { index.wrappedValue -= 1 }.disabled(index.wrappedValue <= 0); Text("Página \(min(index.wrappedValue + 1, max(1, (count + pageSize - 1) / pageSize))) de \(max(1, (count + pageSize - 1) / pageSize))").font(.caption).foregroundStyle(.secondary); Button("Próxima") { index.wrappedValue += 1 }.disabled((index.wrappedValue + 1) * pageSize >= count); Spacer() }
@@ -534,5 +579,59 @@ private struct IMHistoryPreviews: View {
                 Button("Próxima") { state.page += 1 }.disabled((state.page + 1) * 8 >= assets.count)
             }
         }.padding(.vertical, 10)
+    }
+}
+
+/// Shared account editor, available both in Settings and in the management window.
+struct IMAccountSettingsView: View {
+    @ObservedObject var model: IMWorkspaceModel
+    @ObservedObject private var ui: IMWorkspaceUIState
+    init(model: IMWorkspaceModel) { self.model = model; _ui = ObservedObject(wrappedValue: model.ui) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            PFSectionHeading("Contas conectadas", subtitle: "Acesso seguro para cada biblioteca.", systemImage: "person.2.crop.square.stack")
+            Text("As chaves adicionais ficam no Chaves do macOS. Conecte cada proprietário para analisar suas fotos e executar ações em sua conta.").foregroundStyle(.secondary)
+            Button("Usar conta da conexão atual") { model.connect(key: model.primaryKey, persist: false) }.disabled(!model.connectionReady || model.primaryKey.isEmpty)
+            Text("A conta atual é verificada e usada apenas nesta sessão. Use o campo abaixo para salvar uma conta neste perfil.").font(.caption).foregroundStyle(.secondary)
+            ForEach(model.credentials.map(\.account)) { account in
+                PFCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.crop.circle.fill").font(.system(size: 32)).foregroundStyle(PFTheme.accent)
+                            Text(account.name).font(.headline)
+                            Spacer()
+                            Button("Desconectar") { model.disconnect(account.id) }.foregroundStyle(.secondary)
+                        }
+                        if let scopes = model.scopes[account.id] { Text("Permissões: " + scopes.sorted().joined(separator: ", ")).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+                        else { Text("Conta salva. As permissões são verificadas novamente antes das ações.").font(.caption).foregroundStyle(.secondary) }
+                    }
+                }
+            }
+            PFCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    PFSectionHeading("Adicionar conta", subtitle: "A chave é protegida pelo Chaves do macOS.", systemImage: "key.fill")
+                    SecureField("Chave de API do Immich", text: $ui.accountKey).textFieldStyle(.roundedBorder).controlSize(.large)
+                    Button("Verificar e salvar conta") { let key = ui.accountKey; ui.accountKey = ""; model.connect(key: key, persist: true) }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!model.connectionReady || ui.accountKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            Text("Permissões: user.read, album.read, asset.read e asset.view para consultar; person.read para pessoas; albumAsset.create e albumAsset.delete para organizar; asset.delete para enviar duplicatas à lixeira. Permissões ausentes bloqueiam a ação e são informadas antes de alterações.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Shares verified in-memory accounts across Settings and management without persisting the primary key.
+@MainActor final class IMWorkspaceSessionCache {
+    private(set) var current: IMWorkspaceModel?
+    func prepare(address: String, primaryKey: String, profileID: String, ready: Bool, onBusyChanged: @escaping (Bool) -> Void) -> IMWorkspaceModel? {
+        guard current?.busy != true else { return nil }
+        if let existing = current, existing.primaryKey != primaryKey || existing.profileID != profileID { current = nil }
+        if let existing = current {
+            existing.updateConnection(address: address, ready: ready)
+            return ready ? existing : nil
+        }
+        guard ready else { return nil }
+        let model = IMWorkspaceModel(address: address, primaryKey: primaryKey, profileID: profileID, connectionReady: ready, onBusyChanged: onBusyChanged)
+        current = model
+        return model
     }
 }
