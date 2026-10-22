@@ -540,7 +540,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.8").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.8.1").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
