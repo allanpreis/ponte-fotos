@@ -54,3 +54,7 @@ SDK27 interfaces inspected: glassEffect(_:in:) requires macOS26; deployment rema
 
 ## Reverse import (0.9.0)
 Sidebar Immich adds “Immich → Fotos”. It is discoverable offline and explains how to configure a connection. The page queries only on explicit actions: source album, current metadata and thumbnails, editable destination album, per-item selection and Live/static badges. Confirmation precedes PhotoKit permissions and writes. Import locks source/connection/navigation until the current item completes; cancellation preserves confirmed results. History protection must be described as this app's imports, never whole-library duplicate detection. Source controls wrap with ViewThatFits; only item list scrolls.
+
+
+## Apple Photos destination (0.9.1)
+Reverse import destination uses a segmented existing/new choice. Existing mode exposes an explicit refresh action and picker bound to Photos localIdentifier; duplicate titles remain distinguishable in picker and confirmation. New mode exposes a name field and states that creation happens only on confirmation. Existing imported assets stay selectable for album membership without new files or removal from previous albums. Source and destination controls wrap independently; selection footer remains visible at minimum window size.

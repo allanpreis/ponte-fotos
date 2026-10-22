@@ -2,6 +2,17 @@
 
 As mudanças são agrupadas por versão. [Releases e downloads](https://github.com/allanpreis/ponte-fotos/releases) · [Guia completo](docs/GUIA-COMPLETO.md)
 
+## 0.9.1 — 2026-10-22
+
+### 🗂️ Destino no Fotos da Apple
+
+- Escolha explícita entre álbum existente e criação de um novo álbum no fluxo Immich → Fotos.
+- Lista de álbuns editáveis, atualizada sob demanda, com seleção pelo identificador e distinção de nomes repetidos.
+- Novo álbum criado somente após confirmação e reutilizado no restante do lote; ao concluir a primeira operação confirmada, passa a ser o destino selecionado.
+- Fotos já importadas podem ser adicionadas a outro álbum sem baixar ou criar uma nova cópia, preservando os vínculos anteriores.
+- Destinos removidos ou sem permissão são bloqueados antes de baixar originais. A confirmação informa o destino escolhido.
+- 51 verificações sintéticas da importação e dos destinos, sem mutações na fototeca real durante os testes.
+
 ## 0.9.0 — 2026-10-22
 
 ### 📥 Immich → Fotos da Apple
