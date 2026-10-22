@@ -436,10 +436,15 @@ struct PhotoThumbnail: View {
     }
 }
 enum AppBrand {
-    static var logo: NSImage {
-        if let url = Bundle.main.url(forResource: "AppLogo", withExtension: "png"), let image = NSImage(contentsOf: url) { return image }
+    static let logo: NSImage = {
+        if let url = Bundle.main.url(forResource: "AppLogoDisplay", withExtension: "png"),
+           let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+           let bitmap = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            // Keep the full-resolution bitmap; logical points must not become pixels.
+            return NSImage(cgImage: bitmap, size: NSSize(width: 38, height: 38))
+        }
         return NSImage(systemSymbolName: "photo.on.rectangle", accessibilityDescription: "Ponte Fotos")!
-    }
+    }()
 }
 extension Notification.Name { static let pfOpenSettings = Notification.Name("PonteFotos.openSettings") }
 @MainActor final class PFNavigationState: ObservableObject { @Published var settings = false }
@@ -470,7 +475,8 @@ struct ContentView: View {
         }
         .background(PFTheme.background).tint(PFTheme.accent)
         .environment(\.pfGlassEnabled, glassEnabled)
-        .preferredColorScheme(selectedTheme.colorScheme)
+        .onAppear { PFAppearanceController.apply(selectedTheme) }
+        .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
         .onChange(of: model.profile) { previous, _ in model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
         .onChange(of: model.apiKey) { _, _ in model.prepareManagementSession() }
@@ -482,7 +488,6 @@ struct ContentView: View {
         }
         .sheet(item: $model.editing) { item in
             ReviewEditor(item: item, metadata: model.metadata(for: item), save: { try model.saveReview($0, id: item.id) }, restore: { try model.saveReview(nil, id: item.id) }, dismiss: { model.editing = nil })
-                .preferredColorScheme(selectedTheme.colorScheme)
                 .environment(\.pfGlassEnabled, glassEnabled)
         }
         .sheet(isPresented: $model.showManagement, onDismiss: { model.managementModel?.endReview() }) {
@@ -490,8 +495,7 @@ struct ContentView: View {
                 ImmichWorkspaceView(model: workspace, address: model.address, connectionReady: model.serverReady)
                     .disabled(model.busy && !model.managementBusy)
                     .interactiveDismissDisabled(model.managementBusy)
-                    .preferredColorScheme(selectedTheme.colorScheme)
-                    .environment(\.pfGlassEnabled, glassEnabled)
+                        .environment(\.pfGlassEnabled, glassEnabled)
             }
         }
         .confirmationDialog("Enviar \(model.selection.count) itens para o Immich?", isPresented: $model.showUpload, titleVisibility: .visible) {
@@ -504,7 +508,7 @@ struct ContentView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(nsImage: AppBrand.logo).resizable().scaledToFit().frame(width: 38, height: 38)
+                Image(nsImage: AppBrand.logo).resizable().interpolation(.high).scaledToFit().frame(width: 38, height: 38)
                     .clipShape(RoundedRectangle(cornerRadius: 10)).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Ponte Fotos").font(.system(size: 16, weight: .semibold))
@@ -540,7 +544,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.8.1").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.8.2").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
@@ -683,7 +687,7 @@ struct ContentView: View {
     }
 }
 @main struct PonteFotosApp: App {
-    init() { NSApplication.shared.setActivationPolicy(.regular); NSApplication.shared.applicationIconImage = AppBrand.logo }
+    init() { NSApplication.shared.setActivationPolicy(.regular) }
     var body: some Scene { WindowGroup { ContentView() }.defaultSize(width: 1180, height: 800)
         .commands {
             CommandGroup(replacing: .appSettings) {

@@ -89,6 +89,22 @@ enum PFColorTheme: String, CaseIterable, Identifiable {
     var symbol: String { switch self { case .system: return "desktopcomputer"; case .light: return "sun.max"; case .dark: return "moon" } }
     var colorScheme: ColorScheme? { switch self { case .system: return nil; case .light: return .light; case .dark: return .dark } }
 }
+
+/// Use AppKit's application-wide inheritance rather than a SwiftUI window preference.
+/// Clearing the override also lets existing windows and sheets follow later system changes.
+@MainActor enum PFAppearanceController {
+    static func apply(_ theme: PFColorTheme) {
+        apply(theme, to: .shared)
+    }
+
+    static func apply(_ theme: PFColorTheme, to application: NSApplication) {
+        switch theme {
+        case .system: application.appearance = nil
+        case .light: application.appearance = NSAppearance(named: .aqua)
+        case .dark: application.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
 enum PFGlassStyle: Equatable { case opaque, material, liquid }
 enum PFGlassPolicy {
     static func style(enabled: Bool, reduceTransparency: Bool, modernOS: Bool) -> PFGlassStyle {
