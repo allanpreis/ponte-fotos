@@ -13,10 +13,35 @@ final class MemoryHistory: PFReverseHistory {
     func authorize() async throws { authorized = true; if deny { throw BridgeError(message: "denied") } }
     func exists(_ id: String) -> Bool { existing.contains(id) }
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws { if invalidPair { throw BridgeError(message: "invalid pair") } }
-    func create(asset: PFReverseAsset, original: URL, paired: URL?, album: String) async throws -> String {
+    var albumRows = [PFPhotosAlbum(id: "album-1", title: "Viagens")]
+    var albumCreations = 0; var links = 0; var lastAlbumID: String?; var readOnlyIDs = Set<String>()
+    var onList: (() -> Void)?
+    func listAlbums() async throws -> [PFPhotosAlbum] { try await authorize(); onList?(); return PFPhotosAlbum.labeled(albumRows.filter { !readOnlyIDs.contains($0.id) }) }
+    func prepareDestination(_ destination: PFPhotosDestination) throws {
+        guard destination.isValid else { throw BridgeError(message: "empty destination") }
+        if case .existing(let id, _) = destination {
+            guard albumRows.contains(where: { $0.id == id }), !readOnlyIDs.contains(id) else { throw BridgeError(message: "missing or readonly") }
+        }
+    }
+    func resolve(_ destination: PFPhotosDestination) throws -> String {
+        try prepareDestination(destination)
+        switch destination {
+        case .existing(let id, _): lastAlbumID = id; return id
+        case .new(let name):
+            albumCreations += 1
+            let id = "created-album-\(albumCreations)"; albumRows.append(PFPhotosAlbum(id: id, title: name)); lastAlbumID = id; return id
+        }
+    }
+    func addExisting(id: String, destination: PFPhotosDestination) async throws -> String {
+        guard existing.contains(id) else { throw BridgeError(message: "missing photo") }
+        links += 1; return try resolve(destination)
+    }
+    func create(asset: PFReverseAsset, original: URL, paired: URL?, destination: PFPhotosDestination) async throws -> PFPhotosImportResult {
         receivedPair = paired != nil
         receivedDistinctResources = paired.map { $0 != original && FileManager.default.fileExists(atPath: $0.path) && FileManager.default.fileExists(atPath: original.path) } ?? false
-        calls += 1; if fail { throw BridgeError(message: "uncertain") }; existing.insert("photos-1"); return "photos-1"
+        calls += 1; if fail { throw BridgeError(message: "uncertain") }
+        let albumID = try resolve(destination)
+        let id = "photos-\(calls)"; existing.insert(id); return PFPhotosImportResult(assetID: id, albumID: albumID)
     }
 }
 final class FakeRemote: PFReverseRemote {
@@ -40,6 +65,9 @@ final class FakeRemote: PFReverseRemote {
     @MainActor static func main() async throws {
         var checks = 0
         func expect(_ condition: Bool, _ message: String) { precondition(condition, message); checks += 1 }
+        let labelModel = PFReverseImportModel(history: MemoryHistory(), photos: FakePhotos())
+        labelModel.destinationMode = .new; labelModel.destinationAlbumName = "  Memórias  "
+        expect(labelModel.destinationLabel == "Novo álbum: Memórias", "confirmation identifies new album and trims name")
         let value = try asset()
         expect(value.item.selectable, "valid date/GPS")
         expect(value.item.name == "foto.jpg", "basename traversal")
@@ -63,7 +91,7 @@ final class FakeRemote: PFReverseRemote {
         expect(photos.authorized && photos.calls == 1 && model.done == 1, "one explicit import")
         expect(store.values.first?.pending == false && store.values.first?.photosID == "photos-1", "confirmed history")
         model.use(remote: remote, assets: [value]); model.selection = [value.id]; await model.importSelected()
-        expect(photos.calls == 1 && remote.downloads == 1, "existing id skips download/import")
+        expect(photos.calls == 1 && remote.downloads == 1 && photos.links == 1, "existing id links without download/import")
         photos.existing.removeAll(); model.use(remote: remote, assets: [value]); model.selection = [value.id]; await model.importSelected()
         expect(photos.calls == 2, "deleted photos id permits reimport")
         let pending = MemoryHistory(); pending.values = [PFReverseRecord(assetID: value.id, checksum: value.checksum, photosID: nil, pending: true)]
@@ -128,6 +156,65 @@ final class FakeRemote: PFReverseRemote {
         let switched = PFReverseImportModel(history: MemoryHistory(), photos: FakePhotos())
         switched.use(remote: remote, assets: [value]); switched.selection = [value.id]; switched.albumID = "different-album"
         expect(switched.selection.isEmpty && switched.items.isEmpty, "album switch clears previous items and selection")
+        let collidingLabels = PFPhotosAlbum.labeled([PFPhotosAlbum(id: "12345678-A", title: "Mesmo"), PFPhotosAlbum(id: "12345678-B", title: "Mesmo")])
+        expect(Set(collidingLabels.map(\.label)).count == 2, "same-prefix duplicate album names remain distinguishable")
+        let destinationPhotos = FakePhotos(), destinationStore = MemoryHistory(), destinationRemote = FakeRemote(value)
+        destinationPhotos.albumRows = [PFPhotosAlbum(id: "same-aaa1", title: "Viagens"), PFPhotosAlbum(id: "same-bbb2", title: "Viagens"), PFPhotosAlbum(id: "readonly", title: "Compartilhado")]
+        destinationPhotos.readOnlyIDs = ["readonly"]
+        let destinations = PFReverseImportModel(history: destinationStore, photos: destinationPhotos)
+        destinations.use(remote: destinationRemote, assets: [value])
+        destinationPhotos.onList = { expect(destinations.busy && destinations.loadingDestinations, "listing blocks concurrent operations") }
+        await destinations.loadPhotosAlbums()
+        expect(destinationPhotos.calls == 0 && destinationPhotos.links == 0 && destinationPhotos.albumCreations == 0 && destinationStore.saves == 0 && destinationRemote.downloads == 0, "listing authorizes but never mutates or downloads")
+        expect(destinations.destinationAlbumID.isEmpty, "listing does not silently choose a destination")
+        expect(destinations.photosAlbums.count == 2 && Set(destinations.photosAlbums.map(\.label)).count == 2, "editable albums and duplicate title labels")
+        destinations.destinationMode = .existing; destinations.destinationAlbumID = "same-bbb2"; destinations.selection = [value.id]
+        expect(destinations.destinationLabel == destinations.photosAlbums.first(where: { $0.id == "same-bbb2" })?.label, "confirmation distinguishes duplicate destination names")
+        await destinations.importSelected()
+        expect(destinationPhotos.lastAlbumID == "same-bbb2" && destinationPhotos.albumCreations == 0, "exact identifier wins over duplicate album title")
+        // Already-imported rows remain selectable and can be linked to another album.
+        expect(destinations.items.first?.isImported == true && destinations.items.first?.selectable == true, "known imported row remains selectable")
+        destinations.destinationAlbumID = "same-aaa1"; destinations.selection = [value.id]
+        await destinations.importSelected()
+        expect(destinationPhotos.lastAlbumID == "same-aaa1" && destinationPhotos.calls == 1 && destinationPhotos.links == 1 && destinationRemote.downloads == 1 && destinationStore.saves == 2, "known photos link to second album with unchanged history and original")
+        let blockedPhotos = FakePhotos(), blockedStore = MemoryHistory(), blockedRemote = FakeRemote(value)
+        let blocked = PFReverseImportModel(history: blockedStore, photos: blockedPhotos)
+        blocked.use(remote: blockedRemote, assets: [value]); await blocked.loadPhotosAlbums()
+        blocked.destinationMode = .existing; blocked.destinationAlbumID = "album-1"; blocked.selection = [value.id]
+        blockedPhotos.albumRows = []
+        await blocked.importSelected()
+        expect(blockedPhotos.calls == 0 && blockedRemote.downloads == 0 && blockedStore.saves == 0, "deleted destination rejected before download or intent")
+        blockedPhotos.albumRows = [PFPhotosAlbum(id: "album-1", title: "Viagens")]; blockedPhotos.readOnlyIDs = ["album-1"]
+        await blocked.importSelected()
+        expect(blockedPhotos.calls == 0 && blockedRemote.downloads == 0 && blockedStore.saves == 0, "read-only destination rejected before download or intent")
+        blocked.destinationMode = .new; blocked.destinationAlbumName = "   \n "; await blocked.importSelected()
+        expect(!blocked.isDestinationValid && blockedPhotos.calls == 0, "whitespace-only new name blocked")
+        let batchPhotos = FakePhotos(), batchStore = MemoryHistory(), batchRemote = FakeRemote(value)
+        let secondJSON = """
+        {"id":"00000000-0000-0000-0000-000000000003","ownerId":"owner","originalFileName":"second.jpg","checksum":"\(value.checksum)","type":"IMAGE","fileCreatedAt":"2026-10-22T10:00:00Z"}
+        """
+        let second = try JSONDecoder().decode(PFReverseAsset.self, from: Data(secondJSON.utf8)); batchRemote.related[second.id] = second
+        let batch = PFReverseImportModel(history: batchStore, photos: batchPhotos)
+        batch.destinationMode = .new; batch.destinationAlbumName = " Viagens "
+        batch.use(remote: batchRemote, assets: [value, second]); batch.selection = [value.id, second.id]
+        await batch.importSelected()
+        expect(batchPhotos.calls == 2 && batchPhotos.albumCreations == 1 && batch.done == 2, "new destination creates exactly one album per batch even if title already exists")
+        expect(batchPhotos.albumRows.last?.title == "Viagens", "new album title trimmed")
+        expect(batch.destinationMode == .existing && batch.destinationAlbumID == "created-album-1" && batch.photosAlbums.contains(where: { $0.id == "created-album-1" }), "created album becomes selected for subsequent batches")
+        batch.selection = [value.id]; await batch.importSelected()
+        expect(batchPhotos.albumCreations == 1 && batchPhotos.calls == 2 && batchPhotos.links == 1, "subsequent batch reuses new album without recreating original")
+        let snapshotPhotos = FakePhotos(), snapshotStore = MemoryHistory(), snapshotRemote = FakeRemote(value)
+        let snapshot = PFReverseImportModel(history: snapshotStore, photos: snapshotPhotos)
+        snapshot.destinationMode = .new; snapshot.destinationAlbumName = "Revisado"
+        snapshotRemote.onDownload = { snapshot.destinationAlbumName = "Alterado" }
+        snapshot.use(remote: snapshotRemote, assets: [value]); snapshot.selection = [value.id]; await snapshot.importSelected()
+        expect(snapshotPhotos.albumRows.last?.title == "Revisado", "destination snapshot is immutable while downloading")
+        let linkedPhotos = FakePhotos(), linkedStore = MemoryHistory(), linkedRemote = FakeRemote(value)
+        linkedPhotos.existing = ["previous-photo"]; linkedStore.values = [PFReverseRecord(assetID: value.id, checksum: value.checksum, photosID: "previous-photo", pending: false)]
+        let linked = PFReverseImportModel(history: linkedStore, photos: linkedPhotos)
+        linked.use(remote: linkedRemote, assets: [value]); linked.selection = [value.id]; linked.destinationAlbumName = "Novo destino"
+        await linked.importSelected()
+        expect(linkedPhotos.albumCreations == 1 && linkedPhotos.calls == 0 && linkedRemote.downloads == 0 && linkedStore.saves == 0 && linked.destinationMode == .existing, "new album may link known photo without history changes or recreation")
         let credential = IMCredential(account: IMAccount(id: "account", name: "Example"), key: "synthetic")
         let local = PFReverseHTTP(client: IMClient(address: "http://127.0.0.1:1234", credential: credential), profileID: "profile")
         let distant = PFReverseHTTP(client: IMClient(address: "https://photos.example.com", credential: credential), profileID: "profile")
