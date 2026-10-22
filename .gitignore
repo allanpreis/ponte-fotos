@@ -1,0 +1,49 @@
+# Credenciais e configurações privadas
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+.netrc
+config.local.*
+*.local.json
+secrets/
+credentials/
+
+# Artefatos de compilação e distribuição
+build/
+.build/
+DerivedData/
+.module-cache/
+*.app/
+*.dSYM/
+*.zip
+*.tar.gz
+
+# Estado e dados pessoais em execução
+.local/
+history/
+management/
+staging/
+exports/
+reviews.json
+*.log
+
+# macOS, editores e caches
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+*.swp
+*.xcuserstate
+xcuserdata/
