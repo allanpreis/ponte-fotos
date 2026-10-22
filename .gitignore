@@ -30,6 +30,7 @@ DerivedData/
 .local/
 history/
 management/
+reverse-import/
 staging/
 exports/
 reviews.json

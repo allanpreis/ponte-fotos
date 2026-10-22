@@ -50,3 +50,7 @@ No blocking questions. User explicitly requested and received persisted System/L
 - [accessibilityReduceTransparency](https://developer.apple.com/documentation/swiftui/environmentvalues/accessibilityreducetransparency)
 
 SDK27 interfaces inspected: glassEffect(_:in:) requires macOS26; deployment remains macOS14 using runtime availability guards. No custom shaders, compatibility packages or accessibility setting overrides.
+
+
+## Reverse import (0.9.0)
+Sidebar Immich adds “Immich → Fotos”. It is discoverable offline and explains how to configure a connection. The page queries only on explicit actions: source album, current metadata and thumbnails, editable destination album, per-item selection and Live/static badges. Confirmation precedes PhotoKit permissions and writes. Import locks source/connection/navigation until the current item completes; cancellation preserves confirmed results. History protection must be described as this app's imports, never whole-library duplicate detection. Source controls wrap with ViewThatFits; only item list scrolls.

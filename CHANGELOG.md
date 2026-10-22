@@ -2,6 +2,17 @@
 
 As mudanças são agrupadas por versão. [Releases e downloads](https://github.com/allanpreis/ponte-fotos/releases) · [Guia completo](docs/GUIA-COMPLETO.md)
 
+## 0.9.0 — 2026-10-22
+
+### 📥 Immich → Fotos da Apple
+
+- Nova opção **Immich → Fotos** na barra lateral, com álbuns do Immich, miniaturas, seleção e revisão de data/GPS.
+- Importação de originais por PhotoKit, com álbum de destino e confirmação explícita.
+- Download com checksum, temporários protegidos, revalidação de metadados e proteção de pares Live Photo.
+- Histórico por perfil/conta para evitar repetir itens importados pelo app, com bloqueio de resultados incertos.
+- Cancelamento entre itens e conexão preservada durante a operação.
+- Testes sintéticos sem gravações na biblioteca real. Limites de portabilidade de metadados documentados.
+
 ## 0.8.2 — 2026-10-22
 
 ### 🖼️ Ícone e nitidez

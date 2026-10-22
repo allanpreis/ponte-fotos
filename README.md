@@ -2,11 +2,20 @@
 
 # Ponte Fotos
 
-Aplicativo nativo para macOS que envia originais do Fotos da Apple e de pastas para o Immich, permite revisar data e localização e oferece ferramentas para organizar a biblioteca do servidor.
+Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.8.2 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
-O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para os recursos de conexão, upload e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
+O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
+
+## 📥 Immich → Fotos da Apple
+
+Na barra lateral, abra **Immich → Fotos**. Teste a conexão, atualize os álbuns, consulte um álbum e selecione os itens. Confira a data de captura, GPS e o indicador de Live Photo; informe o álbum de destino e confirme a importação.
+
+O app baixa os originais, verifica o checksum e usa o PhotoKit para criar os itens no Fotos deste Mac. O iCloud segue os ajustes do Fotos. Os originais do Immich permanecem intactos. Itens sem data válida/fuso explícito, localização inválida ou recursos indisponíveis ficam bloqueados. Live Photos exigem imagem e vídeo compatíveis. Pessoas reconhecidas e histórico de edições não são transferidos.
+
+Um histórico local por perfil/conta evita repetir importações feitas pelo Ponte Fotos; ele não compara toda a biblioteca preexistente. Resultados sem confirmação final ficam bloqueados para evitar repetição automática. [Guia da importação](docs/GUIA-COMPLETO.md#-importar-do-immich-para-o-fotos-da-apple).
+
 
 ## Apresentação
 
@@ -18,9 +27,9 @@ A versão 0.8.2 corrige o enquadramento do ícone no macOS, melhora a nitidez da
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.8.2 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.8.2/Ponte-Fotos-0.8.2-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.0 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.0/Ponte-Fotos-0.9.0-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.8.2) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.0) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
 
 ## 📸 Uma biblioteca, conectada
 
@@ -196,6 +205,8 @@ Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pess
 
 O `.gitignore` exclui `.env`, credenciais usuais, builds, bundles, arquivos compactados e estado local. Ele não remove segredos já versionados e não substitui revisão antes de cada commit. O repositório contém apenas código, assets do aplicativo, documentação e fixtures sintéticas.
 
+O histórico da importação inversa fica em `~/Library/Application Support/PonteFotos/reverse-import/`, com acesso restrito e sem chaves da API.
+
 ## Desenvolvimento e testes
 
 ```sh
@@ -204,6 +215,7 @@ zsh test-connection.sh
 zsh test-management.sh
 zsh test-media.sh
 zsh test-appearance.sh
+zsh test-reverse.sh
 plutil -lint Info.plist
 codesign --verify --deep --strict "build/Ponte Fotos.app"
 ```
