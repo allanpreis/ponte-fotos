@@ -19,6 +19,7 @@ zsh test-connection.sh
 zsh test-management.sh
 zsh test-media.sh
 zsh test-appearance.sh
+zsh test-reverse.sh
 plutil -lint Info.plist
 codesign --verify --deep --strict "build/Ponte Fotos.app"
 ```

@@ -1,6 +1,6 @@
 # 🌸 Ponte Fotos — guia completo
 
-**Versão 0.8.2 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
+**Versão 0.9.0 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
 
 O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. Você escolhe, revisa data e localização, define o destino e acompanha o envio. Também pode consultar duplicatas entre contas e organizar álbuns do servidor.
 
@@ -14,7 +14,7 @@ O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. 
 2. Confira o SHA-256 do ZIP com o arquivo de checksums anexado à mesma release:
 
    ```sh
-   shasum -a 256 Ponte-Fotos-0.8.2-arm64.zip
+   shasum -a 256 Ponte-Fotos-0.9.0-arm64.zip
    ```
 
 3. Extraia o ZIP e mova **Ponte Fotos.app** para Aplicativos ou para a pasta local `~/Applications`.
@@ -225,3 +225,34 @@ Ao selecionar **Configurações → Aparência → Sistema**, a janela passa ime
 ![Sistema adotando o tema claro sem reiniciar](media/appearance-system-082.png)
 
 Prints de prévia isolada, sem chaves, fotos ou endereços reais. Testes AppKit também cobrem retorno de Claro para Sistema; a troca global do macOS não foi alterada durante o teste visual.
+
+
+## 📥 Importar do Immich para o Fotos da Apple
+
+![Prévia isolada da importação](media/reverse-import-090.png)
+
+1. Teste a conexão em **Configurações** e abra **Immich → Fotos**, na seção Immich da barra lateral.
+2. Clique em **Atualizar álbuns**, selecione o álbum de origem e consulte os itens. Abrir a página não inicia downloads de originais nem importações.
+3. Selecione os itens disponíveis e confira miniaturas, data, GPS e os indicadores Live Photo/foto estática/vídeo. A data mostrada usa o fuso de exibição do Mac; o instante original precisa ter fuso explícito.
+4. Informe o nome do álbum de destino no Fotos. Um álbum com esse nome é reutilizado quando encontrado; caso contrário, é criado durante a importação.
+5. Clique em **Importar para o Fotos…**, revise a confirmação e autorize o Fotos se o macOS solicitar. É necessário acesso completo para gravar e conferir itens já importados.
+6. Acompanhe o progresso. Cancelar interrompe entre itens; itens já confirmados permanecem no Fotos e no histórico. Uma gravação PhotoKit iniciada precisa terminar.
+
+O app usa a biblioteca disponibilizada pelo PhotoKit no Mac, normalmente a Fototeca do Sistema. Não escolhe automaticamente outra fototeca. O envio ao iCloud depende das configurações do Fotos e do espaço disponível.
+
+### Dados preservados e limites
+
+- Arquivo original, sem recodificação, com seus metadados técnicos existentes.
+- Data/hora e coordenadas atuais informadas pelo Immich são aplicadas ao novo item do Fotos, incluindo ajustes que não estejam embutidos no original.
+- Live Photo: imagem e vídeo originais são baixados e verificados; pares incompatíveis são bloqueados, sem conversão silenciosa em foto estática.
+- Não há transferência garantida de pessoas reconhecidas, histórico de edições, tags, avaliações ou legendas específicas de cada produto. Não há garantia de reconstruir pares RAW+JPEG como um só item.
+- Esta primeira versão seleciona origem por álbum, usando a conta principal configurada. Não é uma sincronização automática/bidirecional contínua.
+- Data ausente/sem fuso explícito, GPS incompleto/inválido, original na lixeira/offline ou checksum inválido impedem a importação. Corrija os dados no Immich e consulte novamente.
+
+### Histórico e repetições
+
+O histórico de importação fica em `~/Library/Application Support/PonteFotos/reverse-import/`, separado do histórico de envio. Ele usa uma identidade derivada do perfil e da conta, mantendo continuidade entre conexão local e remota. Arquivos têm permissão restrita e não armazenam a chave da API.
+
+O app verifica o identificador do item no Fotos antes de pular uma importação já concluída. Isso protege somente itens importados por este app; fotos que já estavam na biblioteca por outros caminhos podem ser duplicadas. Resultados incertos ficam bloqueados para evitar novas cópias; confira a biblioteca e preserve o histórico para diagnóstico. Não apague o histórico para repetir lotes sem revisar o resultado.
+
+A operação não apaga nem modifica arquivos no Immich. A importação consome espaço no Mac e, se habilitado, no iCloud. Testes desta versão usam arquivos e serviços simulados; a compatibilidade completa com o servidor real e a fototeca real exige validação posterior em um lote pequeno autorizado.
