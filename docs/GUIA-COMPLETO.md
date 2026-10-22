@@ -1,6 +1,6 @@
 # 🌸 Ponte Fotos — guia completo
 
-**Versão 0.9.0 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
+**Versão 0.9.1 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
 
 O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. Você escolhe, revisa data e localização, define o destino e acompanha o envio. Também pode consultar duplicatas entre contas e organizar álbuns do servidor.
 
@@ -14,7 +14,7 @@ O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. 
 2. Confira o SHA-256 do ZIP com o arquivo de checksums anexado à mesma release:
 
    ```sh
-   shasum -a 256 Ponte-Fotos-0.9.0-arm64.zip
+   shasum -a 256 Ponte-Fotos-0.9.1-arm64.zip
    ```
 
 3. Extraia o ZIP e mova **Ponte Fotos.app** para Aplicativos ou para a pasta local `~/Applications`.
@@ -186,7 +186,7 @@ codesign --verify --deep --strict "build/Ponte Fotos.app"
 
 Testes usam dados sintéticos e interceptação HTTP em memória. A suíte de mídia cria JPEG/MOV temporários e requer codecs disponíveis no macOS; uma sandbox restrita pode impedir a codificação. A fixture HTTP opcional usa Python 3 e escuta apenas em `127.0.0.1:18761`.
 
-Validação automatizada não substitui testes reais de PhotoKit, permissões, troca física de Wi-Fi e compatibilidade com o servidor. Nesta atualização, o Immich do ambiente de desenvolvimento estava em manutenção; não foi realizada uma nova validação ponta a ponta contra esse servidor nem mutação de mídia real.
+Validação automatizada não substitui testes reais de PhotoKit, permissões, troca física de Wi-Fi e compatibilidade com o servidor. O servidor local já voltou a responder. Nesta atualização, os testes de gravação usam dependências sintéticas; não foram criados álbuns ou alteradas fotos reais durante a validação do novo seletor.
 
 ## ⚠️ Limites conhecidos
 
@@ -234,7 +234,7 @@ Prints de prévia isolada, sem chaves, fotos ou endereços reais. Testes AppKit 
 1. Teste a conexão em **Configurações** e abra **Immich → Fotos**, na seção Immich da barra lateral.
 2. Clique em **Atualizar álbuns**, selecione o álbum de origem e consulte os itens. Abrir a página não inicia downloads de originais nem importações.
 3. Selecione os itens disponíveis e confira miniaturas, data, GPS e os indicadores Live Photo/foto estática/vídeo. A data mostrada usa o fuso de exibição do Mac; o instante original precisa ter fuso explícito.
-4. Informe o nome do álbum de destino no Fotos. Um álbum com esse nome é reutilizado quando encontrado; caso contrário, é criado durante a importação.
+4. Em **Destino no Fotos da Apple**, escolha **Álbum existente** ou **Criar novo álbum**. Para um existente, clique em **Atualizar álbuns do Fotos** e escolha na lista; para um novo, informe o nome.
 5. Clique em **Importar para o Fotos…**, revise a confirmação e autorize o Fotos se o macOS solicitar. É necessário acesso completo para gravar e conferir itens já importados.
 6. Acompanhe o progresso. Cancelar interrompe entre itens; itens já confirmados permanecem no Fotos e no histórico. Uma gravação PhotoKit iniciada precisa terminar.
 
@@ -256,3 +256,18 @@ O histórico de importação fica em `~/Library/Application Support/PonteFotos/r
 O app verifica o identificador do item no Fotos antes de pular uma importação já concluída. Isso protege somente itens importados por este app; fotos que já estavam na biblioteca por outros caminhos podem ser duplicadas. Resultados incertos ficam bloqueados para evitar novas cópias; confira a biblioteca e preserve o histórico para diagnóstico. Não apague o histórico para repetir lotes sem revisar o resultado.
 
 A operação não apaga nem modifica arquivos no Immich. A importação consome espaço no Mac e, se habilitado, no iCloud. Testes desta versão usam arquivos e serviços simulados; a compatibilidade completa com o servidor real e a fototeca real exige validação posterior em um lote pequeno autorizado.
+
+
+### 🗂️ Escolher um álbum existente ou criar um novo — 0.9.1
+
+![Destino existente em prévia isolada](media/destination-existing-091.png)
+
+**Álbum existente:** clique em **Atualizar álbuns do Fotos**. A primeira consulta pode pedir acesso ao Fotos. Só são listados álbuns comuns que permitem adicionar conteúdo; álbuns inteligentes e destinos não editáveis ficam de fora. Consultar a lista não cria nem altera fotos ou álbuns. Nomes repetidos recebem um complemento para diferenciá-los; a operação usa o identificador exato do álbum, nunca uma busca pelo nome. Se o destino for removido ou perder permissão, a operação é bloqueada e você deve atualizar a lista.
+
+**Criar novo álbum:** informe o nome e confirme a importação. Será criado um álbum novo, mesmo que outro já tenha o mesmo nome. Dentro do lote, o álbum é criado uma vez e todos os itens vão para ele. Após a primeira operação confirmada, o app seleciona o álbum criado como existente para os próximos lotes.
+
+![Novo álbum em prévia isolada](media/destination-new-091.png)
+
+**Fotos já importadas:** itens marcados como já presentes no Fotos podem ser selecionados novamente. O app usa o identificador salvo no histórico para adicioná-los ao destino, sem novo download nem nova cópia e sem removê-los dos álbuns anteriores. Essa ação não reaplica alterações de metadados feitas posteriormente no Immich. Ela depende do histórico deste app e não reconhece automaticamente fotos importadas por outros programas.
+
+Confira o destino na confirmação. Cancelar a confirmação não cria álbuns nem adiciona itens. Se houver interrupção com resultado incerto, confira o Fotos antes de repetir, especialmente ao criar um novo álbum. Não há garantia de retomada automática de criação de álbum após encerramento abrupto.
