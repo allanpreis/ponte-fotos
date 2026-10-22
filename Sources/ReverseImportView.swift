@@ -50,11 +50,11 @@ struct PFReverseImportView: View {
         .padding(.horizontal, 24).padding(.bottom, 16)
         .alert("Importar para o Fotos da Apple?", isPresented: $ui.confirmingImport) {
             Button("Cancelar", role: .cancel) {}
-            Button("Importar \(eligibleSelection.count) itens") {
+            Button(eligibleSelection.count == 1 ? "Importar 1 item" : "Importar \(eligibleSelection.count) itens") {
                 Task { await model.importSelected() }
             }
         } message: {
-            Text("Serão criados \(eligibleSelection.count) itens no álbum “\(model.destinationAlbumName.trimmingCharacters(in: .whitespacesAndNewlines))” da biblioteca do Fotos deste Mac. O macOS poderá pedir permissão. A sincronização com o iCloud segue os ajustes do Fotos. Os originais continuam no Immich.")
+            Text("Seleção: \(eligibleSelection.count) \(eligibleSelection.count == 1 ? "item" : "itens"). Destino: “\(model.destinationLabel)” no Fotos deste Mac. Itens já importados pelo app serão adicionados ao álbum sem criar novas cópias. O macOS poderá pedir permissão. O iCloud segue os ajustes do Fotos. Os originais continuam no Immich.")
         }
     }
 
@@ -65,18 +65,50 @@ struct PFReverseImportView: View {
                     HStack(alignment: .bottom, spacing: 12) { albumPicker; sourceActions }
                     VStack(alignment: .leading, spacing: 12) { albumPicker; sourceActions }
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Álbum de destino no Fotos").font(.caption).foregroundStyle(.secondary)
-                    TextField("Importadas do Immich", text: $model.destinationAlbumName)
-                        .textFieldStyle(.roundedBorder).frame(maxWidth: 420)
-                        .disabled(working)
-                    Text("Cria um álbum com esse nome ou usa o existente na biblioteca deste Mac.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                destinationControls
                 Text("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var destinationControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Destino no Fotos da Apple").font(.caption).foregroundStyle(.secondary)
+            Picker("Tipo de destino no Fotos", selection: $model.destinationMode) {
+                Text("Álbum existente").tag(PFPhotosDestinationMode.existing)
+                Text("Criar novo álbum").tag(PFPhotosDestinationMode.new)
+            }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).disabled(working)
+            if model.destinationMode == .existing {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { photosAlbumPicker; refreshPhotosAlbums }
+                    VStack(alignment: .leading, spacing: 10) { photosAlbumPicker; refreshPhotosAlbums }
+                }
+                Text(model.photosAlbums.isEmpty
+                     ? "Atualize os álbuns para escolher um destino. O macOS poderá pedir acesso ao Fotos; esta consulta não cria nem altera itens."
+                     : "Somente álbuns que permitem adicionar fotos são listados. Álbuns com nomes iguais são diferenciados na lista.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                TextField("Nome do novo álbum", text: $model.destinationAlbumName)
+                    .textFieldStyle(.roundedBorder).frame(maxWidth: 420).disabled(working)
+                    .accessibilityLabel("Nome do novo álbum no Fotos")
+                Text("Um novo álbum será criado somente ao confirmar a importação, mesmo se já existir outro com o mesmo nome.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var photosAlbumPicker: some View {
+        Picker("Álbum de destino no Fotos", selection: $model.destinationAlbumID) {
+            Text("Selecione um álbum do Fotos").tag("")
+            ForEach(model.photosAlbums) { album in Text(album.label).tag(album.id) }
+        }.labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
+            .disabled(working || model.photosAlbums.isEmpty)
+    }
+
+    private var refreshPhotosAlbums: some View {
+        Button("Atualizar álbuns do Fotos") { Task { await model.loadPhotosAlbums() } }
+            .disabled(working)
     }
 
     private var albumPicker: some View {
@@ -111,7 +143,7 @@ struct PFReverseImportView: View {
     private var selectionCount: some View {
         HStack(spacing: 10) {
             Text("Fotos e vídeos").font(.headline)
-            PFBadge("\(eligibleSelection.count) selecionados")
+            PFBadge(eligibleSelection.count == 1 ? "1 selecionado" : "\(eligibleSelection.count) selecionados")
         }
     }
 
@@ -167,7 +199,7 @@ struct PFReverseImportView: View {
 
     @ViewBuilder private func importBadge(_ item: PFReverseItem) -> some View {
         if item.isImported {
-            PFBadge("Já importado por este app", systemImage: "checkmark.circle", color: .green)
+            PFBadge("Já no Fotos · sem nova cópia", systemImage: "checkmark.circle", color: .green)
         } else if !item.selectable {
             PFBadge("Indisponível", systemImage: "exclamationmark.circle", color: .orange)
         }
@@ -196,7 +228,7 @@ struct PFReverseImportView: View {
                 } label: {
                     Label("Importar para o Fotos…", systemImage: "square.and.arrow.down")
                 }.buttonStyle(.borderedProminent).controlSize(.large)
-                    .disabled(working || !connectionReady || eligibleSelection.isEmpty || model.destinationAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(working || !connectionReady || eligibleSelection.isEmpty || !model.isDestinationValid)
             }
         }
     }
