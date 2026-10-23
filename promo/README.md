@@ -2,7 +2,7 @@
 
 Composição original de 36 segundos, silenciosa, em português, 1920×1080 a 30 fps. Renderizada com HyperFrames 0.8.158 e GSAP 3.14.2. As paisagens e diagramas são sintéticos; não há dados ou fotos da biblioteca de um usuário.
 
-O filme apresenta envio, revisão de metadados, duplicatas com Live/estática e seleção automática de conexão. Os diagramas ilustram o funcionamento; não são gravações da interface. A referência de ritmo foi o vídeo público do projeto [iCloudImmichCleanSync](https://github.com/miltos211/iCloudImmichCleanSync); seus arquivos, cenas e textos não foram reutilizados.
+O filme apresenta envio, revisão de metadados, duplicatas com Live/estática e seleção automática de conexão. Os diagramas ilustram o funcionamento; não são gravações da interface.
 
 Com Node.js e npm instalados, nesta pasta:
 
@@ -20,6 +20,10 @@ MP4 e pôster de entrega estão em `../docs/media/`. A duração e a resolução
 
 ## Créditos de marca
 
-A logo do Ponte Fotos é a imagem gerada e aprovada pelo usuário, copiada sem redesenho de `Assets/AppLogo.png`. O logo do Immich em `assets/immich-logo.svg` vem do [repositório oficial](https://github.com/immich-app/immich/blob/main/design/immich-logo.svg), consultado em22/10/2026. A licença do projeto de origem acompanha o arquivo em `assets/IMMICH-LICENSE.txt`. A marca identifica o destino da integração; não implica endosso.
+A marca do Ponte Fotos usa `Assets/AppLogo.png`. O logo do Immich em `assets/immich-logo.svg` vem do [repositório oficial](https://github.com/immich-app/immich/blob/main/design/immich-logo.svg), consultado em 22/10/2026. A licença do projeto de origem acompanha o arquivo em `assets/IMMICH-LICENSE.txt`. A marca identifica o destino da integração; não implica endosso.
 
 Na abertura, uma foto percorre origem→Ponte→Immich. Na última cena, os estados de rede e a seleção das URLs mudam em sequência. Todos os endereços mostrados são exemplos.
+
+## Cobertura
+
+Esta apresentação antecede o fluxo Immich → Fotos. Para uma nova edição, inclua a importação, a escolha entre álbum existente e novo álbum e a navegação atual. Os diagramas não documentam a aparência exata do aplicativo.
