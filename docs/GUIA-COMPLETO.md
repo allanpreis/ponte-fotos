@@ -1,6 +1,6 @@
 # 🌸 Ponte Fotos — guia completo
 
-**Versão 0.9.2 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
+**Versão 0.9.3 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
 
 O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. Você escolhe, revisa data e localização, define o destino e acompanha o envio. Também pode consultar duplicatas entre contas e organizar álbuns do servidor.
 
@@ -14,7 +14,7 @@ O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. 
 2. Confira o SHA-256 do ZIP com o arquivo de checksums anexado à mesma release:
 
    ```sh
-   shasum -a 256 Ponte-Fotos-0.9.2-arm64.zip
+   shasum -a 256 Ponte-Fotos-0.9.3-arm64.zip
    ```
 
 3. Extraia o ZIP e mova **Ponte Fotos.app** para Aplicativos ou para a pasta local `~/Applications`.
@@ -276,3 +276,10 @@ Confira o destino na confirmação. Cancelar a confirmação não cria álbuns n
 ### 📶 Estabilidade da seleção — 0.9.2
 
 Avisos repetidos de rede do macOS, sem mudança de rota ou Wi-Fi, não reiniciam a conexão automática. Ao atualizar explicitamente os álbuns do Immich na mesma conexão, o álbum escolhido permanece selecionado pelo ID. Se ele tiver sido removido, escolha outro; o app não substitui uma seleção removida silenciosamente. Mudanças reais de conexão continuam invalidando consultas por segurança.
+
+
+### 🛠️ Integridade e permissões — 0.9.3
+
+Coordenadas XMP em graus/minutos/segundos preservam também os segundos. Campos inválidos, incompletos ou fora dos limites impedem que o arquivo seja incluído na análise; confira o contador de arquivos não lidos e revise o XMP antes de tentar novamente. XMP sem GPS continua preservando a localização incorporada.
+
+A organização considera as permissões das chaves e o acesso das contas proprietárias/editoras antes de escolher quem fará cada operação. Cancelar uma consulta HTTP deixa de produzir um falso erro de rede. A cópia de arquivos e o checksum da preparação rodam fora da thread da interface; a cópia atual ainda precisa terminar antes de uma pausa segura.
