@@ -20,6 +20,15 @@ final class IMAlbumFixture: URLProtocol {
     }
     override func stopLoading() {}
 }
+final class IMCancelledFixture: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let code: URLError.Code = request.url!.path.hasSuffix("cancelled") ? .cancelled : .notConnectedToInternet
+        client?.urlProtocol(self, didFailWithError: URLError(code))
+    }
+    override func stopLoading() {}
+}
 @main struct ImmichManagementAPITests {
     static func main() async throws {
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [IMAlbumFixture.self]
@@ -39,6 +48,23 @@ final class IMAlbumFixture: URLProtocol {
         precondition(Set(merged.first { $0.id == "one" }!.readerIDs) == ["a","b"])
         let asset = try await client.asset("photo")
         precondition(asset.ownerName == "Usuário B" && asset.fileSize == 1234 && asset.width == 800)
-        print("Management API: ownership via isOwned, editor access, shared union and real asset response shape passed (memory HTTP only).")
+        let cancelledConfig = URLSessionConfiguration.ephemeral
+        cancelledConfig.protocolClasses = [IMCancelledFixture.self]
+        let cancelledTransport = URLSession(configuration: cancelledConfig)
+        defer { cancelledTransport.invalidateAndCancel() }
+        let cancelledClient = IMClient(address: "http://fixture", credential: a, session: cancelledTransport)
+        // URLSession reports NSURLErrorDomain -999 even without a cancelled Swift Task.
+        precondition(!Task.isCancelled)
+        do {
+            _ = try await cancelledClient.data("cancelled")
+            preconditionFailure("Cancelled HTTP request must throw")
+        } catch is CancellationError { }
+        catch { preconditionFailure("HTTP -999 was not normalized: \(error)") }
+        do {
+            _ = try await cancelledClient.data("offline")
+            preconditionFailure("Offline request must throw")
+        } catch is CancellationError { preconditionFailure("A real network failure is not cancellation") }
+        catch { precondition(error is BridgeError) }
+        print("Management API: ownership via isOwned, editor access, shared union and real asset response shape and HTTP cancellation passed (memory HTTP only).")
     }
 }

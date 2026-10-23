@@ -24,6 +24,9 @@ final class OrganizationFixture {
     var links: [String: Set<String>] = [:]
     var events: [String] = []
     var permissions = ["all"]
+    var accountPermissions: [String: [String]] = [:]
+    var hiddenAssets: [String: Set<String>] = [:]
+    var mutationAccounts: [String] = []
     var birthday = "2000-02-29"
     var associated = true
     var failAdd = 0
@@ -80,8 +83,9 @@ final class OrganizationFixture {
         if path == "albums", method == "GET" {
             return (200, visible.filter { query["assetId"] == nil || links[$0.id, default: []].contains(query["assetId"]!) }.map(albumJSON))
         }
-        if path == "api-keys/me" { return (200, ["permissions": permissions]) }
+        if path == "api-keys/me" { return (200, ["permissions": accountPermissions[account] ?? permissions]) }
         if path == "people/person" { personRequests += 1; return (200, ["id": "person", "name": "Pessoa", "birthDate": birthday]) }
+        if path.hasPrefix("assets/"), hiddenAssets[account, default: []].contains(String(path.dropFirst(7))) { return (403, ["error": "forbidden"]) }
         if path.hasPrefix("assets/"), method == "GET", let asset = assets[String(path.dropFirst(7))] { return (200, raw(asset)) }
         if path == "timeline/buckets" { return (200, [["timeBucket": "2020-01-01"]]) }
         if path == "timeline/bucket" { return (200, ["id": Array(links[query["albumId"] ?? "", default: []]).sorted()]) }
@@ -100,6 +104,7 @@ final class OrganizationFixture {
             let body = try JSONSerialization.jsonObject(with: bodyData(request)) as! [String: [String]]
             let ids = body["ids"]!
             let albumID = String(path.split(separator: "/")[1])
+            mutationAccounts.append(account)
             events.append("\(method):\(albumID):\(ids.joined(separator: ","))")
             if method == "PUT" {
                 addCalls += 1
@@ -111,11 +116,11 @@ final class OrganizationFixture {
         }
         preconditionFailure("Unexpected request \(method) \(path)")
     }
-    func session() -> IMSession {
+    func session(accounts: [String] = ["p", "q"]) -> IMSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [OrganizationProtocol.self]
         OrganizationProtocol.handler = { try self.response($0) }
-        return IMSession(address: "http://organization.invalid", profileID: "profile", credentials: ["p", "q"].map { IMCredential(account: IMAccount(id: $0, name: $0), key: $0) }, session: URLSession(configuration: configuration))
+        return IMSession(address: "http://organization.invalid", profileID: "profile", credentials: accounts.map { IMCredential(account: IMAccount(id: $0, name: $0), key: $0) }, session: URLSession(configuration: configuration))
     }
 }
 
@@ -181,6 +186,92 @@ final class OrganizationFixture {
             let group = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
             try await IMOrganization.organize(session: session, analysis: analysis, selections: [group.id: "both"], progress: { _, _, _ in }, report: { _ in })
             check(fixture.events == ["PUT:B:c"] && fixture.links["A"]!.contains("c") && fixture.links["B"]!.contains("c"))
+        }
+        do {
+            let fixture = OrganizationFixture(), session = fixture.session()
+            fixture.accountPermissions = ["q": ["album.read", "asset.read"], "p": ["all"]]
+            let analysis = try await IMOrganization.compare(session: session, albums: Array(fixture.albums.prefix(2)), progress: { _, _, _ in })
+            let group = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
+            try await IMOrganization.organize(session: session, analysis: analysis, selections: [group.id: "both"], progress: { _, _, _ in }, report: { _ in })
+            check(fixture.events == ["PUT:B:c"])
+            check(fixture.mutationAccounts == ["p"])
+        }
+        // B needs both adding c and removing d: split scopes across keys cannot
+        // authorize a transaction, and no changes may precede this preflight.
+        for scopes in [["albumAsset.create"], ["albumAsset.delete"], ["albumAsset.create", "albumAsset.delete"]] {
+            let fixture = OrganizationFixture()
+            fixture.albums[0].ownerID = "r"
+            fixture.albums[0].readerIDs.append("r")
+            fixture.albums[0].writerIDs = ["r"]
+            let session = fixture.session(accounts: ["p", "q", "r"])
+            let analysis = try await IMOrganization.compare(session: session, albums: Array(fixture.albums.prefix(2)), progress: { _, _, _ in })
+            let c = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
+            let d = analysis.groups.first { $0.assets.contains { $0.id == "d" } }!
+            fixture.accountPermissions = ["q": scopes, "p": ["albumAsset.create"]]
+            if scopes.count == 2 {
+                try await IMOrganization.organize(session: session, analysis: analysis, selections: [c.id: "B", d.id: "A"], progress: { _, _, _ in }, report: { _ in })
+                check(fixture.events.filter { $0.contains(":B:") }.count == 2)
+            } else {
+                await blocked {
+                    try await IMOrganization.organize(session: session, analysis: analysis, selections: [c.id: "B", d.id: "A"], progress: { _, _, _ in }, report: { _ in })
+                }
+                check(fixture.events.isEmpty)
+            }
+        }
+        do {
+            let fixture = OrganizationFixture(), session = fixture.session()
+            let analysis = try await IMOrganization.compare(session: session, albums: Array(fixture.albums.prefix(2)), progress: { _, _, _ in })
+            let group = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
+            fixture.hiddenAssets = ["q": ["c"]]
+            try await IMOrganization.organize(session: session, analysis: analysis, selections: [group.id: "both"], progress: { _, _, _ in }, report: { _ in })
+            check(fixture.mutationAccounts == ["p"])
+        }
+        for status in [401, 403, 404] {
+            let fixture = OrganizationFixture(), session = fixture.session()
+            let analysis = try await IMOrganization.compare(session: session, albums: Array(fixture.albums.prefix(2)), progress: { _, _, _ in })
+            let group = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
+            OrganizationProtocol.handler = { request in
+                if request.url!.path.hasSuffix("api-keys/me"), request.value(forHTTPHeaderField: "x-api-key") == "q" {
+                    return (status, ["error": "access"])
+                }
+                return try fixture.response(request)
+            }
+            try await IMOrganization.organize(session: session, analysis: analysis, selections: [group.id: "both"], progress: { _, _, _ in }, report: { _ in })
+            check(fixture.mutationAccounts == ["p"])
+        }
+        for failure in ["timeout", "server", "decode", "cancelled"] {
+            let fixture = OrganizationFixture(), session = fixture.session()
+            let analysis = try await IMOrganization.compare(session: session, albums: Array(fixture.albums.prefix(2)), progress: { _, _, _ in })
+            let group = analysis.groups.first { $0.assets.contains { $0.id == "c" } }!
+            var permissionAccounts: [String] = []
+            OrganizationProtocol.handler = { request in
+                if request.url!.path.hasSuffix("api-keys/me") {
+                    permissionAccounts.append(request.value(forHTTPHeaderField: "x-api-key") ?? "")
+                    switch failure {
+                    case "timeout": throw URLError(.timedOut)
+                    case "cancelled": throw URLError(.cancelled)
+                    case "server": return (503, ["error": "unavailable"])
+                    default: return (200, ["permissions": "invalid-response"])
+                    }
+                }
+                return try fixture.response(request)
+            }
+            do {
+                try await IMOrganization.organize(session: session, analysis: analysis, selections: [group.id: "both"], progress: { _, _, _ in }, report: { _ in })
+                preconditionFailure("Preflight failure must propagate")
+            } catch {
+                check((error is CancellationError) == (failure == "cancelled"))
+                if failure != "cancelled" {
+                    let message = error.localizedDescription
+                    switch failure {
+                    case "timeout": check(message.contains("consulta ao Immich não foi confirmada"))
+                    case "server": check(message.contains("HTTP 503"))
+                    default: check(message.contains("incompatível"))
+                    }
+                }
+            }
+            check(permissionAccounts == ["q"])
+            check(fixture.events.isEmpty)
         }
         for failure in ["permission", "checksum", "live", "membership", "persistence", "profile", "expired", "selection", "unverified-add", "second-add"] {
             let fixture = OrganizationFixture(), session = fixture.session()
