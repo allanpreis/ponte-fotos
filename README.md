@@ -23,11 +23,11 @@ Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbu
 
 ## Apresentação
 
-https://github.com/user-attachments/assets/e5f2059a-b226-4cff-93a3-d166cbb0f6cb
+https://github.com/user-attachments/assets/597d2a8e-a5d8-4eb8-9608-9b1b301bc455
 
-[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 36 segundos · sem áudio · 1080p.
+[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · [Pôster](docs/media/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
 
-O vídeo apresenta envio, revisão, duplicatas e conexão automática por meio de diagramas ilustrativos. Foi produzido antes da importação Immich → Fotos e não mostra esse fluxo. Consulte os prints atuais e o guia para conhecer os dois sentidos da transferência. [Fonte do vídeo](promo/README.md).
+A apresentação ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface. [Fonte do vídeo](promo/README.md).
 
 ## Interface
 

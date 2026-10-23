@@ -61,3 +61,7 @@ renders/
 .playwright-cli/
 playwright-report/
 test-results/
+
+# Miniaturas locais do editor de vídeo
+.thumbnails/
+.*.hf-transaction-*/
