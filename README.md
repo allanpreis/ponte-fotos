@@ -23,7 +23,7 @@ Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbu
 
 ## Apresentação
 
-https://github.com/user-attachments/assets/597d2a8e-a5d8-4eb8-9608-9b1b301bc455
+https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
 
 [Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · [Pôster](docs/media/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
 
