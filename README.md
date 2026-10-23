@@ -4,9 +4,11 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.2 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.3 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
+
+A versão 0.9.3 corrige a leitura de GPS XMP com segundos, a escolha de contas editoras autorizadas e o aviso ao cancelar consultas. Preparação de cópias e checksum rodam fora da thread da interface. [Notas da versão](docs/releases/v0.9.3.md).
 
 ## 📥 Immich → Fotos da Apple
 
@@ -29,9 +31,9 @@ A versão 0.8.2 corrige o enquadramento do ícone no macOS, melhora a nitidez da
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.2 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.2/Ponte-Fotos-0.9.2-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.3 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.2) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
 
 ## 📸 Uma biblioteca, conectada
 
@@ -218,6 +220,7 @@ zsh test-management.sh
 zsh test-media.sh
 zsh test-appearance.sh
 zsh test-reverse.sh
+zsh test-fileio.sh
 plutil -lint Info.plist
 codesign --verify --deep --strict "build/Ponte Fotos.app"
 ```

@@ -2,6 +2,16 @@
 
 As mudanças são agrupadas por versão. [Releases e downloads](https://github.com/allanpreis/ponte-fotos/releases) · [Guia completo](docs/GUIA-COMPLETO.md)
 
+## 0.9.3 — 2026-10-23
+
+### 🛠️ Correções da revisão de código
+
+- GPS XMP preserva segundos e rejeita coordenadas inválidas, incompletas ou incompatíveis com o eixo, sem fallback silencioso.
+- Organização seleciona uma conta proprietária/editora que tenha todos os escopos e acesso necessários, antes de qualquer alteração.
+- Cancelamento HTTP é reconhecido como cancelamento, sem mensagem indevida de falha de conexão.
+- Preparação de cópias e checksum fora da thread da interface; originais preservados e temporários privados.
+- Regressões sintéticas para os casos identificados na auditoria. A tentativa Strix anterior foi inconclusiva; estas correções foram verificadas independentemente.
+
 ## 0.9.2 — 2026-10-23
 
 ### 📶 Conexão automática e seleção estável
