@@ -6,57 +6,57 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 0.9.3 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 0.9.4 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
-**Language:** this README is available in English and Brazilian Portuguese. The current app interface, screenshots, presentation video, and release notes are in Brazilian Portuguese. Instructions below retain the app's Portuguese control names, with English translations to help you find them.
+**Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. Quit and reopen the app to apply a change. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-Version 0.9.3 fixes XMP GPS parsing with seconds, selection of authorized editor accounts, and cancellation messages for queries. Copy preparation and checksum calculation run off the UI thread. [Release notes (Portuguese)](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3).
+Version 0.9.4 adds English and Brazilian Portuguese throughout the interface, status messages, review screens, and permission prompts, plus a saved language preference. Dates follow the selected language while retaining the Mac’s time zone. Existing transfer and organization safeguards remain in place. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4).
 
 ## 📥 Immich → Apple Photos
 
-Open **Immich → Fotos** (Immich → Photos) in the sidebar. Test the connection, refresh the albums, load an album, and select items. Check capture dates, GPS, and the Live Photo indicator; choose **Álbum existente** (Existing album) or **Criar novo álbum** (Create new album) as the destination, then confirm the import.
+Open **Immich → Photos** in the sidebar. Test the connection, refresh the albums, load an album, and select items. Check capture dates, GPS, and the Live Photo indicator; choose **Existing album** or **Create new album** as the destination, then confirm the import.
 
 The app downloads originals, verifies their checksums, and uses PhotoKit to create items in Photos on this Mac. iCloud follows your Photos settings. Immich originals remain untouched. Items without a valid date and explicit time zone, with invalid locations, or with unavailable resources are blocked. Live Photos require a compatible image and video. Recognized people and editing history are not transferred.
 
-**Atualizar álbuns do Fotos** (Refresh Photos albums) lists only editable destinations without creating or changing items. Albums with identical names are distinguished in the list and selected by identifier. A new album is created only after confirmation and becomes the destination for subsequent batches.
+**Refresh Photos albums** lists only editable destinations without creating or changing items. Albums with identical names are distinguished in the list and selected by identifier. A new album is created only after confirmation and becomes the destination for subsequent batches.
 
 Photos previously imported by the app can be selected and added to another album without downloading them again, creating more copies, or removing them from earlier albums. A local history for each profile/account prevents repeating imports made by Ponte Fotos; it does not compare your entire preexisting library. Results without final confirmation remain blocked to prevent automatic retries.
 
 ## Presentation
 
-https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
+https://github.com/user-attachments/assets/937288e1-6684-49f7-9696-dfd71f2f05e8
 
-[Watch or download the video](Assets/ponte-fotos-promo.mp4) · [Poster](Assets/ponte-fotos-poster.png) · 66 seconds · no audio · 1080p · Portuguese text.
+[Watch or download the video](Assets/ponte-fotos-promo-en.mp4) · [Poster](Assets/ponte-fotos-poster-en.png) · 66 seconds · no audio · 1080p · English text.
 
 The presentation illustrates transfers in both directions, metadata review, importing into existing or new Photos albums, adding previously imported items to albums without more copies, Live Photo protection, organization, and automatic connection selection. The diagrams use synthetic data and are not recordings of the interface.
 
 ## Interface
 
-![Ponte Fotos: library and navigation (Portuguese interface)](Assets/library-093.png)
+![Ponte Fotos: library and navigation (English interface)](Assets/library-en-094.png)
 
-![Importing from Immich into Apple Photos (Portuguese interface)](Assets/reverse-import-093.png)
+![Importing from Immich into Apple Photos (English interface)](Assets/reverse-import-en-094.png)
 
 The screenshots use demo data without accessing personal libraries.
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 0.9.3 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 0.9.4 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.4/Ponte-Fotos-0.9.4-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
-Open **Configurações** (Settings) in the sidebar or press **⌘,**:
+Open **Settings** in the sidebar or press **⌘,**:
 
-- **Conexão** (Connection): local/remote addresses, **Automático/Local/Remoto** (Automatic/Local/Remote) mode, home Wi-Fi, and the main API key.
-- **Contas e API** (Accounts and API): additional accounts used for library management; requires a validated connection and stores keys in macOS Keychain.
-- **Aparência** (Appearance): **Claro**, **Escuro**, or **Sistema** (Light, Dark, or System). Your selection is saved and also applies to review and management windows.
+- **Connection**: local/remote addresses, **Automatic/Local/Remote** mode, home Wi-Fi, and the main API key.
+- **Accounts & API**: additional accounts used for library management; requires a validated connection and stores keys in macOS Keychain.
+- **Appearance**: **Light**, **Dark**, or **System** theme, glass effects, and **App language**. Theme choices apply to review and management windows. Language changes apply after restarting the app.
 
 The main screen keeps the source, destination, media list, and actions visible without a scrolling connection panel. In smaller windows, the list keeps its own scroll area; longer forms scroll only within Settings.
 
-**Usar transparência e vidro** (Use transparency and glass) controls the navigation's appearance. Native Liquid Glass is used on macOS 26 or later; macOS 14/15 use compatible translucent materials. Turning this option off or enabling **Reduce transparency** in macOS uses opaque surfaces. Photos and forms remain solid for readability. Theme and glass preferences are nonsensitive UserDefaults values; they are not stored with API keys.
+**Use transparency and glass** controls the navigation's appearance. Native Liquid Glass is used on macOS 26 or later; macOS 14/15 use compatible translucent materials. Turning this option off or enabling **Reduce transparency** in macOS uses opaque surfaces. Photos and forms remain solid for readability. Language, theme, and glass preferences are nonsensitive UserDefaults values; they are not stored with API keys.
 
 ## Features
 
@@ -103,10 +103,10 @@ Do not run the bundle directly from a synced folder that changes its extended at
 
 ## First connection
 
-1. Open **Configurações → Conexão** in the app (or press **⌘,**).
+1. Open **Settings → Connection** in the app (or press **⌘,**).
 2. Enter your Immich URL and the destination account's API key. Use the base URL without embedded credentials or query parameters.
-3. Choose **Local** or **Remoto** mode and click **Testar conexão** (Test connection).
-4. To save the details, click **Salvar configuração** (Save configuration). They are stored in macOS Keychain.
+3. Choose **Local** or **Remote** mode and click **Test connection**.
+4. To save the details, click **Save settings**. They are stored in macOS Keychain.
 
 The published code starts with an empty configuration. Example values: local URL `http://immich.local:2283`, remote URL `https://photos.example.com`, Wi-Fi `MinhaRede`. These are fictional examples; replace them with your own details in the interface.
 
@@ -130,7 +130,7 @@ The server may require additional scopes depending on its version and the endpoi
 
 ### Automatic address selection
 
-Enter the local URL, remote URL, and exact home Wi-Fi name, then choose **Automático**. Grant **Localização** (Location) permission using the app's button: macOS requires this permission to provide the network name. The app uses the SSID to choose the address; it does not query or store your location.
+Enter the local URL, remote URL, and exact home Wi-Fi name, then choose **Automatic**. Grant **Location** permission using the app's button: macOS requires this permission to provide the network name. The app uses the SSID to choose the address; it does not query or store your location.
 
 - On the configured Wi-Fi, it tries the local URL; connectivity failures or eligible server errors may trigger a remote attempt.
 - On another network, without Wi-Fi, or without SSID access, it uses the remote URL.
@@ -142,9 +142,9 @@ Validation pins the account UUID, not a cryptographic server identity. Configure
 
 ## Upload photos and videos
 
-1. Select **Biblioteca Apple** (Apple library) and **Abrir biblioteca** (Open library), granting access to Photos. Or use **Escolher pasta…** (Choose folder…) to select a source folder or drive.
+1. Select **Apple Photos** in the sidebar and grant access to Photos. Or select **Drives and folders** to choose a source folder or drive.
 2. Select items and check the date/GPS indicators. Downloading iCloud originals depends on access to the account/library in macOS itself.
-3. Use **Revisar selecionada** (Review selected item) to complete missing dates or locations. Uploading without a reliable date requires review; the app does not automatically use file creation time as the capture date.
+3. Use **Review** to complete missing dates or locations. Uploading without a reliable date requires review; the app does not automatically use file creation time as the capture date.
 4. Choose the destination: no album, an existing album, or a new album.
 5. Upload a small sample and check the result in Immich before sending a large batch.
 
@@ -152,7 +152,7 @@ Originals retain their bytes; an XMP sidecar carries dates and locations from th
 
 For Live Photos from Apple Photos, the motion video is uploaded first and associated with the main image. HEIC and MOV files from external folders are independent items: the app does not assume they are a pair based only on their names. Associated RAW and JPEG files are preserved as distinct resources without automatic stacking.
 
-**Pausar após este item** (Pause after this item) finishes the current resource set. History and checksums help reuse previously uploaded resources that are still valid. Interruptions can leave pending or uncertain results: check the server before retrying.
+**Pause after this item** finishes the current resource set. History and checksums help reuse previously uploaded resources that are still valid. Interruptions can leave pending or uncertain results: check the server before retrying.
 
 ### Metadata verification
 
@@ -162,13 +162,13 @@ PhotoKit supplies an absolute instant; previews use the Mac's time zone, and XMP
 
 ## Manage Immich
 
-With a validated connection, open **Gerenciar biblioteca** (Manage library) in the sidebar. In **Contas e API**, click **Usar conta da conexão atual** (Use current connection account) or add an account with its own key. Additional accounts are saved separately in Keychain; the current account can be used only in memory for that session.
+With a validated connection, open **Manage library** in the sidebar. In **Accounts & API**, click **Use current connection account** or add an account with its own key. Additional accounts are saved separately in Keychain; the current account can be used only in memory for that session.
 
 ### Albums and duplicates
 
 Select albums and run the query. Comparison uses exact checksums and media types, including the main image of Live Photos. Matching names or similar appearance alone do not establish duplication. Recompressed, edited, or otherwise byte-different files may be absent from the results.
 
-Each copy shows its account, name, format, metadata, and accessible albums. **Live Photo · com movimento** (Live Photo · with motion) and **Foto estática** (Still photo) appear in separate groups. A Live Photo is suggested for retention; moving any Live Photo to the trash is blocked. Groups without a connected owner account may also be blocked.
+Each copy shows its account, name, format, metadata, and accessible albums. **Live Photo · with motion** and **Still photo** appear in separate groups. A Live Photo is suggested for retention; moving any Live Photo to the trash is blocked. Groups without a connected owner account may also be blocked.
 
 Before moving items to the trash, the app revalidates content, ownership, motion, access, and album membership; it adds and confirms membership in accessible albums on the retained copy before the first deletion. Deletion is recoverable in Immich (`force: false`); the app does not empty the trash. It cannot preserve album membership invisible to the connected accounts.
 
@@ -207,7 +207,7 @@ Every management change goes through a review screen and explicit confirmation. 
 | `~/Library/Application Support/PonteFotos/staging/` | Temporary copies; abrupt interruption can leave files behind. |
 | Selected export folder | Originals and XMP sidecars exported by the user. |
 
-Histories, reviews, and exports may contain personal names, IDs, dates, and GPS. Do not publish them in issues, logs, or repositories. **Esquecer conexão salva** (Forget saved connection) removes the main connection from Keychain; current fields remain in memory until you close the app. This does not automatically remove additional accounts or local histories.
+Histories, reviews, and exports may contain personal names, IDs, dates, and GPS. Do not publish them in issues, logs, or repositories. **Forget connection** removes the main connection from Keychain; current fields remain in memory until you close the app. This does not automatically remove additional accounts or local histories.
 
 The `.gitignore` excludes `.env`, common credentials, builds, bundles, archives, and local state. It does not remove secrets already tracked by Git or replace review before each commit. The repository contains application source code, app assets, and README documentation and media.
 
@@ -217,7 +217,7 @@ Reverse import history is stored in `~/Library/Application Support/PonteFotos/re
 
 ```text
 Sources/          Swift application source code
-Assets/           Logo, icons, screenshots, presentation video and poster
+Assets/           Logo, icons, localized strings, screenshots, presentation videos and posters
 Info.plist        Version, identifier, and macOS permissions
 build.sh          Build and local signing
 README.md         English installation, features, usage, and limitations
