@@ -6,13 +6,13 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.3 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.4 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
-**Idioma:** esta documentação está disponível em inglês e português. A interface do aplicativo, os prints, o vídeo e as notas de versões atuais estão em português (Brasil).
+**Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Encerre e abra o app para aplicar a mudança. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.3 corrige a leitura de GPS XMP com segundos, a escolha de contas editoras autorizadas e o aviso ao cancelar consultas. Preparação de cópias e checksum rodam fora da thread da interface. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3).
+A versão 0.9.4 adiciona inglês e português (Brasil) à interface, aos status, às revisões e aos pedidos de permissão, além de salvar a preferência de idioma. As datas acompanham o idioma escolhido e preservam o fuso do Mac. As proteções dos fluxos de transferência e organização continuam disponíveis. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4).
 
 ## 📥 Immich → Fotos da Apple
 
@@ -43,9 +43,9 @@ As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.3 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.4 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.4/Ponte-Fotos-0.9.4-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -53,11 +53,11 @@ Abra **Configurações** na barra lateral ou use **⌘,**:
 
 - **Conexão**: endereços local/remoto, modo Automático/Local/Remoto, Wi-Fi doméstico e chave principal.
 - **Contas e API**: contas adicionais usadas pela gestão; exige conexão validada e mantém chaves no Chaves do macOS.
-- **Aparência**: Claro, Escuro ou Sistema. A escolha é salva e aplicada também às janelas de revisão e gestão.
+- **Aparência**: tema Claro, Escuro ou Sistema, efeitos de vidro e **Idioma do aplicativo**. O tema também vale para revisão e gestão. A mudança de idioma é aplicada depois de reiniciar o app.
 
 A tela principal mantém origem, destino, lista de mídia e ações sem um painel rolável de conexão. Em janelas menores, a lista conserva sua própria rolagem; formulários extensos rolam somente dentro de Configurações.
 
-A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
+A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Idioma, tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
 
 ## Recursos
 
@@ -143,9 +143,9 @@ A conferência fixa o UUID da conta, não uma identidade criptográfica do servi
 
 ## Enviar fotos e vídeos
 
-1. Selecione **Biblioteca Apple** e **Abrir biblioteca**, concedendo acesso ao Fotos. Ou use **Escolher pasta…** e selecione a origem em um disco/pasta.
+1. Selecione **Fotos da Apple** na barra lateral e conceda acesso ao Fotos. Ou selecione **Discos e pastas** e escolha a origem em um disco/pasta.
 2. Escolha itens e confira as indicações de data/GPS. A opção de baixar originais do iCloud depende do acesso à conta/biblioteca do próprio macOS.
-3. Use **Revisar selecionada** para completar data ou localização ausente. Sem data confiável, o envio exige revisão; o app não usa automaticamente a criação do arquivo como data de captura.
+3. Use **Revisar** para completar data ou localização ausente. Sem data confiável, o envio exige revisão; o app não usa automaticamente a criação do arquivo como data de captura.
 4. Escolha o destino: sem álbum, álbum existente ou novo álbum.
 5. Envie uma pequena amostra e confira o resultado no Immich antes de um lote grande.
 
@@ -208,7 +208,7 @@ Toda alteração da gestão passa por uma tela de revisão e uma confirmação e
 | `~/Library/Application Support/PonteFotos/staging/` | Cópias temporárias; uma interrupção abrupta pode deixar resíduos. |
 | Pasta escolhida para exportação | Originais e XMP exportados pelo usuário. |
 
-Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pessoais. Não os publique em issues, logs ou repositórios. **Esquecer conexão salva** remove a conexão principal do Chaves; os campos atuais permanecem na memória até fechar. Isso não remove automaticamente contas adicionais ou históricos locais.
+Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pessoais. Não os publique em issues, logs ou repositórios. **Esquecer conexão** remove a conexão principal do Chaves; os campos atuais permanecem na memória até fechar. Isso não remove automaticamente contas adicionais ou históricos locais.
 
 O `.gitignore` exclui `.env`, credenciais usuais, builds, bundles, arquivos compactados e estado local. Ele não remove segredos já versionados e não substitui revisão antes de cada commit. O repositório contém os fontes do aplicativo, seus recursos visuais e a mídia usada pelos READMEs.
 
@@ -218,7 +218,7 @@ O histórico da importação inversa fica em `~/Library/Application Support/Pont
 
 ```text
 Sources/       Código Swift do aplicativo
-Assets/        Logo, ícones, prints, vídeo e pôster da apresentação
+Assets/        Logo, ícones, traduções, prints, vídeos e pôsteres da apresentação
 Info.plist     Versão, identificador e permissões do macOS
 build.sh       Compilação e assinatura local
 README.md      Documentação principal em inglês
