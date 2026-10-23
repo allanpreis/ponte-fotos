@@ -53,3 +53,11 @@ xcuserdata/
 node_modules/
 .hyperframes/
 renders/
+
+# Ferramentas locais de agentes e evidências de QA
+.omx/
+.codex/
+.agents/
+.playwright-cli/
+playwright-report/
+test-results/

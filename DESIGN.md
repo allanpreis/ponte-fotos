@@ -1,60 +1,38 @@
-# Design
+# Interface do Ponte Fotos
 
-## Source of truth
-Active · 2026-10-22 · Ponte Fotos macOS, main window, metadata review and all Immich management sheets. Evidence: current SwiftUI views, README, original user screenshots and existing synthetic visual fixture. This contract governs the 0.7 settings and appearance update.
+## Navegação
 
-## Brand
-Calm, precise and familiar to macOS. Photography remains the subject; interface decoration is restrained. Preserve the existing app logo. Avoid gradients, neon, marketing slogans and web-style dashboards.
+A barra lateral separa Fotos da Apple, discos e pastas, Immich → Fotos, gestão da biblioteca e configurações. A tela principal reúne origem, destino, lista de mídia e ações. Conexão, contas/API e aparência ficam em Configurações, acessíveis também por ⌘,.
 
-## Product goals
-Make source, destination, connection and pending work easy to recognize. Give primary actions a clear location. Preserve original files and all existing confirmation guards. No change to upload, duplicate analysis, networking, credentials or transaction rules.
+Na importação, a origem é um álbum do Immich. O destino permite escolher um álbum editável do Fotos ou informar o nome de um novo álbum. Nomes repetidos são diferenciados; a seleção usa o identificador do álbum. A criação ocorre somente após confirmação.
 
-## Personas and jobs
-A Mac user importing original photos or reviewing an Immich library, sometimes offline or with a server under maintenance. Common jobs: choose source, review metadata, select destination, send; inspect duplicates and confirm organization.
+## Cores e tipografia
 
-## Information architecture
-Main window: source sidebar, compact connection-status button, source/destination sections, selectable media list and persistent actions. No scrolling connection pane in the main workflow. Dedicated Settings page (sidebar or Cmd+,) owns Connection, Accounts/API and Appearance sections; only its long forms scroll. Immich management retains five named areas. Metadata review has summary, capture date, location and persistent save/cancel actions.
+Use tipografia de sistema: título de página em 28 pt semibold, títulos de seção nativos, corpo em 13 pt e texto secundário em 11–12 pt. Cores semânticas acompanham o tema: azul para ações, verde para resultados confirmados, laranja para avisos e vermelho para erros.
 
-## Design principles
-Use native controls before custom equivalents. Separate configuration from everyday actions. Make read, selection and mutation states distinct. A label must explain a state without relying only on color. Safety text must remain visible and accurate.
+Os espaçamentos seguem a escala 4/8/12/16/20/24/32 pt. Cartões agrupam tarefas relacionadas, com raio contínuo de 18 pt e contorno discreto de 0,5 pt. `Sources/DesignSystem.swift` reúne temas, cartões, títulos, indicadores e estados vazios.
 
-## Visual language
-System SF typography; no bundled fonts. Page title 28pt semibold, section headings native headline, body 13pt, secondary 11–12pt. Native blue accent, semantic primary/secondary text, window and control backgrounds that adapt to light/dark. Green for confirmed results, orange for warnings, red for errors. Spacing 4/8/12/16/20/24/32pt; cards 18pt continuous radius, subtle 0.5pt separator stroke. Native Liquid Glass only in sidebar/footer on macOS26+, regularMaterial fallback on macOS14/15. Content cards remain opaque. User may disable glass; Reduce Transparency always forces opaque navigation. No decorative animation; honor system reduced motion.
+## Aparência e acessibilidade
 
-## Components
-`Sources/DesignSystem.swift` owns PFTheme, PFCard, PFSectionHeading, PFBadge and PFEmptyState. Cards group related tasks rather than individual labels. Use borderedProminent only for primary actions. Live/static badges occupy their own layout row, never overlay filenames or dates. Selected keeper needs text/icon as well as border color.
+Os temas Claro, Escuro e Sistema se aplicam também às janelas de revisão e gestão. Liquid Glass é usado em áreas de navegação e ações no macOS 26 ou superior; macOS 14/15 usa materiais compatíveis. Desativar vidro ou ativar Reduzir transparência produz navegação opaca. Fotos e formulários mantêm superfícies sólidas.
 
-## Accessibility
-Native button/picker/toggle semantics, VoiceOver labels and keyboard focus. Decorative icons hidden from accessibility. Semantic colors preserve system adaptation; text never reduced to faint custom gray. Long filenames may wrap or truncate with selectable full metadata in review. No information communicated solely through color; disabled controls retain explanatory context.
+Prefira controles nativos, rótulos de acessibilidade e foco por teclado. Estados precisam de texto ou ícone além da cor. Indicadores de Live Photo e foto estática ocupam uma linha própria, sem sobrepor nomes ou datas. Ícones decorativos não participam da leitura por VoiceOver.
 
-## Responsive behavior
-Desktop target macOS 14+, Apple Silicon. Main window minimum 900×650, default about 1220×840. Sidebar about 220pt. Source/destination and action groups use ViewThatFits or adaptive grids; stack when horizontal content cannot fit. Settings forms scroll on their dedicated page, not above the library. Review content scrolls with actions pinned. Check compact and large windows, plus light and dark appearances. No mobile web interface is introduced.
+## Layout
 
-## Interaction states
-Empty library has a clear source prompt. Connection state remains visible when collapsed. Loading shows progress and existing cancel/pause semantics. Offline server disables remote actions, local review/export stay available. Errors are selectable and labeled. Mutation review keeps explicit acceptance and all existing protection rules.
+A janela tem mínimo de 900 × 650 e barra lateral de aproximadamente 220 pt. Grupos de controles se adaptam com `ViewThatFits` ou grades adaptativas; formulários e listas têm rolagem própria. As ações de revisão permanecem acessíveis enquanto o conteúdo rola.
 
-## Content voice
-Portuguese, concise verbs: Abrir biblioteca, Escolher pasta, Revisar, Enviar. Explain what will change before confirmation. Preserve precise Live Photo/static distinctions. Do not expose internal implementation terms unless useful for an informed decision.
+## Estados e confirmações
 
-## Implementation constraints
-SwiftUI/AppKit only, existing macOS 14 APIs, no dependencies. Preserve observable model identity and selection state. Views may be extracted, engines and persistence remain unchanged. Run existing connection/management/media tests, build/plist/signature, plus synthetic native visual checks. Verify no private configuration is introduced into source.
+A biblioteca vazia orienta a escolha de uma origem. Consultas remotas dependem de conexão validada; revisão e exportação local permanecem disponíveis sem servidor. Erros são identificados e selecionáveis. Consultar álbuns não inicia importações.
 
-## Open questions
-No blocking questions. User explicitly requested and received persisted System/Light/Dark themes and a transparency/glass toggle, propagated to each presentation root. A signed/notarized distribution and Intel support are outside this visual refresh.
+Alterações exigem revisão e confirmação. Durante uma transferência, origem, conexão e navegação ficam protegidas até um ponto seguro. Cancelar preserva os resultados já confirmados. O histórico de importação reconhece somente itens importados pelo aplicativo.
 
+Os textos usam português direto e verbos concretos, como Abrir biblioteca, Escolher pasta, Revisar e Enviar. A confirmação explica o que será alterado e qual será o destino.
 
-## Apple API references
+## Referências
+
 - [Materials — Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/materials)
 - [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)
 - [preferredColorScheme](https://developer.apple.com/documentation/swiftui/view/preferredcolorscheme(_:))
 - [accessibilityReduceTransparency](https://developer.apple.com/documentation/swiftui/environmentvalues/accessibilityreducetransparency)
-
-SDK27 interfaces inspected: glassEffect(_:in:) requires macOS26; deployment remains macOS14 using runtime availability guards. No custom shaders, compatibility packages or accessibility setting overrides.
-
-
-## Reverse import (0.9.0)
-Sidebar Immich adds “Immich → Fotos”. It is discoverable offline and explains how to configure a connection. The page queries only on explicit actions: source album, current metadata and thumbnails, editable destination album, per-item selection and Live/static badges. Confirmation precedes PhotoKit permissions and writes. Import locks source/connection/navigation until the current item completes; cancellation preserves confirmed results. History protection must be described as this app's imports, never whole-library duplicate detection. Source controls wrap with ViewThatFits; only item list scrolls.
-
-
-## Apple Photos destination (0.9.1)
-Reverse import destination uses a segmented existing/new choice. Existing mode exposes an explicit refresh action and picker bound to Photos localIdentifier; duplicate titles remain distinguishable in picker and confirmation. New mode exposes a name field and states that creation happens only on confirmation. Existing imported assets stay selectable for album membership without new files or removal from previous albums. Source and destination controls wrap independently; selection footer remains visible at minimum window size.

@@ -10,7 +10,7 @@ As mudanças são agrupadas por versão. [Releases e downloads](https://github.c
 - Organização seleciona uma conta proprietária/editora que tenha todos os escopos e acesso necessários, antes de qualquer alteração.
 - Cancelamento HTTP é reconhecido como cancelamento, sem mensagem indevida de falha de conexão.
 - Preparação de cópias e checksum fora da thread da interface; originais preservados e temporários privados.
-- Regressões sintéticas para os casos identificados na auditoria. A tentativa Strix anterior foi inconclusiva; estas correções foram verificadas independentemente.
+- Regressões sintéticas para os casos identificados na auditoria.
 
 ## 0.9.2 — 2026-10-23
 

@@ -27,7 +27,15 @@ https://github.com/user-attachments/assets/e5f2059a-b226-4cff-93a3-d166cbb0f6cb
 
 [Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · 36 segundos · sem áudio · 1080p.
 
-A versão 0.8.2 corrige o enquadramento do ícone no macOS, melhora a nitidez da logo e aplica o tema Sistema imediatamente. A arte gerada aprovada permanece no app, no ícone e no vídeo. A apresentação mostra a foto atravessando o Ponte Fotos até o logo oficial do Immich e a troca automática de URLs conforme a rede. [Arte e conceito](docs/BRAND.md) · [Fonte reproduzível do vídeo](promo/README.md).
+O vídeo apresenta envio, revisão, duplicatas e conexão automática por meio de diagramas ilustrativos. Foi produzido antes da importação Immich → Fotos e não mostra esse fluxo. Consulte os prints atuais e o guia para conhecer os dois sentidos da transferência. [Fonte do vídeo](promo/README.md).
+
+## Interface
+
+![Ponte Fotos: biblioteca e navegação](docs/media/library-093.png)
+
+![Importação do Immich com destino no Fotos da Apple](docs/media/reverse-import-093.png)
+
+As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
 
 ## 📦 Instalar pela release
 
@@ -35,15 +43,9 @@ Baixe o [Ponte Fotos 0.9.3 para Apple Silicon](https://github.com/allanpreis/pon
 
 [🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
 
-## 📸 Uma biblioteca, conectada
-
-![Biblioteca com a logo aprovada e arquivos de demonstração](docs/media/library-v081.png)
-
-Os prints usam uma prévia isolada e dados de demonstração. Veja também [temas e vidro](docs/media/settings-v081.png) e [Live Photo/estática na gestão](docs/media/duplicates-v081.png).
-
 ## Visual e configurações
 
-A versão 0.7 separa as configurações da tela de fotos. Abra **Configurações** na barra lateral ou use **⌘,**:
+Abra **Configurações** na barra lateral ou use **⌘,**:
 
 - **Conexão**: endereços local/remoto, modo Automático/Local/Remoto, Wi-Fi doméstico e chave principal.
 - **Contas e API**: contas adicionais usadas pela gestão; exige conexão validada e mantém chaves no Chaves do macOS.
@@ -53,7 +55,7 @@ A tela principal mantém origem, destino, lista de mídia e ações sem um paine
 
 A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
 
-O contrato visual e as referências oficiais da Apple estão em [DESIGN.md](DESIGN.md). As regras de envio e proteção de Live Photos permanecem preservadas.
+As convenções de interface estão em [DESIGN.md](DESIGN.md).
 
 ## Recursos
 
@@ -160,7 +162,7 @@ O PhotoKit fornece um instante absoluto; a prévia usa o fuso do Mac e o XMP com
 
 ## Gerenciar o Immich
 
-Com a conexão validada, abra **Gerenciar Immich** na barra lateral. Em **Contas e API**, clique em **Usar conta da conexão atual** ou adicione uma conta com a própria chave. Contas adicionais são salvas separadamente no Chaves; a conta atual pode ser usada apenas em memória nessa sessão. Nenhuma chave é copiada de outro dashboard.
+Com a conexão validada, abra **Gerenciar biblioteca** na barra lateral. Em **Contas e API**, clique em **Usar conta da conexão atual** ou adicione uma conta com a própria chave. Contas adicionais são salvas separadamente no Chaves; a conta atual pode ser usada apenas em memória nessa sessão.
 
 ### Álbuns e duplicatas
 
@@ -248,6 +250,9 @@ Sources/
   ImmichDuplicates.swift      Análise e revisão de duplicatas
   ImmichOrganization.swift    Comparação e pessoa/idade
   ImmichWorkspace.swift       Interface das cinco abas
+  ReverseImport.swift         Importação para o Fotos e histórico
+  ReverseImportView.swift     Interface da importação
+  TransferFileIO.swift        Cópia e checksum fora da interface
 Assets/                       Logo e ícones do app
 Tests/                        Testes e fixtures sintéticas
 Info.plist                    Versão, identificador e permissões
