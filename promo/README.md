@@ -1,29 +1,40 @@
 # Vídeo de apresentação
 
-Composição original de 36 segundos, silenciosa, em português, 1920×1080 a 30 fps. Renderizada com HyperFrames 0.8.158 e GSAP 3.14.2. As paisagens e diagramas são sintéticos; não há dados ou fotos da biblioteca de um usuário.
+Apresentação ilustrativa de **66 segundos**, em português, sem áudio, em **1920 × 1080 a 30 fps**. Usa HyperFrames 0.8.185 e GSAP 3.14.2. As paisagens, álbuns e diagramas são sintéticos; o vídeo não é uma gravação da interface.
 
-O filme apresenta envio, revisão de metadados, duplicatas com Live/estática e seleção automática de conexão. Os diagramas ilustram o funcionamento; não são gravações da interface.
+## Cenas
 
-Com Node.js e npm instalados, nesta pasta:
+| Tempo | Conteúdo |
+| --- | --- |
+| 0–8 s | Fotos da Apple e pastas → Immich; Immich → Fotos |
+| 8–16 s | Originais, revisão de data/GPS e exportação com XMP |
+| 16–25 s | Importação de originais, checksum e Live Photos compatíveis |
+| 25–35 s | Álbum existente ou novo; novos vínculos para itens já importados |
+| 35–44 s | Duplicatas exatas e proteção de Live Photos contra descarte |
+| 44–52 s | Comparação de álbuns e seleção por pessoa e idade |
+| 52–60 s | Conexão local/remota conforme o Wi-Fi configurado |
+| 60–66 s | Marca, endereço do projeto e requisitos |
+
+As transferências dependem da seleção e confirmação do usuário. O histórico reconhece importações anteriores feitas pelo Ponte Fotos; não compara toda a fototeca. A importação de Live Photos exige pares compatíveis. Pessoa e idade usa informações já cadastradas no Immich.
+
+## Reproduzir
+
+Com Node.js 22 ou superior, npm e FFmpeg instalados, execute nesta pasta:
 
 ```sh
 npm run check
 npm run dev
-npm run render -- --output ponte-fotos-promo.mp4 --fps 30 --quality delivery
+npm run render -- --output ../docs/media/ponte-fotos-promo.mp4 --fps 30 --quality delivery
 ```
 
-O primeiro uso baixa a versão fixada do HyperFrames do npm. A renderização usa os assets locais. O aplicativo macOS não depende dessa ferramenta para compilar ou funcionar.
+O primeiro uso baixa a versão fixada do HyperFrames do npm. Os assets da composição são locais. O app macOS não depende dessas ferramentas.
 
-A biblioteca GSAP mantém seu aviso no arquivo distribuído; consulte a [licença do GSAP](https://gsap.com/standard-license/). Nenhuma fonte proprietária é distribuída; a composição usa `system-ui`.
+`index.html` reúne oito cenas em `compositions/`, com uma timeline GSAP pausada e determinística por cena. `style.css` define a linguagem visual compartilhada. `index.motion.json` verifica o aparecimento e o enquadramento de elementos durante as transferências. A repetição da paisagem entre cenas e cópias é intencional.
 
-MP4 e pôster de entrega estão em `../docs/media/`. A duração e a resolução são definidas nos atributos `data-*` de `index.html`; o movimento está na timeline GSAP pausada, buscável e determinística. O storyboard público é descrito pelas quatro cenas do HTML.
+MP4 e pôster ficam em `../docs/media/`.
 
-## Créditos de marca
+## Créditos
 
-A marca do Ponte Fotos usa `Assets/AppLogo.png`. O logo do Immich em `assets/immich-logo.svg` vem do [repositório oficial](https://github.com/immich-app/immich/blob/main/design/immich-logo.svg), consultado em 22/10/2026. A licença do projeto de origem acompanha o arquivo em `assets/IMMICH-LICENSE.txt`. A marca identifica o destino da integração; não implica endosso.
+A marca do Ponte Fotos usa `Assets/AppLogo.png`, reproduzida sem redesenho em `assets/logo.png`. O logo do Immich em `assets/immich-logo.svg` vem do [repositório oficial](https://github.com/immich-app/immich/blob/main/design/immich-logo.svg); a licença acompanha o arquivo em `assets/IMMICH-LICENSE.txt`. A marca identifica a integração e não implica endosso.
 
-Na abertura, uma foto percorre origem→Ponte→Immich. Na última cena, os estados de rede e a seleção das URLs mudam em sequência. Todos os endereços mostrados são exemplos.
-
-## Cobertura
-
-Esta apresentação antecede o fluxo Immich → Fotos. Para uma nova edição, inclua a importação, a escolha entre álbum existente e novo álbum e a navegação atual. Os diagramas não documentam a aparência exata do aplicativo.
+A biblioteca GSAP mantém seu aviso no arquivo distribuído; consulte a [licença do GSAP](https://gsap.com/standard-license/). A composição usa tipografia `system-ui`, sem fontes proprietárias distribuídas. Os endereços de servidor mostrados são exemplos.
