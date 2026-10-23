@@ -34,12 +34,12 @@ struct PFReverseAsset: Decodable {
         let date = Self.date(exifInfo?.dateTimeOriginal ?? fileCreatedAt)
         let lat = exifInfo?.latitude, lon = exifInfo?.longitude
         var issue: String?
-        if !["IMAGE", "VIDEO"].contains(type) { issue = "Formato não suportado." }
-        else if isOffline == true || isTrashed == true { issue = "Original indisponível ou na lixeira." }
-        else if date == nil { issue = "Data de captura ausente ou inválida. Corrija no Immich antes de importar." }
-        else if !Self.validCoordinates(lat, lon) { issue = "Localização incompleta ou inválida." }
-        else if !Self.validChecksum(checksum) { issue = "Checksum original ausente ou inválido." }
-        return PFReverseItem(id: id, name: Self.safeName(originalFileName), typeLabel: livePhotoVideoId != nil ? "Live Photo" : type == "VIDEO" ? "Vídeo" : "Foto estática", captureDate: date, latitude: lat, longitude: lon, isLive: livePhotoVideoId != nil, issue: issue)
+        if !["IMAGE", "VIDEO"].contains(type) { issue = L("Formato não suportado.") }
+        else if isOffline == true || isTrashed == true { issue = L("Original indisponível ou na lixeira.") }
+        else if date == nil { issue = L("Data de captura ausente ou inválida. Corrija no Immich antes de importar.") }
+        else if !Self.validCoordinates(lat, lon) { issue = L("Localização incompleta ou inválida.") }
+        else if !Self.validChecksum(checksum) { issue = L("Checksum original ausente ou inválido.") }
+        return PFReverseItem(id: id, name: Self.safeName(originalFileName), typeLabel: livePhotoVideoId != nil ? "Live Photo" : type == "VIDEO" ? L("Vídeo") : L("Foto estática"), captureDate: date, latitude: lat, longitude: lon, isLive: livePhotoVideoId != nil, issue: issue)
     }
     static func date(_ value: String?) -> Date? {
         guard let value else { return nil }
@@ -65,7 +65,7 @@ struct PFReverseAsset: Decodable {
         var digest = Insecure.SHA1()
         while let bytes = try handle.read(upToCount: 1024 * 1024), !bytes.isEmpty { digest.update(data: bytes) }
         let actual = Data(digest.finalize())
-        guard validChecksum(checksum), actual.base64EncodedString() == checksum || actual.map({ String(format: "%02x", $0) }).joined() == checksum.lowercased() else { throw BridgeError(message: "O original baixado não corresponde ao checksum do Immich. Nada foi importado.") }
+        guard validChecksum(checksum), actual.base64EncodedString() == checksum || actual.map({ String(format: "%02x", $0) }).joined() == checksum.lowercased() else { throw BridgeError(message: L("O original baixado não corresponde ao checksum do Immich. Nada foi importado.")) }
     }
 }
 
@@ -85,11 +85,11 @@ struct PFReverseHTTP: PFReverseRemote {
     func albums() async throws -> [IMAlbum] { try await client.albums() }
     func ids(album: String) async throws -> [String] { try await client.albumIDs(album).sorted() }
     func asset(_ id: String) async throws -> PFReverseAsset {
-        guard UUID(uuidString: id) != nil else { throw BridgeError(message: "Identificador do arquivo inválido.") }
+        guard UUID(uuidString: id) != nil else { throw BridgeError(message: L("Identificador do arquivo inválido.")) }
         return try JSONDecoder().decode(PFReverseAsset.self, from: await client.data("assets/" + id))
     }
     func download(_ asset: PFReverseAsset, directory: URL) async throws -> URL {
-        guard UUID(uuidString: asset.id) != nil else { throw BridgeError(message: "Identificador do original inválido.") }
+        guard UUID(uuidString: asset.id) != nil else { throw BridgeError(message: L("Identificador do original inválido.")) }
         let api = try ImmichClient(address: client.address, key: client.credential.key)
         // A separate ephemeral, no-redirect session prevents API credentials from following a redirect.
         let config = URLSessionConfiguration.ephemeral
@@ -119,7 +119,7 @@ protocol PFReverseHistory {
 }
 struct PFReverseDiskHistory: PFReverseHistory {
     private func url(_ scope: String) throws -> URL {
-        guard scope.count == 64, scope.allSatisfy({ $0.isHexDigit }) else { throw BridgeError(message: "Identidade de histórico inválida.") }
+        guard scope.count == 64, scope.allSatisfy({ $0.isHexDigit }) else { throw BridgeError(message: L("Identidade de histórico inválida.")) }
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos/reverse-import", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         return dir.appendingPathComponent(scope + ".json")
@@ -183,7 +183,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     var canRead: Bool { PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized }
     func authorize() async throws {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        guard status == .authorized else { throw BridgeError(message: "Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.") }
+        guard status == .authorized else { throw BridgeError(message: L("Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.")) }
     }
     func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws {
@@ -194,12 +194,12 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                     if (info[PHLivePhotoInfoIsDegradedKey] as? Bool) == true { return }
                     lock.lock(); guard !resumed else { lock.unlock(); return }; resumed = true; lock.unlock()
                     if photo != nil { continuation.resume() }
-                    else { continuation.resume(throwing: BridgeError(message: "O par Live Photo não é compatível com o Fotos. Nenhum item estático foi criado em seu lugar.")) }
+                    else { continuation.resume(throwing: BridgeError(message: L("O par Live Photo não é compatível com o Fotos. Nenhum item estático foi criado em seu lugar."))) }
                 }
             }
         }
         let resourceTypes: [PHAssetResourceType] = paired != nil ? [.photo, .pairedVideo] : [asset.type == "VIDEO" ? .video : .photo]
-        guard PHAssetCreationRequest.supportsAssetResourceTypes(resourceTypes.map { NSNumber(value: $0.rawValue) }) else { throw BridgeError(message: "Os recursos deste original não são compatíveis com o Fotos.") }
+        guard PHAssetCreationRequest.supportsAssetResourceTypes(resourceTypes.map { NSNumber(value: $0.rawValue) }) else { throw BridgeError(message: L("Os recursos deste original não são compatíveis com o Fotos.")) }
     }
     func listAlbums() async throws -> [PFPhotosAlbum] {
         try await authorize()
@@ -207,18 +207,18 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         var albums: [PFPhotosAlbum] = []
         result.enumerateObjects { collection, _, _ in
             if collection.canPerform(.addContent) {
-                albums.append(PFPhotosAlbum(id: collection.localIdentifier, title: collection.localizedTitle ?? "Sem título"))
+                albums.append(PFPhotosAlbum(id: collection.localIdentifier, title: collection.localizedTitle ?? L("Sem título")))
             }
         }
         return PFPhotosAlbum.labeled(albums)
     }
     private func collection(_ destination: PFPhotosDestination) throws -> PHAssetCollection? {
-        guard destination.isValid else { throw BridgeError(message: "Escolha um álbum existente ou informe o nome do novo álbum.") }
+        guard destination.isValid else { throw BridgeError(message: L("Escolha um álbum existente ou informe o nome do novo álbum.")) }
         guard case .existing(let id, _) = destination else { return nil }
         guard let album = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject,
               album.assetCollectionType == .album, album.assetCollectionSubtype == .albumRegular,
               album.canPerform(.addContent) else {
-            throw BridgeError(message: "O álbum de destino foi removido ou não permite adicionar fotos. Atualize os álbuns do Fotos e selecione novamente.")
+            throw BridgeError(message: L("O álbum de destino foi removido ou não permite adicionar fotos. Atualize os álbuns do Fotos e selecione novamente."))
         }
         return album
     }
@@ -226,7 +226,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     // Resolving by ID avoids sending photos to a different album with the same title.
     private static func albumRequest(_ destination: PFPhotosDestination, existing: PHAssetCollection?) throws -> (PHAssetCollectionChangeRequest, String) {
         if let existing {
-            guard let request = PHAssetCollectionChangeRequest(for: existing) else { throw BridgeError(message: "O álbum não permite alterações.") }
+            guard let request = PHAssetCollectionChangeRequest(for: existing) else { throw BridgeError(message: L("O álbum não permite alterações.")) }
             return (request, existing.localIdentifier)
         }
         let request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: destination.title.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -236,7 +236,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func addExisting(id: String, destination: PFPhotosDestination) async throws -> String {
         let existingAlbum = try collection(destination)
         let found = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        guard found.count == 1 else { throw BridgeError(message: "A foto importada não está mais no Fotos. Consulte os itens novamente.") }
+        guard found.count == 1 else { throw BridgeError(message: L("A foto importada não está mais no Fotos. Consulte os itens novamente.")) }
         if let existingAlbum {
             let contents = PHAsset.fetchAssets(in: existingAlbum, options: nil)
             if contents.index(of: found.object(at: 0)) != NSNotFound { return existingAlbum.localIdentifier }
@@ -249,7 +249,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             } catch { changeError = error }
         }
         if let changeError { throw changeError }
-        guard let albumID else { throw BridgeError(message: "O Fotos não confirmou o álbum de destino.") }
+        guard let albumID else { throw BridgeError(message: L("O Fotos não confirmou o álbum de destino.")) }
         return albumID
     }
     func create(asset: PFReverseAsset, original: URL, paired: URL?, destination: PFPhotosDestination) async throws -> PFPhotosImportResult {
@@ -272,7 +272,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             } catch { changeError = error }
         }
         if let changeError { throw changeError }
-        guard let createdID, let albumID else { throw BridgeError(message: "Resultado do Fotos sem identificador. Confira a biblioteca antes de repetir.") }
+        guard let createdID, let albumID else { throw BridgeError(message: L("Resultado do Fotos sem identificador. Confira a biblioteca antes de repetir.")) }
         return PFPhotosImportResult(assetID: createdID, albumID: albumID)
     }
 }
@@ -289,7 +289,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     @Published var destinationMode: PFPhotosDestinationMode = .new
     @Published var photosAlbums: [PFPhotosAlbum] = []
     @Published var destinationAlbumID = ""
-    @Published var destinationAlbumName = "Importadas do Immich"
+    @Published var destinationAlbumName = L("Importadas do Immich")
     @Published var loadingDestinations = false
     var destination: PFPhotosDestination? {
         switch destinationMode {
@@ -301,8 +301,8 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     }
     var destinationLabel: String {
         switch destinationMode {
-        case .existing: return photosAlbums.first(where: { $0.id == destinationAlbumID })?.label ?? "Selecione um álbum"
-        case .new: return "Novo álbum: " + destinationAlbumName.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .existing: return photosAlbums.first(where: { $0.id == destinationAlbumID })?.label ?? L("Selecione um álbum")
+        case .new: return L("Novo álbum: ") + destinationAlbumName.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
     var isDestinationValid: Bool { destination?.isValid == true }
@@ -313,12 +313,12 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             let rows = try await photos.listAlbums()
             photosAlbums = rows
             if !rows.contains(where: { $0.id == destinationAlbumID }) { destinationAlbumID = "" }
-            status = rows.isEmpty ? "Nenhum álbum editável encontrado. Você pode criar um novo álbum ao importar." : "\(rows.count) álbuns do Fotos disponíveis."
+            status = rows.isEmpty ? L("Nenhum álbum editável encontrado. Você pode criar um novo álbum ao importar.") : L("\(rows.count) álbuns do Fotos disponíveis.")
         } catch { photosAlbums = []; destinationAlbumID = ""; status = error.localizedDescription }
     }
     @Published var busy = false
     @Published var importing = false
-    @Published var status = "Conecte o Immich para escolher um álbum."
+    @Published var status = L("Conecte o Immich para escolher um álbum.")
     @Published var showConfirmation = false
     @Published var done = 0
     @Published var total = 0
@@ -345,7 +345,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         invalidateConnection()
         let token = generation
         do {
-            guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: "Salve o perfil de conexão antes de importar.") }
+            guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: L("Salve o perfil de conexão antes de importar.")) }
             let value = try await connect(address, key, profileID)
             let rows = try await value.albums()
             guard token == generation else { return }
@@ -353,7 +353,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             albums = rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             // An explicit refresh must not silently switch the user's source album.
             albumID = previousAlbum.isEmpty ? (albums.first?.id ?? "") : (albums.contains { $0.id == previousAlbum } ? previousAlbum : "")
-            status = "Escolha um álbum para revisar os originais."
+            status = L("Escolha um álbum para revisar os originais.")
         } catch { if token == generation { status = error.localizedDescription } }
     }
     func loadAlbum() async {
@@ -368,18 +368,18 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 try Task.checkCancellation(); guard generation == token else { return }
                 let asset = try await remote.asset(id)
                 var item = asset.item
-                if records.contains(where: { $0.assetID == id && $0.pending }) { item.issue = "Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente." }
+                if records.contains(where: { $0.assetID == id && $0.pending }) { item.issue = L("Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente.") }
                 if photos.canRead, let record = records.last(where: { $0.assetID == id && $0.checksum == asset.checksum && !$0.pending }), let photosID = record.photosID {
                     item.isImported = photos.exists(photosID)
                 }
                 // No permission prompt occurs while browsing.
                 loaded[id] = asset; rows.append(item)
-                status = "Revisando \(rows.count) de \(ids.count)…"
+                status = L("Revisando \(rows.count) de \(ids.count)…")
             }
             guard generation == token, albumID == album else { return }
             let pairedIDs = Set(loaded.values.compactMap(\.livePhotoVideoId))
             rows = rows.filter { !pairedIDs.contains($0.id) }
-            assets = loaded; items = rows; status = "\(rows.count) originais encontrados. Selecione os itens para importar."
+            assets = loaded; items = rows; status = L("\(rows.count) originais encontrados. Selecione os itens para importar.")
         } catch { if generation == token { status = error.localizedDescription } }
     }
     func thumbnail(id: String) async -> NSImage? {
@@ -405,7 +405,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func importSelected() async {
         guard !busy && !importing && !loadingDestinations, let remote else { return }
         let selected = items.filter { selection.contains($0.id) && $0.selectable }.compactMap { assets[$0.id] }
-        guard !selected.isEmpty, var target = destination, target.isValid else { status = "Selecione originais válidos e informe o álbum de destino."; return }
+        guard !selected.isEmpty, var target = destination, target.isValid else { status = L("Selecione originais válidos e informe o álbum de destino."); return }
         importing = true; cancellationRequested = false; showConfirmation = false; done = 0; total = selected.count
         let token = generation
         defer { importing = false; if token != generation { self.remote = nil; items = []; albums = []; assets = [:]; selection = [] } }
@@ -414,11 +414,11 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             try photos.prepareDestination(target)
             var records = try history.load(scope: remote.scope)
             for originalAsset in selected {
-                if cancellationRequested || generation != token { status = "Importação interrompida entre itens. \(done) concluídos."; return }
+                if cancellationRequested || generation != token { status = L("Importação interrompida entre itens. \(done) concluídos."); return }
                 let asset = try await remote.asset(originalAsset.id)
                 guard asset.item.selectable, asset.checksum == originalAsset.checksum, asset.livePhotoVideoId == originalAsset.livePhotoVideoId,
-                      asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: "O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.") }
-                if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: "Há um resultado pendente para este item. Confira o Fotos antes de repetir.") }
+                      asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: L("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.")) }
+                if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: L("Há um resultado pendente para este item. Confira o Fotos antes de repetir.")) }
                 if let previous = records.last(where: { $0.assetID == asset.id && $0.checksum == asset.checksum }), let id = previous.photosID, photos.exists(id) {
                     if cancellationRequested || generation != token { return }
                     let albumID = try await photos.addExisting(id: id, destination: target)
@@ -429,18 +429,18 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ponte-reverse-" + UUID().uuidString, isDirectory: true)
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
                 defer { try? FileManager.default.removeItem(at: dir) }
-                status = "Baixando e verificando \(asset.item.name)…"
+                status = L("Baixando e verificando \(asset.item.name)…")
                 let file = try await remote.download(asset, directory: dir)
                 var paired: URL?
                 if let videoID = asset.livePhotoVideoId {
-                    guard asset.type == "IMAGE" else { throw BridgeError(message: "Par Live Photo inválido.") }
+                    guard asset.type == "IMAGE" else { throw BridgeError(message: L("Par Live Photo inválido.")) }
                     let video = try await remote.asset(videoID)
-                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true else { throw BridgeError(message: "Vídeo da Live Photo indisponível.") }
+                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true else { throw BridgeError(message: L("Vídeo da Live Photo indisponível.")) }
                     paired = try await remote.download(video, directory: dir)
                 }
-                if cancellationRequested || generation != token { status = "Importação interrompida antes de gravar no Fotos."; return }
+                if cancellationRequested || generation != token { status = L("Importação interrompida antes de gravar no Fotos."); return }
                 try await photos.validate(asset: asset, original: file, paired: paired)
-                if cancellationRequested || generation != token { status = "Importação interrompida antes de gravar no Fotos."; return }
+                if cancellationRequested || generation != token { status = L("Importação interrompida antes de gravar no Fotos."); return }
                 // Persist intent BEFORE PhotoKit. Crashes/ambiguous errors must never trigger blind retries.
                 records.removeAll { $0.assetID == asset.id }
                 records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true))
@@ -452,8 +452,8 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 try history.save(records, scope: remote.scope)
                 markImported(asset.id); done += 1
             }
-            status = "\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados."
-        } catch { status = error.localizedDescription + " Importação interrompida; confira os itens e o histórico antes de repetir." }
+            status = L("\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados.")
+        } catch { status = error.localizedDescription + L(" Importação interrompida; confira os itens e o histórico antes de repetir.") }
     }
     private func rememberResolvedAlbum(id: String, destination: PFPhotosDestination) {
         guard case .new = destination else { return }

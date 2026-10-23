@@ -9,9 +9,9 @@ enum ConnectionMode: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .automatic: return "Automático"
-        case .local: return "Local"
-        case .remote: return "Remoto"
+        case .automatic: return L("Automático")
+        case .local: return L("Local")
+        case .remote: return L("Remoto")
         }
     }
 }
@@ -69,14 +69,14 @@ struct ConnectionProfile: Codable, Equatable {
                   parts.user == nil, parts.password == nil,
                   parts.query == nil, parts.fragment == nil,
                   parts.url != nil else {
-                throw BridgeError(message: "Informe uma URL \(name) válida, sem usuário, senha ou parâmetros.")
+                throw BridgeError(message: L("Informe uma URL \(name) válida, sem usuário, senha ou parâmetros."))
             }
             if let port = parts.port, !(1...65535).contains(port) {
-                throw BridgeError(message: "A porta da URL \(name) é inválida.")
+                throw BridgeError(message: L("A porta da URL \(name) é inválida."))
             }
         }
-        try address(localAddress, name: "local", required: mode == .local)
-        try address(remoteAddress, name: "remota", required: mode != .local)
+        try address(localAddress, name: L("local"), required: mode == .local)
+        try address(remoteAddress, name: L("remota"), required: mode != .local)
     }
 }
 
@@ -102,7 +102,7 @@ struct NetworkRoutingChanges {
 @MainActor
 final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelegate, CWEventDelegate {
     @Published private(set) var ssid: String?
-    @Published private(set) var locationStatus = "Permita Localização para identificar o Wi-Fi."
+    @Published private(set) var locationStatus = L("Permita Localização para identificar o Wi-Fi.")
     var onChange: (() -> Void)?
     var onStatusChange: (() -> Void)?
     private let locationManager = CLLocationManager()
@@ -154,16 +154,16 @@ final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelega
         switch locationManager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
             ssid = wifiClient.interface()?.ssid()
-            locationStatus = ssid == nil ? "Wi-Fi indisponível; será usada a conexão remota no modo automático." : "Wi-Fi identificado neste Mac."
+            locationStatus = ssid == nil ? L("Wi-Fi indisponível; será usada a conexão remota no modo automático.") : L("Wi-Fi identificado neste Mac.")
         case .denied, .restricted:
             ssid = nil
-            locationStatus = "Localização não permitida; use a conexão remota ou escolha Local manualmente."
+            locationStatus = L("Localização não permitida; use a conexão remota ou escolha Local manualmente.")
         case .notDetermined:
             ssid = nil
-            locationStatus = "Permita Localização para identificar o Wi-Fi."
+            locationStatus = L("Permita Localização para identificar o Wi-Fi.")
         @unknown default:
             ssid = nil
-            locationStatus = "Não foi possível identificar o Wi-Fi."
+            locationStatus = L("Não foi possível identificar o Wi-Fi.")
         }
     }
 

@@ -57,7 +57,7 @@ struct MetadataOverride: Codable {
         func number(_ text: String) -> Double? { Double(text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".").replacingOccurrences(of: "−", with: "-")) }
         guard let lat = number(latitude), let lon = number(longitude), lat.isFinite, lon.isFinite,
               (-90...90).contains(lat), (-180...180).contains(lon) else {
-            throw BridgeError(message: "Informe latitude entre −90 e 90 e longitude entre −180 e 180. Exemplo: −23,55052 e −46,63331.")
+            throw BridgeError(message: L("Informe latitude entre −90 e 90 e longitude entre −180 e 180. Exemplo: −23,55052 e −46,63331."))
         }
         return (lat, lon)
     }

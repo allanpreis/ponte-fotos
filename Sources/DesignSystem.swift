@@ -85,7 +85,7 @@ enum PFAppearance {
 enum PFColorTheme: String, CaseIterable, Identifiable {
     case system, light, dark
     var id: String { rawValue }
-    var title: String { switch self { case .system: return "Sistema"; case .light: return "Claro"; case .dark: return "Escuro" } }
+    var title: String { switch self { case .system: return L("Sistema"); case .light: return L("Claro"); case .dark: return L("Escuro") } }
     var symbol: String { switch self { case .system: return "desktopcomputer"; case .light: return "sun.max"; case .dark: return "moon" } }
     var colorScheme: ColorScheme? { switch self { case .system: return nil; case .light: return .light; case .dark: return .dark } }
 }

@@ -31,9 +31,9 @@ enum ConnectionProbeError: LocalizedError {
     }
     var errorDescription: String? {
         switch self {
-        case .authentication: return "A chave não foi aceita ou não permite consultar a conta do Immich."
-        case .unavailable(let reason): return "Não foi possível acessar o Immich. \(reason)"
-        case .invalidServer: return "O endereço não retornou uma identidade válida de um servidor Immich 3.x."
+        case .authentication: return L("A chave não foi aceita ou não permite consultar a conta do Immich.")
+        case .unavailable(let reason): return L("Não foi possível acessar o Immich. \(reason)")
+        case .invalidServer: return L("O endereço não retornou uma identidade válida de um servidor Immich 3.x.")
         }
     }
 }
@@ -45,10 +45,10 @@ struct ImmichClient {
     init(address: String, key: String) throws {
         guard var parts = URLComponents(string: address.trimmingCharacters(in: .whitespacesAndNewlines)),
               ["http", "https"].contains(parts.scheme?.lowercased() ?? ""), let host = parts.host, !host.isEmpty,
-              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil else { throw BridgeError(message: "Informe a URL completa do Immich, com http:// ou https://.") }
+              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil else { throw BridgeError(message: L("Informe a URL completa do Immich, com http:// ou https://.")) }
         parts.path = parts.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         parts.path = "/" + (parts.path.isEmpty ? "api" : parts.path.hasSuffix("api") ? parts.path : parts.path + "/api")
-        guard let url = parts.url, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw BridgeError(message: "Informe sua chave de API do Immich.") }
+        guard let url = parts.url, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw BridgeError(message: L("Informe sua chave de API do Immich.")) }
         self.base = url; self.key = key.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     func request(_ path: String, method: String = "GET") -> URLRequest {
@@ -58,15 +58,15 @@ struct ImmichClient {
     }
     func check(_ response: URLResponse) throws {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw BridgeError(message: "Immich respondeu HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0). Confira URL, versão e permissões da chave.")
+            throw BridgeError(message: L("Immich respondeu HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0). Confira URL, versão e permissões da chave."))
         }
     }
     func test() async throws -> String {
         let (data, response) = try await Self.session.data(for: request("server/version")); try check(response)
         let version: ServerVersion
         do { version = try JSONDecoder().decode(ServerVersion.self, from: data) }
-        catch { throw BridgeError(message: "O endereço respondeu, mas não retornou uma versão válida do Immich. Confira a URL base do servidor.") }
-        guard version.major == 3 else { throw BridgeError(message: "Esta versão inicial requer Immich 3.x. Servidor não compatível ou versão indisponível.") }
+        catch { throw BridgeError(message: L("O endereço respondeu, mas não retornou uma versão válida do Immich. Confira a URL base do servidor.")) }
+        guard version.major == 3 else { throw BridgeError(message: L("Esta versão inicial requer Immich 3.x. Servidor não compatível ou versão indisponível.")) }
         return version.label
     }
     func probe(timeout: TimeInterval = 5) async throws -> ConnectionIdentity {
@@ -86,14 +86,14 @@ struct ImmichClient {
                 case .timedOut, .cannotFindHost, .cannotConnectToHost, .networkConnectionLost,
                      .dnsLookupFailed, .notConnectedToInternet, .internationalRoamingOff,
                      .dataNotAllowed:
-                    throw ConnectionProbeError.unavailable("Verifique a rede e o endereço configurado.")
+                    throw ConnectionProbeError.unavailable(L("Verifique a rede e o endereço configurado."))
                 default: throw ConnectionProbeError.invalidServer
                 }
             } catch { throw ConnectionProbeError.invalidServer }
             guard let http = response as? HTTPURLResponse else { throw ConnectionProbeError.invalidServer }
             if http.statusCode == 401 || http.statusCode == 403 { throw ConnectionProbeError.authentication }
             if (500..<600).contains(http.statusCode) {
-                throw ConnectionProbeError.unavailable("Servidor respondeu HTTP \(http.statusCode).")
+                throw ConnectionProbeError.unavailable(L("Servidor respondeu HTTP \(http.statusCode)."))
             }
             guard (200..<300).contains(http.statusCode) else { throw ConnectionProbeError.invalidServer }
             return data
@@ -131,7 +131,7 @@ struct ImmichClient {
         return Data(hash.finalize()).base64EncodedString()
     }
     func upload(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?) async throws -> UploadResult {
-        guard let date = metadata.date else { throw BridgeError(message: "Foto sem data na biblioteca. Revise no Fotos antes de enviar.") }
+        guard let date = metadata.date else { throw BridgeError(message: L("Foto sem data na biblioteca. Revise no Fotos antes de enviar.")) }
         let boundary = "Ponte-\(UUID().uuidString)"
         let body = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         FileManager.default.createFile(atPath: body.path, contents: nil, attributes: [.posixPermissions: 0o600])
@@ -175,7 +175,7 @@ struct AlbumAddResult: Decodable {
     static func validate(_ results: [Self], expected: [String]) throws {
         for id in expected {
             guard let result = results.first(where: { $0.id == id }), result.success || result.error == "duplicate" else {
-                throw BridgeError(message: "A mídia foi enviada, mas não foi possível confirmar sua inclusão no álbum. Confira acesso de edição e tente novamente.")
+                throw BridgeError(message: L("A mídia foi enviada, mas não foi possível confirmar sua inclusão no álbum. Confira acesso de edição e tente novamente."))
             }
         }
     }
@@ -195,7 +195,7 @@ extension ImmichClient {
     }
     func createAlbum(_ name: String) async throws -> ImmichAlbum {
         let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { throw BridgeError(message: "Informe o nome do novo álbum.") }
+        guard !cleaned.isEmpty else { throw BridgeError(message: L("Informe o nome do novo álbum.")) }
         return try JSONDecoder().decode(ImmichAlbum.self, from: await json("albums", method: "POST", body: ["albumName": cleaned]))
     }
     func addToAlbum(_ id: String, assetIDs: [String]) async throws {

@@ -33,26 +33,26 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
     static func validateAnalysis(_ analysis: IMDuplicateAnalysis, profileID: String, now: Date = Date()) throws {
         let age = now.timeIntervalSince(analysis.createdAt)
         guard analysis.profileID == profileID, age >= 0, age <= 24 * 60 * 60 else {
-            throw BridgeError(message: "Esta análise expirou ou pertence a outra conexão. Consulte novamente.")
+            throw BridgeError(message: L("Esta análise expirou ou pertence a outra conexão. Consulte novamente."))
         }
     }
 
     static func pairs(analysis: IMDuplicateAnalysis, selections: [String:String]) throws -> [Pair] {
         guard !selections.isEmpty, selections.keys.allSatisfy({ id in analysis.groups.contains { $0.id == id } }) else {
-            throw BridgeError(message: "Selecione pelo menos um grupo válido.")
+            throw BridgeError(message: L("Selecione pelo menos um grupo válido."))
         }
         var result: [Pair] = [], used = Set<String>()
         for group in analysis.groups where selections[group.id] != nil {
             guard group.unavailableOwnerIDs.isEmpty,
                   let keep = group.assets.first(where: { $0.id == selections[group.id] }), group.assets.count > 1 else {
-                throw BridgeError(message: "Conecte as contas proprietárias e escolha a cópia para manter. Consulte novamente.")
+                throw BridgeError(message: L("Conecte as contas proprietárias e escolha a cópia para manter. Consulte novamente."))
             }
             for asset in group.assets {
                 guard used.insert(asset.id).inserted, asset.eligible(allowLive: true), asset.checksum == keep.checksum,
-                      asset.type == keep.type else { throw BridgeError(message: "Grupo de duplicatas inválido. Consulte novamente.") }
+                      asset.type == keep.type else { throw BridgeError(message: L("Grupo de duplicatas inválido. Consulte novamente.")) }
                 if asset.id != keep.id {
                     guard !asset.isLive, asset.livePhotoVideoId == nil else {
-                        throw BridgeError(message: "A Live Photo está protegida para preservar o movimento. Mantenha a Live Photo ou desmarque o grupo.")
+                        throw BridgeError(message: L("A Live Photo está protegida para preservar o movimento. Mantenha a Live Photo ou desmarque o grupo."))
                     }
                     result.append(Pair(keep: keep, drop: asset))
                 }
@@ -64,19 +64,19 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
     static func unchanged(_ old: IMAsset, _ fresh: IMAsset) throws {
         guard fresh.id == old.id, fresh.ownerId == old.ownerId, fresh.checksum == old.checksum,
               fresh.type == old.type, fresh.livePhotoVideoId == old.livePhotoVideoId, fresh.eligible(allowLive: true) else {
-            throw BridgeError(message: "Uma cópia mudou desde a análise. Consulte novamente.")
+            throw BridgeError(message: L("Uma cópia mudou desde a análise. Consulte novamente."))
         }
     }
 
     static func require(_ required: Set<String>, client: IMClient, permissions: [String:Set<String>]) throws {
         let allowed = permissions[client.credential.account.id] ?? []
         guard allowed.contains("all") || required.isSubset(of: allowed) else {
-            throw BridgeError(message: "A chave de \(client.credential.account.name) precisa de: \(required.sorted().joined(separator: ", ")).")
+            throw BridgeError(message: L("A chave de \(client.credential.account.name) precisa de: \(required.sorted().joined(separator: ", "))."))
         }
     }
 
     static func scan(session: IMSession, albums: [IMAlbum], progress: @escaping IMProgress) async throws -> IMDuplicateAnalysis {
-        guard !albums.isEmpty, albums.count <= 100, Set(albums.map(\.id)).count == albums.count else { throw BridgeError(message: "Selecione álbuns válidos.") }
+        guard !albums.isEmpty, albums.count <= 100, Set(albums.map(\.id)).count == albums.count else { throw BridgeError(message: L("Selecione álbuns válidos.")) }
         var permissions: [String:Set<String>] = [:]
         for client in session.clients {
             permissions[client.credential.account.id] = try await client.permissions()
@@ -87,14 +87,14 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         var readers: [String:IMClient] = [:], origins: [String:[IMAlbum]] = [:]
         for (index, selection) in albums.enumerated() {
             try Task.checkCancellation()
-            guard let album = catalog.first(where: { $0.id == selection.id }) else { throw BridgeError(message: "Um álbum não está mais disponível.") }
+            guard let album = catalog.first(where: { $0.id == selection.id }) else { throw BridgeError(message: L("Um álbum não está mais disponível.")) }
             let reader = try session.reader(album)
             for id in try await reader.albumIDs(album.id) {
                 readers[id] = readers[id] ?? reader
                 origins[id, default: []].append(album)
             }
-            guard readers.count <= 30_000 else { throw BridgeError(message: "Limite de 30 mil itens por análise. Selecione menos álbuns.") }
-            progress("Listando itens dos álbuns", index + 1, albums.count)
+            guard readers.count <= 30_000 else { throw BridgeError(message: L("Limite de 30 mil itens por análise. Selecione menos álbuns.")) }
+            progress(L("Listando itens dos álbuns"), index + 1, albums.count)
         }
         var assets: [IMAsset] = [], skipped = 0
         for (index, id) in readers.keys.sorted().enumerated() {
@@ -102,7 +102,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             var asset = try await readers[id]!.asset(id)
             if asset.eligible(allowLive: true) { asset.albums = origins[id] ?? []; assets.append(asset) }
             else { skipped += 1 }
-            progress("Comparando arquivos idênticos", index + 1, readers.count)
+            progress(L("Comparando arquivos idênticos"), index + 1, readers.count)
         }
         var found = groups(assets, availableOwners: Set(session.clients.map { $0.credential.account.id }))
         for groupIndex in found.indices {
@@ -115,12 +115,12 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                     try unchanged(old, fresh)
                     fresh.albums = try await session.memberships(old.id)
                     guard Set(old.albums.map(\.id)).isSubset(of: Set(fresh.albums.map(\.id))) else {
-                        throw BridgeError(message: "Uma cópia saiu do álbum durante a análise. Consulte novamente.")
+                        throw BridgeError(message: L("Uma cópia saiu do álbum durante a análise. Consulte novamente."))
                     }
                     found[groupIndex].assets[assetIndex] = fresh
                 }
             }
-            progress("Conferindo álbuns das cópias", groupIndex + 1, found.count)
+            progress(L("Conferindo álbuns das cópias"), groupIndex + 1, found.count)
         }
         return IMDuplicateAnalysis(id: UUID().uuidString, profileID: session.profileID, albums: albums,
             createdAt: Date(), groups: found, total: readers.count, skipped: skipped)
@@ -132,11 +132,11 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         asset.albums = try await session.memberships(old.id)
         // Every observed album, including private albums outside the scan, must still exist.
         guard Set(old.albums.map(\.id)).isSubset(of: Set(asset.albums.map(\.id))) else {
-            throw BridgeError(message: "Uma cópia saiu de um álbum. Consulte novamente.")
+            throw BridgeError(message: L("Uma cópia saiu de um álbum. Consulte novamente."))
         }
         for album in asset.albums {
             let ids = try await session.reader(album).albumIDs(album.id)
-            guard ids.contains(asset.id) else { throw BridgeError(message: "O vínculo de uma cópia não foi confirmado. Consulte novamente.") }
+            guard ids.contains(asset.id) else { throw BridgeError(message: L("O vínculo de uma cópia não foi confirmado. Consulte novamente.")) }
         }
         return asset
     }
@@ -145,7 +145,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         let keep = try await fresh(pair.keep, session: session)
         let drop = try await fresh(pair.drop, session: session)
         guard Set(drop.albums.map(\.id)).isSubset(of: Set(keep.albums.map(\.id))) else {
-            throw BridgeError(message: "Há um álbum sem a cópia mantida. A exclusão foi bloqueada; consulte novamente.")
+            throw BridgeError(message: L("Há um álbum sem a cópia mantida. A exclusão foi bloqueada; consulte novamente."))
         }
     }
 
@@ -171,7 +171,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             validated.append(current)
             let keepAlbums = Set(current.keep.albums.map(\.id))
             for album in current.drop.albums where !keepAlbums.contains(album.id) {
-                guard let target = catalog.first(where: { $0.id == album.id }) else { throw BridgeError(message: "Um álbum de destino não está disponível.") }
+                guard let target = catalog.first(where: { $0.id == album.id }) else { throw BridgeError(message: L("Um álbum de destino não está disponível.")) }
                 let candidates = session.clients.filter {
                     $0.credential.account.id == target.ownerID || target.writerIDs.contains($0.credential.account.id)
                 }.sorted { ($0.credential.account.id == target.ownerID ? 0 : 1) < ($1.credential.account.id == target.ownerID ? 0 : 1) }
@@ -187,13 +187,13 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                     catch { continue } // Read-only probes: an editor may have visibility the owner lacks.
                 }
                 guard let writer = selectedWriter else {
-                    throw BridgeError(message: "Nenhuma conta editora pode ler a cópia mantida e adicionar ao álbum \(target.name). Confira albumAsset.create e os acessos.")
+                    throw BridgeError(message: L("Nenhuma conta editora pode ler a cópia mantida e adicionar ao álbum \(target.name). Confira albumAsset.create e os acessos."))
                 }
                 if additionIDs.insert(target.id + ":" + current.keep.id).inserted {
                     additions.append(Addition(keep: current.keep, album: target, writer: writer))
                 }
             }
-            progress("Conferindo cópias e permissões", index + 1, plan.count)
+            progress(L("Conferindo cópias e permissões"), index + 1, plan.count)
         }
         for (index, addition) in additions.enumerated() {
             try Task.checkCancellation()
@@ -203,11 +203,11 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             do {
                 try await addition.writer.add([addition.keep.id], to: addition.album.id)
                 guard try await addition.writer.albumIDs(addition.album.id).contains(addition.keep.id) else {
-                    throw BridgeError(message: "O Immich não confirmou a cópia mantida no álbum. Exclusões bloqueadas.")
+                    throw BridgeError(message: L("O Immich não confirmou a cópia mantida no álbum. Exclusões bloqueadas."))
                 }
-            } catch { record.status = "uncertain"; record.message = "Adição sem confirmação; confira o Immich antes de repetir."; try report(record); throw error }
+            } catch { record.status = "uncertain"; record.message = L("Adição sem confirmação; confira o Immich antes de repetir."); try report(record); throw error }
             record.status = "confirmed"; try report(record)
-            progress("Preservando álbuns das cópias", index + 1, additions.count)
+            progress(L("Preservando álbuns das cópias"), index + 1, additions.count)
         }
         // All additions, including their read-back, finish before the first trash request.
         for pair in validated { try Task.checkCancellation(); try await coverage(pair, session: session) }
@@ -220,10 +220,10 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             do {
                 try await owner.trash([pair.drop.id])
                 let result = try await owner.asset(pair.drop.id)
-                guard result.id == pair.drop.id, result.ownerId == pair.drop.ownerId, result.checksum == pair.drop.checksum, result.isTrashed else { throw BridgeError(message: "A lixeira não foi confirmada. Confira o Immich antes de repetir.") }
-            } catch { record.status = "uncertain"; record.message = "Lixeira sem confirmação; confira o Immich antes de repetir."; try report(record); throw error }
+                guard result.id == pair.drop.id, result.ownerId == pair.drop.ownerId, result.checksum == pair.drop.checksum, result.isTrashed else { throw BridgeError(message: L("A lixeira não foi confirmada. Confira o Immich antes de repetir.")) }
+            } catch { record.status = "uncertain"; record.message = L("Lixeira sem confirmação; confira o Immich antes de repetir."); try report(record); throw error }
             record.status = "confirmed"; try report(record)
-            progress("Enviando cópias estáticas à lixeira", index + 1, validated.count)
+            progress(L("Enviando cópias estáticas à lixeira"), index + 1, validated.count)
         }
     }
 }

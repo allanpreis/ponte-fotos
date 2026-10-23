@@ -12,11 +12,12 @@ struct PFSettingsView: View {
     @Binding var themeRaw: String
     @Binding var glassEnabled: Bool
     @StateObject private var state = PFSettingsState()
+    @AppStorage(PFLocalization.preferenceKey) private var languageRaw = PFAppLanguage.system.rawValue
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Picker("Seção de configurações", selection: $state.section) {
-                ForEach(PFSettingsSection.allCases) { Text($0.rawValue).tag($0) }
+            Picker(L("Seção de configurações"), selection: $state.section) {
+                ForEach(PFSettingsSection.allCases) { Text(LV($0.rawValue)).tag($0) }
             }.pickerStyle(.segmented).controlSize(.large).frame(maxWidth: 500).disabled(model.busy)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -35,33 +36,33 @@ struct PFSettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             PFCard {
                 VStack(alignment: .leading, spacing: 18) {
-                    PFSectionHeading("Seu servidor Immich", subtitle: "Configure os endereços e escolha como conectar.", systemImage: "network")
-                    Picker("Modo de conexão", selection: $model.profile.mode) {
+                    PFSectionHeading(L("Seu servidor Immich"), subtitle: L("Configure os endereços e escolha como conectar."), systemImage: "network")
+                    Picker(L("Modo de conexão"), selection: $model.profile.mode) {
                         ForEach(ConnectionMode.allCases) { Text($0.label).tag($0) }
                     }.pickerStyle(.segmented).frame(maxWidth: 350)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), alignment: .top)], alignment: .leading, spacing: 16) {
-                        field("URL local", placeholder: "http://immich.local:2283", value: $model.profile.localAddress)
-                        field("URL remota", placeholder: "https://photos.example.com", value: $model.profile.remoteAddress)
+                        field(L("URL local"), placeholder: "http://immich.local:2283", value: $model.profile.localAddress)
+                        field(L("URL remota"), placeholder: "https://photos.example.com", value: $model.profile.remoteAddress)
                     }
-                    Text("No modo Automático, o Wi-Fi de casa prioriza o endereço local. Fora dessa rede, o aplicativo usa o endereço remoto.")
+                    Text(L("No modo Automático, o Wi-Fi de casa prioriza o endereço local. Fora dessa rede, o aplicativo usa o endereço remoto."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             PFCard {
                 VStack(alignment: .leading, spacing: 16) {
-                    PFSectionHeading("Rede de casa", subtitle: "O nome do Wi-Fi ajuda a escolher o endereço certo.", systemImage: "wifi")
-                    field("Nome do Wi-Fi", placeholder: "Nome exato da rede", value: $model.profile.homeSSID)
+                    PFSectionHeading(L("Rede de casa"), subtitle: L("O nome do Wi-Fi ajuda a escolher o endereço certo."), systemImage: "wifi")
+                    field(L("Nome do Wi-Fi"), placeholder: L("Nome exato da rede"), value: $model.profile.homeSSID)
                     ViewThatFits(in: .horizontal) {
                         HStack { wifiStatus; Spacer(); wifiPermission }
                         VStack(alignment: .leading, spacing: 12) { wifiStatus; wifiPermission }
                     }
-                    Text("A permissão de Localização é exigida pelo macOS para ler o nome da rede. O app não usa nem armazena sua posição.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(L("A permissão de Localização é exigida pelo macOS para ler o nome da rede. O app não usa nem armazena sua posição.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             PFCard {
                 VStack(alignment: .leading, spacing: 16) {
-                    PFSectionHeading("Conta principal", subtitle: "A chave de API fica protegida no Chaves do macOS.", systemImage: "key")
-                    SecureField("Chave de API do Immich", text: $model.apiKey).textFieldStyle(.roundedBorder).controlSize(.large)
+                    PFSectionHeading(L("Conta principal"), subtitle: L("A chave de API fica protegida no Chaves do macOS."), systemImage: "key")
+                    SecureField(L("Chave de API do Immich"), text: $model.apiKey).textFieldStyle(.roundedBorder).controlSize(.large)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 12) { connectionActions }
                         VStack(alignment: .leading, spacing: 12) { connectionActions }
@@ -73,26 +74,38 @@ struct PFSettingsView: View {
             }
         }.disabled(model.busy)
     }
-    private var wifiStatus: some View { Text(model.wifiName.map { "Wi-Fi atual: \($0)" } ?? model.wifiStatus).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-    private var wifiPermission: some View { Button("Permitir identificar Wi-Fi") { model.requestWifiPermission() } }
+    private var wifiStatus: some View { Text(model.wifiName.map { L("Wi-Fi atual: \($0)") } ?? model.wifiStatus).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+    private var wifiPermission: some View { Button(L("Permitir identificar Wi-Fi")) { model.requestWifiPermission() } }
     private var connectionActions: some View {
         Group {
-            Button("Testar conexão") { Task { await model.testConnection() } }.buttonStyle(.borderedProminent)
-            Button("Salvar configuração", systemImage: "key") { model.saveConnection() }.disabled(model.apiKey.isEmpty)
-            if model.connectionSaved { Button("Esquecer conexão") { model.forgetConnection() } }
+            Button(L("Testar conexão")) { Task { await model.testConnection() } }.buttonStyle(.borderedProminent)
+            Button(L("Salvar configuração"), systemImage: "key") { model.saveConnection() }.disabled(model.apiKey.isEmpty)
+            if model.connectionSaved { Button(L("Esquecer conexão")) { model.forgetConnection() } }
         }
     }
     private func field(_ title: String, placeholder: String, value: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title).font(.callout.weight(.medium))
-            TextField(placeholder, text: value).textFieldStyle(.roundedBorder).controlSize(.large).accessibilityLabel(title)
+            Text(LV(title)).font(.callout.weight(.medium))
+            TextField(LV(placeholder), text: value).textFieldStyle(.roundedBorder).controlSize(.large).accessibilityLabel(LV(title))
         }
     }
     private var appearance: some View {
         VStack(alignment: .leading, spacing: 18) {
             PFCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    PFSectionHeading(L("Idioma do aplicativo"), subtitle: L("Escolha o idioma usado no Ponte Fotos."), systemImage: "globe")
+                    Picker(L("Idioma"), selection: $languageRaw) {
+                        ForEach(PFAppLanguage.allCases) { language in Text(language.title).tag(language.rawValue) }
+                    }.pickerStyle(.menu).frame(maxWidth: 360).disabled(model.busy)
+                        .onChange(of: languageRaw) { _, value in
+                            PFLocalization.savePreference(PFAppLanguage(rawValue: value) ?? .system)
+                        }
+                    Text(L("A alteração de idioma será aplicada na próxima vez que você abrir o aplicativo.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            PFCard {
                 VStack(alignment: .leading, spacing: 20) {
-                    PFSectionHeading("Tema do aplicativo", subtitle: "Escolha sua aparência ou acompanhe o macOS.", systemImage: "circle.lefthalf.filled")
+                    PFSectionHeading(L("Tema do aplicativo"), subtitle: L("Escolha sua aparência ou acompanhe o macOS."), systemImage: "circle.lefthalf.filled")
                     HStack(spacing: 12) {
                         ForEach(PFColorTheme.allCases) { theme in
                             Button { themeRaw = theme.rawValue } label: {
@@ -106,27 +119,27 @@ struct PFSettingsView: View {
                                     .frame(maxWidth: .infinity).padding(.vertical, 20)
                                     .background(themeRaw == theme.rawValue ? PFTheme.accent.opacity(0.08) : PFTheme.background, in: RoundedRectangle(cornerRadius: 14))
                                     .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(themeRaw == theme.rawValue ? PFTheme.accent : PFTheme.separator, lineWidth: 1))
-                            }.buttonStyle(.plain).accessibilityLabel("Tema \(theme.title)").accessibilityValue(themeRaw == theme.rawValue ? "Selecionado" : "")
+                            }.buttonStyle(.plain).accessibilityLabel(L("Tema \(theme.title)")).accessibilityValue(themeRaw == theme.rawValue ? L("Selecionado") : "")
                         }
                     }
                 }
             }
             PFCard {
                 VStack(alignment: .leading, spacing: 16) {
-                    PFSectionHeading("Liquid Glass", subtitle: "Profundidade sutil na navegação e nas ações.", systemImage: "square.on.square")
-                    Toggle("Usar transparência e vidro", isOn: $glassEnabled).toggleStyle(.switch)
+                    PFSectionHeading(L("Liquid Glass"), subtitle: L("Profundidade sutil na navegação e nas ações."), systemImage: "square.on.square")
+                    Toggle(L("Usar transparência e vidro"), isOn: $glassEnabled).toggleStyle(.switch)
                     Text(glassDescription).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     if reduceTransparency {
-                        Label("Reduzir transparência está ativo no macOS. As superfícies permanecem opacas.", systemImage: "accessibility").font(.caption).foregroundStyle(.secondary)
+                        Label(L("Reduzir transparência está ativo no macOS. As superfícies permanecem opacas."), systemImage: "accessibility").font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("As fotos e os formulários mantêm fundos sólidos para facilitar a leitura. O aplicativo respeita as preferências de acessibilidade do sistema.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(L("As fotos e os formulários mantêm fundos sólidos para facilitar a leitura. O aplicativo respeita as preferências de acessibilidade do sistema.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
     }
     private var glassDescription: String {
-        if #available(macOS 26.0, *) { return "Neste macOS, o aplicativo usa o efeito Liquid Glass nativo da Apple." }
-        return "Neste macOS, o aplicativo usa materiais translúcidos compatíveis. O Liquid Glass nativo requer macOS 26 ou superior."
+        if #available(macOS 26.0, *) { return L("Neste macOS, o aplicativo usa o efeito Liquid Glass nativo da Apple.") }
+        return L("Neste macOS, o aplicativo usa materiais translúcidos compatíveis. O Liquid Glass nativo requer macOS 26 ou superior.")
     }
     private var accounts: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -136,9 +149,9 @@ struct PFSettingsView: View {
                 IMAccountSettingsView(model: workspace).disabled(workspace.busy)
             } else {
                 PFCard {
-                    PFEmptyState("Conecte seu servidor", detail: "Teste a conexão na seção Conexão para adicionar ou revisar as contas do Immich.", systemImage: "person.crop.circle.badge.plus")
+                    PFEmptyState(L("Conecte seu servidor"), detail: L("Teste a conexão na seção Conexão para adicionar ou revisar as contas do Immich."), systemImage: "person.crop.circle.badge.plus")
                 }
-                Button("Ir para Conexão") { state.section = .connection }
+                Button(L("Ir para Conexão")) { state.section = .connection }
             }
         }
     }

@@ -15,7 +15,7 @@ struct PhotoItem: Identifiable {
         if let asset { return asset.localIdentifier }
         return "file-" + SHA256.hash(data: Data((external?.url.standardizedFileURL.path ?? "").utf8)).map { String(format: "%02x", $0) }.joined()
     }
-    var title: String { external?.url.lastPathComponent ?? resources.first(where: { $0.type == .photo || $0.type == .video })?.originalFilename ?? "Sem nome" }
+    var title: String { external?.url.lastPathComponent ?? resources.first(where: { $0.type == .photo || $0.type == .video })?.originalFilename ?? L("Sem nome") }
     var live: Bool { asset?.mediaSubtypes.contains(.photoLive) ?? false }
     var raw: Bool { external.map { UTType(filenameExtension: $0.url.pathExtension)?.conforms(to: .rawImage) == true } ?? resources.contains { UTType($0.uniformTypeIdentifier)?.conforms(to: .rawImage) == true } }
     var fileNames: String { external?.url.path ?? resources.map(\.originalFilename).joined(separator: " + ") }
@@ -27,7 +27,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
     @Published var albums: [AlbumItem] = []
     @Published var album = "all"
     @Published var selection = Set<String>()
-    @Published var status = "Conecte sua biblioteca para começar."
+    @Published var status = L("Conecte sua biblioteca para começar.")
     @Published var showUpload = false
     @Published var showManagement = false
     @Published var managementBusy = false
@@ -49,8 +49,8 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
     }
     @Published var profile = ConnectionProfile()
     @Published var wifiName: String?
-    @Published var wifiStatus = "Identificação de Wi-Fi não autorizada"
-    @Published var connectionLabel = "Conexão não testada"
+    @Published var wifiStatus = L("Identificação de Wi-Fi não autorizada")
+    @Published var connectionLabel = L("Conexão não testada")
     @Published var showConnectionSettings = false
     private let network = NetworkObserver()
     private var networkTask: Task<Void, Never>?
@@ -92,7 +92,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
                     profile.localAddress = connection.address; profile.mode = .local
                 }
                 verifiedUserID = connection.userID
-                connectionSaved = true; status = "Conexão salva carregada. Verificando a rede…"
+                connectionSaved = true; status = L("Conexão salva carregada. Verificando a rede…")
             }
         } catch { status = error.localizedDescription }
         edits = (try? JSONDecoder().decode([String: MetadataOverride].self, from: Data(contentsOf: url))) ?? [:]
@@ -109,17 +109,17 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         do {
             try profile.validate()
             try ConnectionStore.save(address: address, key: apiKey, profile: profile, userID: verifiedUserID)
-            connectionSaved = true; status = "URLs, rede e chave salvas no Chaves do macOS."
+            connectionSaved = true; status = L("URLs, rede e chave salvas no Chaves do macOS.")
             Task { await testConnection() }
         }
         catch { status = error.localizedDescription }
     }
     func forgetConnection() {
-        do { try ConnectionStore.remove(); connectionSaved = false; verifiedUserID = nil; profile.id = UUID().uuidString; resetConnection(); status = "Conexão salva removida do Chaves. Os campos atuais permanecem até fechar." }
+        do { try ConnectionStore.remove(); connectionSaved = false; verifiedUserID = nil; profile.id = UUID().uuidString; resetConnection(); status = L("Conexão salva removida do Chaves. Os campos atuais permanecem até fechar.") }
         catch { status = error.localizedDescription }
     }
     func reviewSelection() {
-        guard let item = items.first(where: { selection.contains($0.id) }) else { status = "Selecione uma foto para revisar."; return }
+        guard let item = items.first(where: { selection.contains($0.id) }) else { status = L("Selecione uma foto para revisar."); return }
         editing = item
     }
     func metadata(for item: PhotoItem) -> CaptureMetadata { edits[item.id]?.applying(to: item.metadata) ?? item.metadata }
@@ -133,16 +133,16 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         let url = workspace.appendingPathComponent("reviews.json")
         try JSONEncoder().encode(updated).write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        edits = updated; results[id] = "Revisão salva · pronta para enviar"
+        edits = updated; results[id] = L("Revisão salva · pronta para enviar")
     }
     func resetConnection() {
-        serverReady = false; verifiedConnection = ""; remoteAlbums = []; remoteAlbumID = ""; albumStatus = ""; connectionLabel = "Conexão não testada"
+        serverReady = false; verifiedConnection = ""; remoteAlbums = []; remoteAlbumID = ""; albumStatus = ""; connectionLabel = L("Conexão não testada")
     }
     var destinationLabel: String {
         switch destination {
-        case .timeline: return "Rolo da câmera, sem adicionar a álbum"
-        case .existing: return remoteAlbums.first(where: { $0.id == remoteAlbumID })?.albumName ?? "Escolha um álbum"
-        case .new: return "Novo álbum: \(newAlbumName)"
+        case .timeline: return L("Rolo da câmera, sem adicionar a álbum")
+        case .existing: return remoteAlbums.first(where: { $0.id == remoteAlbumID })?.albumName ?? L("Escolha um álbum")
+        case .new: return L("Novo álbum: \(newAlbumName)")
         }
     }
     var canSend: Bool {
@@ -152,17 +152,17 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         do {
             remoteAlbums = try await ImmichClient(address: address, key: apiKey).albums(timeout: timeout)
             if !remoteAlbums.contains(where: { $0.id == remoteAlbumID }) { remoteAlbumID = remoteAlbums.first?.id ?? "" }
-            albumStatus = remoteAlbums.isEmpty ? "Nenhum álbum disponível. Você pode criar um." : "\(remoteAlbums.count) álbuns disponíveis"
-        } catch { remoteAlbums = []; remoteAlbumID = ""; albumStatus = "Não foi possível listar álbuns: \(error.localizedDescription)" }
+            albumStatus = remoteAlbums.isEmpty ? L("Nenhum álbum disponível. Você pode criar um.") : L("\(remoteAlbums.count) álbuns disponíveis")
+        } catch { remoteAlbums = []; remoteAlbumID = ""; albumStatus = L("Não foi possível listar álbuns: \(error.localizedDescription)") }
     }
     func cancelScan() { scanTask?.cancel() }
     func chooseFolder(on volume: ExternalVolume? = nil) async {
         guard !busy else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
-        panel.prompt = "Ler fotos e vídeos"; panel.message = "Escolha a pasta a analisar. Os arquivos de origem não serão alterados."
+        panel.prompt = L("Ler fotos e vídeos"); panel.message = L("Escolha a pasta a analisar. Os arquivos de origem não serão alterados.")
         panel.directoryURL = volume?.url
         guard panel.runModal() == .OK, let folder = panel.url else { return }
-        busy = true; stopRequested = false; progress = 0; status = "Analisando arquivos e metadados de \(folder.lastPathComponent)…"
+        busy = true; stopRequested = false; progress = 0; status = L("Analisando arquivos e metadados de \(folder.lastPathComponent)…")
         defer { busy = false }
         if folderScoped { scopedFolder?.stopAccessingSecurityScopedResource() }
         scopedFolder = folder; folderScoped = folder.startAccessingSecurityScopedResource()
@@ -174,21 +174,21 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         externalItems = result.media.map { PhotoItem(asset: nil, resources: [], metadata: $0.metadata, external: $0) }
         loadMore()
         let missing = externalItems.filter { $0.metadata.date == nil }.count
-        status = "\(externalItems.count) arquivos encontrados · \(missing) sem data de captura · \(result.issues) arquivos/pastas não lidos. Revise antes de enviar."
+        status = L("\(externalItems.count) arquivos encontrados · \(missing) sem data de captura · \(result.issues) arquivos/pastas não lidos. Revise antes de enviar.")
     }
     func connectLibrary() async {
-        busy = true; status = "Abrindo biblioteca do Fotos…"; defer { busy = false }
+        busy = true; status = L("Abrindo biblioteca do Fotos…"); defer { busy = false }
         let authorization = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         guard authorization == .authorized || authorization == .limited else {
-            status = "Acesso ao Fotos não autorizado. Libere Ponte Fotos em Ajustes do Sistema → Privacidade e Segurança → Fotos."; return
+            status = L("Acesso ao Fotos não autorizado. Libere Ponte Fotos em Ajustes do Sistema → Privacidade e Segurança → Fotos."); return
         }
         if folderScoped { scopedFolder?.stopAccessingSecurityScopedResource(); folderScoped = false }
         sourceName = nil; externalItems = []
         connected = true
-        albums = [AlbumItem(id: "all", title: "Todas as fotos", collection: nil)]
+        albums = [AlbumItem(id: "all", title: L("Todas as fotos"), collection: nil)]
         let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: nil)
         collections.enumerateObjects { collection, _, _ in
-            self.albums.append(AlbumItem(id: collection.localIdentifier, title: collection.localizedTitle ?? "Álbum", collection: collection))
+            self.albums.append(AlbumItem(id: collection.localIdentifier, title: collection.localizedTitle ?? L("Álbum"), collection: collection))
         }
         loadAlbum()
     }
@@ -205,7 +205,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         if sourceName != nil {
             let end = min(offset + 100, externalItems.count)
             if end > offset { items.append(contentsOf: externalItems[offset..<end]) }
-            offset = end; status = "\(items.count) de \(externalItems.count) arquivos carregados."
+            offset = end; status = L("\(items.count) de \(externalItems.count) arquivos carregados.")
             return
         }
         guard let fetched else { return }
@@ -214,7 +214,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             let a = fetched.object(at: index)
             items.append(PhotoItem(asset: a, resources: PHAssetResource.assetResources(for: a).filter { [.photo, .video, .pairedVideo, .alternatePhoto].contains($0.type) }, metadata: CaptureMetadata(date: a.creationDate, latitude: a.location?.coordinate.latitude, longitude: a.location?.coordinate.longitude, favorite: a.isFavorite)))
         }
-        offset = end; status = "\(items.count) de \(fetched.count) itens carregados. Selecione um lote pequeno para o primeiro teste."
+        offset = end; status = L("\(items.count) de \(fetched.count) itens carregados. Selecione um lote pequeno para o primeiro teste.")
     }
     @discardableResult func prepareManagementSession() -> IMWorkspaceModel? {
         guard !busy else { return nil }
@@ -240,11 +240,11 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         guard profile.mode == .automatic, !apiKey.isEmpty else { return }
         if busy {
             pendingNetworkChange = true
-            if uploading { stopRequested = true; connectionLabel = "Rede mudou · pausa após este item" }
+            if uploading { stopRequested = true; connectionLabel = L("Rede mudou · pausa após este item") }
             return
         }
         resetConnection()
-        connectionLabel = "Rede mudou · verificando conexão…"
+        connectionLabel = L("Rede mudou · verificando conexão…")
         networkTask?.cancel()
         networkTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
@@ -255,7 +255,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
     }
     func testConnection() async {
         guard !busy else { return }
-        busy = true; resetConnection(); connectionLabel = "Verificando conexão…"
+        busy = true; resetConnection(); connectionLabel = L("Verificando conexão…")
         defer { busy = false }
         do {
             let resolution = try await ConnectionResolver.resolve(profile: profile, ssid: wifiName, key: apiKey, expectedUserID: verifiedUserID)
@@ -263,14 +263,14 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             verifiedUserID = resolution.identity.userID
             verifiedConnection = address + "\n" + apiKey
             serverReady = true
-            connectionLabel = "Conexão " + resolution.candidate.kind.lowercased()
-            status = "Conexão com \(resolution.identity.serverVersion) OK."
+            connectionLabel = L("Conexão: \(LV(resolution.candidate.kind))")
+            status = L("Conexão com \(resolution.identity.serverVersion) OK.")
             if connectionSaved {
                 try ConnectionStore.save(address: address, key: apiKey, profile: profile, userID: resolution.identity.userID)
             }
             await refreshAlbums(timeout: 5)
         } catch {
-            resetConnection(); connectionLabel = "Sem conexão verificada"; status = error.localizedDescription
+            resetConnection(); connectionLabel = L("Sem conexão verificada"); status = error.localizedDescription
         }
     }
     func exportResource(_ resource: PHAssetResource, to url: URL) async throws {
@@ -284,7 +284,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
     func prepare(_ item: PhotoItem, root: URL) async throws -> [(Int, ResourceDescriptor, URL, URL)] {
-        guard item.metadata.date != nil else { throw BridgeError(message: "Sem data de captura: preencha na revisão antes de enviar.") }
+        guard item.metadata.date != nil else { throw BridgeError(message: L("Sem data de captura: preencha na revisão antes de enviar.")) }
         if let external = item.external {
             let folder = root.appendingPathComponent(item.id, isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -297,8 +297,8 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: xmp.path)
             return [(0, ResourceDescriptor(type: external.isVideo ? .video : .photo, originalFilename: external.url.lastPathComponent), file, xmp)]
         }
-        guard !item.resources.isEmpty else { throw BridgeError(message: "Nenhum recurso original disponível.") }
-        if item.live && !item.resources.contains(where: { $0.type == .pairedVideo }) { throw BridgeError(message: "Live Photo sem vídeo original disponível. Envio interrompido.") }
+        guard !item.resources.isEmpty else { throw BridgeError(message: L("Nenhum recurso original disponível.")) }
+        if item.live && !item.resources.contains(where: { $0.type == .pairedVideo }) { throw BridgeError(message: L("Live Photo sem vídeo original disponível. Envio interrompido.")) }
         let folder = root.appendingPathComponent(item.id.replacingOccurrences(of: "/", with: "_"), isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         var files: [(Int, ResourceDescriptor, URL, URL)] = []
@@ -307,7 +307,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             try FileManager.default.createDirectory(at: resourceFolder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let name = URL(fileURLWithPath: resource.originalFilename).lastPathComponent
             let file = resourceFolder.appendingPathComponent(name)
-            status = "Preparando \(name)…"
+            status = L("Preparando \(name)…")
             try await exportResource(resource, to: file)
             let xmp = file.appendingPathExtension("xmp")
             try Data(item.metadata.xmp().utf8).write(to: xmp, options: .atomic)
@@ -319,31 +319,31 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
     }
     func exportSelected() async {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        panel.prompt = "Exportar aqui"
+        panel.prompt = L("Exportar aqui")
         guard panel.runModal() == .OK, let parent = panel.url else { return }
         let root = parent.appendingPathComponent("Ponte-Fotos-\(UUID().uuidString.prefix(8))")
         busy = true; stopRequested = false; progress = 0; defer { busy = false }
         let batch = chosen
         for (index, item) in batch.enumerated() {
             if stopRequested { break }
-            do { _ = try await prepare(item, root: root); results[item.id] = "Exportado com XMP" }
+            do { _ = try await prepare(item, root: root); results[item.id] = L("Exportado com XMP") }
             catch { results[item.id] = error.localizedDescription }
             progress = Double(index + 1) / Double(batch.count)
         }
-        status = "Exportação finalizada. Arquivos em \(root.path)"
+        status = L("Exportação finalizada. Arquivos em \(root.path)")
         NSWorkspace.shared.open(root)
     }
     func sendSelected() async {
-        guard canSend, verifiedConnection == address + "\n" + apiKey else { status = "Teste a conexão antes de enviar."; return }
+        guard canSend, verifiedConnection == address + "\n" + apiKey else { status = L("Teste a conexão antes de enviar."); return }
         busy = true; uploading = true; progress = 0; stopRequested = false
         defer { uploading = false; busy = false }
         do {
             let client = try ImmichClient(address: address, key: apiKey)
-            guard let userID = verifiedUserID else { throw BridgeError(message: "Teste a conexão antes de enviar.") }
+            guard let userID = verifiedUserID else { throw BridgeError(message: L("Teste a conexão antes de enviar.")) }
             let transferProfile = profile
             var targetAlbumID: String?
             if destination == .existing {
-                guard remoteAlbums.contains(where: { $0.id == remoteAlbumID }) else { throw BridgeError(message: "Atualize e selecione um álbum de destino.") }
+                guard remoteAlbums.contains(where: { $0.id == remoteAlbumID }) else { throw BridgeError(message: L("Atualize e selecione um álbum de destino.")) }
                 targetAlbumID = remoteAlbumID
             } else if destination == .new {
                 let album = try await client.createAlbum(newAlbumName)
@@ -357,7 +357,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             let batch = chosen
             for (position, item) in batch.enumerated() {
                 if stopRequested { break }
-                results[item.id] = "Preparando…"
+                results[item.id] = L("Preparando…")
                 let folder = staging.appendingPathComponent(item.id.replacingOccurrences(of: "/", with: "_"))
                 do {
                     let files = try await prepare(item, root: staging)
@@ -376,7 +376,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
                             result = previous.result
                             try ConnectionHistory.save(records, to: recordURL)
                         } else {
-                            status = "Enviando \(resource.originalFilename)…"
+                            status = L("Enviando \(resource.originalFilename)…")
                             result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil)
                             records.removeAll { $0.resourceIndex == index }
                             records.append(TransferRecord(resourceIndex: index, checksum: checksum, result: result))
@@ -384,12 +384,12 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
                             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
                         }
                         if let edit = edits[item.id], edit.hasChanges {
-                            status = "Aplicando sua revisão no Immich…"
+                            status = L("Aplicando sua revisão no Immich…")
                             try await client.applyReview(edit, to: result.id)
                         }
                         if resource.type != .pairedVideo { albumAssetIDs.append(result.id) }
                         if resource.type == .pairedVideo { videoID = result.id }
-                        status = "Conferindo data, localização e associação…"
+                        status = L("Conferindo data, localização e associação…")
                         var verified = false
                         for attempt in 0..<6 {
                             let remote = try await client.info(result.id)
@@ -399,16 +399,16 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
                         if !verified { allVerified = false }
                     }
                     if let targetAlbumID {
-                        status = "Adicionando ao álbum…"
+                        status = L("Adicionando ao álbum…")
                         try await client.addToAlbum(targetAlbumID, assetIDs: albumAssetIDs)
                     }
-                    let checked = "Data conferida" + (item.metadata.latitude != nil ? " · GPS conferido" : " · sem GPS informado") + (item.live ? " · Live conferido" : "")
-                    results[item.id] = (allVerified ? checked : "Enviado/existente · conferência pendente ou divergente") + (targetAlbumID != nil ? " · no álbum" : "")
-                } catch { results[item.id] = "Falha: \(error.localizedDescription)" }
+                    let checked = L("Data conferida") + (item.metadata.latitude != nil ? L(" · GPS conferido") : L(" · sem GPS informado")) + (item.live ? L(" · Live conferido") : "")
+                    results[item.id] = (allVerified ? checked : L("Enviado/existente · conferência pendente ou divergente")) + (targetAlbumID != nil ? L(" · no álbum") : "")
+                } catch { results[item.id] = L("Falha: \(error.localizedDescription)") }
                 try? FileManager.default.removeItem(at: folder)
                 withAnimation { progress = Double(position + 1) / Double(batch.count) }
             }
-            status = stopRequested ? "Pausado entre itens. Selecione o lote e envie para retomar." : "Lote finalizado. Confira os resultados de cada foto."
+            status = stopRequested ? L("Pausado entre itens. Selecione o lote e envie para retomar.") : L("Lote finalizado. Confira os resultados de cada foto.")
         } catch { status = error.localizedDescription }
     }
 }
@@ -489,6 +489,7 @@ struct ContentView: View {
         workspace
         .background(PFTheme.background).tint(PFTheme.accent)
         .environment(\.pfGlassEnabled, glassEnabled)
+        .environment(\.locale, PFLocalization.locale)
         .onAppear { PFAppearanceController.apply(selectedTheme) }
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
@@ -510,6 +511,7 @@ struct ContentView: View {
         .sheet(item: $model.editing) { item in
             ReviewEditor(item: item, metadata: model.metadata(for: item), save: { try model.saveReview($0, id: item.id) }, restore: { try model.saveReview(nil, id: item.id) }, dismiss: { model.editing = nil })
                 .environment(\.pfGlassEnabled, glassEnabled)
+        .environment(\.locale, PFLocalization.locale)
         }
         .sheet(isPresented: $model.showManagement, onDismiss: { model.managementModel?.endReview() }) {
             if let workspace = model.managementModel {
@@ -517,12 +519,13 @@ struct ContentView: View {
                     .disabled(model.busy && !model.managementBusy)
                     .interactiveDismissDisabled(model.managementBusy)
                         .environment(\.pfGlassEnabled, glassEnabled)
+        .environment(\.locale, PFLocalization.locale)
             }
         }
-        .confirmationDialog("Enviar \(model.selection.count) itens para o Immich?", isPresented: $model.showUpload, titleVisibility: .visible) {
-            Button("Enviar com originais e XMP") { Task { await model.sendSelected() } }
+        .confirmationDialog(L("Enviar \(model.selection.count) itens para o Immich?"), isPresented: $model.showUpload, titleVisibility: .visible) {
+            Button(L("Enviar com originais e XMP")) { Task { await model.sendSelected() } }
         } message: {
-            Text("Destino: \(model.address) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação.")
+            Text(L("Destino: \(model.address) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação."))
         }
     }
 
@@ -533,30 +536,30 @@ struct ContentView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10)).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Ponte Fotos").font(.system(size: 16, weight: .semibold))
-                    Text("Sua biblioteca, conectada.").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Sua biblioteca, conectada.")).font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(.bottom, 28)
-            Text("BIBLIOTECA").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
-            sidebarAction("Fotos da Apple", icon: "photo.stack", selected: !navigation.settings && !navigation.reverse && model.connected && model.sourceName == nil) { navigation.settings = false; navigation.reverse = false; Task { await model.connectLibrary() } }.disabled(model.busy)
-            sidebarAction("Discos e pastas", icon: "folder", selected: !navigation.settings && !navigation.reverse && model.sourceName != nil) { navigation.settings = false; navigation.reverse = false; Task { await model.chooseFolder() } }.disabled(model.busy)
+            Text(L("BIBLIOTECA")).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
+            sidebarAction(L("Fotos da Apple"), icon: "photo.stack", selected: !navigation.settings && !navigation.reverse && model.connected && model.sourceName == nil) { navigation.settings = false; navigation.reverse = false; Task { await model.connectLibrary() } }.disabled(model.busy)
+            sidebarAction(L("Discos e pastas"), icon: "folder", selected: !navigation.settings && !navigation.reverse && model.sourceName != nil) { navigation.settings = false; navigation.reverse = false; Task { await model.chooseFolder() } }.disabled(model.busy)
             Divider().padding(.vertical, 18)
             Text("IMMICH").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).padding(.horizontal, 10).padding(.bottom, 8)
-            sidebarAction("Immich → Fotos", icon: "square.and.arrow.down", selected: navigation.reverse && !navigation.settings) {
+            sidebarAction(L("Immich → Fotos"), icon: "square.and.arrow.down", selected: navigation.reverse && !navigation.settings) {
                 navigation.settings = false; navigation.reverse = true
             }.disabled(model.busy)
-                .help("Trazer originais do Immich para a biblioteca do Fotos da Apple")
-            sidebarAction("Gerenciar biblioteca", icon: "square.grid.2x2") { model.openManagement() }
+                .help(L("Trazer originais do Immich para a biblioteca do Fotos da Apple"))
+            sidebarAction(L("Gerenciar biblioteca"), icon: "square.grid.2x2") { model.openManagement() }
                 .disabled(model.busy || !model.serverReady)
-                .help(model.serverReady ? "Duplicatas, álbuns, pessoas e histórico" : "Teste a conexão para gerenciar o Immich")
+                .help(model.serverReady ? L("Duplicatas, álbuns, pessoas e histórico") : L("Teste a conexão para gerenciar o Immich"))
             HStack {
-                Text("DISPOSITIVOS").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text(L("DISPOSITIVOS")).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 Spacer()
-                Button { volumes.refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("Atualizar dispositivos").accessibilityLabel("Atualizar dispositivos")
+                Button { volumes.refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help(L("Atualizar dispositivos")).accessibilityLabel(L("Atualizar dispositivos"))
             }.padding(.horizontal, 10).padding(.top, 28).padding(.bottom, 8)
             ScrollView {
                 VStack(alignment: .leading, spacing: 5) {
                     if volumes.volumes.isEmpty {
-                        Text("Os discos conectados\naparecem aqui.").font(.caption).foregroundStyle(.secondary).padding(10)
+                        Text(L("Os discos conectados\naparecem aqui.")).font(.caption).foregroundStyle(.secondary).padding(10)
                     }
                     ForEach(volumes.volumes) { volume in
                         sidebarAction(volume.name, icon: "externaldrive") { navigation.settings = false; navigation.reverse = false; Task { await model.chooseFolder(on: volume) } }.disabled(model.busy)
@@ -564,12 +567,12 @@ struct ContentView: View {
                 }
             }
             Spacer(minLength: 16)
-            sidebarAction("Configurações", icon: "gearshape", selected: navigation.settings) { navigation.settings = true }.disabled(model.busy)
+            sidebarAction(L("Configurações"), icon: "gearshape", selected: navigation.settings) { navigation.settings = true }.disabled(model.busy)
             Divider().padding(.vertical, 12)
             VStack(alignment: .leading, spacing: 8) {
-                Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
-                Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.9.3").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Label(L("Originais preservados"), systemImage: "checkmark.shield").font(.caption.weight(.medium))
+                Text(L("Live Photos, RAW e metadados\nacompanham suas memórias.")).font(.caption).foregroundStyle(.secondary)
+                Text("Ponte Fotos 0.9.4").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
@@ -588,75 +591,75 @@ struct ContentView: View {
     private var pageHeader: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(navigation.settings ? "Configurações" : navigation.reverse ? "Importar para o Fotos" : "Sua biblioteca").font(.system(size: 27, weight: .semibold))
-                Text(navigation.settings ? "Conexão, contas e aparência em um só lugar." : navigation.reverse ? "Do Immich para a biblioteca da Apple, com os originais." : "Escolha, revise e envie suas fotos para o Immich.").font(.callout).foregroundStyle(.secondary)
+                Text(navigation.settings ? L("Configurações") : navigation.reverse ? L("Importar para o Fotos") : L("Sua biblioteca")).font(.system(size: 27, weight: .semibold))
+                Text(navigation.settings ? L("Conexão, contas e aparência em um só lugar.") : navigation.reverse ? L("Do Immich para a biblioteca da Apple, com os originais.") : L("Escolha, revise e envie suas fotos para o Immich.")).font(.callout).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             if navigation.settings {
-                Button("Voltar às fotos", systemImage: "arrow.left") { navigation.settings = false }.controlSize(.large).disabled(model.busy)
+                Button(L("Voltar às fotos"), systemImage: "arrow.left") { navigation.settings = false }.controlSize(.large).disabled(model.busy)
             } else {
                 Button { navigation.settings = true } label: {
-                    Label(model.serverReady ? model.connectionLabel : "Configurar conexão", systemImage: model.serverReady ? "checkmark.icloud" : "network")
+                    Label(model.serverReady ? model.connectionLabel : L("Configurar conexão"), systemImage: model.serverReady ? "checkmark.icloud" : "network")
                         .lineLimit(1)
-                }.disabled(model.busy).help("Abrir configurações de conexão")
+                }.disabled(model.busy).help(L("Abrir configurações de conexão"))
             }
         }
     }
     private var sourcePanel: some View {
         PFCard {
             VStack(alignment: .leading, spacing: 12) {
-                PFSectionHeading("Origem", systemImage: model.sourceName == nil ? "photo.stack" : "folder")
+                PFSectionHeading(L("Origem"), systemImage: model.sourceName == nil ? "photo.stack" : "folder")
                 if let source = model.sourceName { Text(source).font(.callout.weight(.medium)).lineLimit(2) }
                 else {
-                    Picker("Álbum do Fotos", selection: $model.album) { ForEach(model.albums) { Text($0.title).tag($0.id) } }.labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
+                    Picker(L("Álbum do Fotos"), selection: $model.album) { ForEach(model.albums) { Text($0.title).tag($0.id) } }.labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
                 }
-                Toggle("Baixar originais do iCloud", isOn: $model.allowCloud).font(.caption).disabled(model.sourceName != nil)
+                Toggle(L("Baixar originais do iCloud"), isOn: $model.allowCloud).font(.caption).disabled(model.sourceName != nil)
             }
         }.disabled(model.busy).onChange(of: model.album) { model.loadAlbum() }
     }
     private var destinationPanel: some View {
         PFCard {
             VStack(alignment: .leading, spacing: 12) {
-                PFSectionHeading("Destino", systemImage: "externaldrive.badge.icloud")
-                Picker("Destino no Immich", selection: $model.destination) { ForEach(UploadDestination.allCases) { Text($0.label).tag($0) } }.labelsHidden().controlSize(.large)
+                PFSectionHeading(L("Destino"), systemImage: "externaldrive.badge.icloud")
+                Picker(L("Destino no Immich"), selection: $model.destination) { ForEach(UploadDestination.allCases) { Text($0.label).tag($0) } }.labelsHidden().controlSize(.large)
                 if model.destination == .existing {
                     HStack {
-                        Picker("Álbum de destino", selection: $model.remoteAlbumID) {
-                            if model.remoteAlbums.isEmpty { Text("Nenhum álbum").tag("") }
-                            ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? " · compartilhado" : "")).tag($0.id) }
+                        Picker(L("Álbum de destino"), selection: $model.remoteAlbumID) {
+                            if model.remoteAlbums.isEmpty { Text(L("Nenhum álbum")).tag("") }
+                            ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? L(" · compartilhado") : "")).tag($0.id) }
                         }.labelsHidden()
-                        Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help("Atualizar álbuns").accessibilityLabel("Atualizar álbuns").disabled(!model.serverReady)
+                        Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help(L("Atualizar álbuns")).accessibilityLabel(L("Atualizar álbuns")).disabled(!model.serverReady)
                     }
                     Text(model.albumStatus).font(.caption).foregroundStyle(.secondary)
                 }
-                if model.destination == .new { TextField("Nome do novo álbum", text: $model.newAlbumName).textFieldStyle(.roundedBorder) }
-                if model.destination == .timeline { Text("Na linha do tempo, preservando os álbuns existentes.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                if model.destination == .new { TextField(L("Nome do novo álbum"), text: $model.newAlbumName).textFieldStyle(.roundedBorder) }
+                if model.destination == .timeline { Text(L("Na linha do tempo, preservando os álbuns existentes.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
             }
         }.disabled(model.busy)
     }
     private var libraryPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Fotos e vídeos").font(.headline)
-                PFBadge("\(model.selection.count) selecionados")
+                Text(L("Fotos e vídeos")).font(.headline)
+                PFBadge(L("\(model.selection.count) selecionados"))
                 Spacer()
-                Button("Revisar", systemImage: "slider.horizontal.3") { model.reviewSelection() }.disabled(model.busy || model.selection.isEmpty)
+                Button(L("Revisar"), systemImage: "slider.horizontal.3") { model.reviewSelection() }.disabled(model.busy || model.selection.isEmpty)
             }
             List(model.items, selection: $model.selection) { item in
-                photoRow(item).tag(item.id).contextMenu { Button("Revisar data e localização") { model.editing = item } }
+                photoRow(item).tag(item.id).contextMenu { Button(L("Revisar data e localização")) { model.editing = item } }
             }.listStyle(.inset).scrollContentBackground(.hidden)
                 .background(PFTheme.surface, in: RoundedRectangle(cornerRadius: PFTheme.corner))
                 .overlay(RoundedRectangle(cornerRadius: PFTheme.corner).strokeBorder(PFTheme.separator, lineWidth: 0.5))
                 .overlay {
                     if model.items.isEmpty {
-                        PFEmptyState(model.sourceName != nil ? "Nenhuma mídia encontrada" : model.connected ? "Nenhuma foto neste álbum" : "Suas memórias começam aqui", detail: model.sourceName != nil ? "Escolha outra pasta ou confira o acesso ao disco." : model.connected ? "Escolha outro álbum para continuar." : "Abra a biblioteca do Fotos ou escolha uma pasta na barra lateral.", systemImage: "photo.on.rectangle.angled").allowsHitTesting(false)
+                        PFEmptyState(model.sourceName != nil ? L("Nenhuma mídia encontrada") : model.connected ? L("Nenhuma foto neste álbum") : L("Suas memórias começam aqui"), detail: model.sourceName != nil ? L("Escolha outra pasta ou confira o acesso ao disco.") : model.connected ? L("Escolha outro álbum para continuar.") : L("Abra a biblioteca do Fotos ou escolha uma pasta na barra lateral."), systemImage: "photo.on.rectangle.angled").allowsHitTesting(false)
                     }
                 }.frame(minHeight: 180).disabled(model.busy)
             HStack(spacing: 14) {
-                Button("Carregar mais") { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy)
-                Button("Selecionar visíveis") { model.selection = Set(model.items.map(\.id)) }.disabled(model.busy)
+                Button(L("Carregar mais")) { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy)
+                Button(L("Selecionar visíveis")) { model.selection = Set(model.items.map(\.id)) }.disabled(model.busy)
                 Spacer()
-                Text("\(model.items.count) itens carregados").font(.caption).foregroundStyle(.secondary)
+                Text(L("\(model.items.count) itens carregados")).font(.caption).foregroundStyle(.secondary)
             }.buttonStyle(.borderless)
         }
     }
@@ -670,17 +673,17 @@ struct ContentView: View {
                     if item.live { PFBadge("Live", systemImage: "livephoto") }
                     if item.raw { PFBadge("RAW", color: .orange) }
                 }
-                Text(metadata.date?.formatted(date: .abbreviated, time: .shortened) ?? "Complete a data de captura").font(.caption).foregroundStyle(metadata.date == nil ? Color.orange : Color.secondary)
+                Text(metadata.date.map { PFLocalization.formatDate($0, date: .abbreviated, time: .shortened) } ?? L("Complete a data de captura")).font(.caption).foregroundStyle(metadata.date == nil ? Color.orange : Color.secondary)
                 Text(item.fileNames).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                 if let external = item.external, !external.note.isEmpty { Text(external.note).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 5) {
                 if let lat = metadata.latitude, let lon = metadata.longitude { Label(String(format: "%.4f, %.4f", lat, lon), systemImage: "location").font(.caption.monospaced()).foregroundStyle(.secondary) }
-                else { Label("Sem localização", systemImage: "location.slash").font(.caption).foregroundStyle(.orange) }
-                Text(model.results[item.id] ?? "Pronto para revisar").font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth: 170, alignment: .trailing)
+                else { Label(L("Sem localização"), systemImage: "location.slash").font(.caption).foregroundStyle(.orange) }
+                Text(model.results[item.id] ?? L("Pronto para revisar")).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth: 170, alignment: .trailing)
             }
-            Button { model.editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help("Revisar data e localização").accessibilityLabel("Revisar \(item.title)")
+            Button { model.editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help(L("Revisar data e localização")).accessibilityLabel(L("Revisar \(item.title)"))
         }.padding(.vertical, 8)
     }
     private var footer: some View {
@@ -703,20 +706,20 @@ struct ContentView: View {
     private var footerActions: some View {
         HStack(spacing: 10) {
             if model.busy {
-                Button(model.scanning ? "Parar análise" : "Pausar após este item") { model.stopRequested = true; model.cancelScan() }
+                Button(model.scanning ? L("Parar análise") : L("Pausar após este item")) { model.stopRequested = true; model.cancelScan() }
             } else {
-                Button("Exportar XMP…", systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
-                Button("Enviar selecionados", systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.borderedProminent).disabled(!model.canSend)
+                Button(L("Exportar XMP…"), systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
+                Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.borderedProminent).disabled(!model.canSend)
             }
         }.controlSize(.large)
     }
 }
 @main struct PonteFotosApp: App {
     init() { NSApplication.shared.setActivationPolicy(.regular) }
-    var body: some Scene { WindowGroup { ContentView() }.defaultSize(width: 1180, height: 800)
+    var body: some Scene { WindowGroup { ContentView().environment(\.locale, PFLocalization.locale) }.defaultSize(width: 1180, height: 800)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Configurações…") { NotificationCenter.default.post(name: .pfOpenSettings, object: nil) }
+                Button(L("Configurações…")) { NotificationCenter.default.post(name: .pfOpenSettings, object: nil) }
                     .keyboardShortcut(",", modifiers: .command)
             }
         } }

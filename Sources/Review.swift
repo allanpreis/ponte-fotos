@@ -4,7 +4,7 @@ enum UploadDestination: String, CaseIterable, Identifiable {
     case timeline, existing, new
     var id: String { rawValue }
     var label: String {
-        switch self { case .timeline: return "Rolo da câmera · sem álbum"; case .existing: return "Álbum existente"; case .new: return "Criar álbum" }
+        switch self { case .timeline: return L("Rolo da câmera · sem álbum"); case .existing: return L("Álbum existente"); case .new: return L("Criar álbum") }
     }
 }
 @MainActor final class ReviewDraft: ObservableObject {
@@ -40,8 +40,8 @@ struct ReviewEditor: View {
                     .frame(width: 48, height: 48)
                     .background(.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 13))
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Revisar informações").font(.title2.bold())
-                    Text("Complete a história desta foto antes de enviar.")
+                    Text(L("Revisar informações")).font(.title2.bold())
+                    Text(L("Complete a história desta foto antes de enviar."))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -54,46 +54,46 @@ struct ReviewEditor: View {
                         PhotoThumbnail(item: item)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(item.title).font(.headline).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                            Label("Original preservado", systemImage: "checkmark.shield")
+                            Label(L("Original preservado"), systemImage: "checkmark.shield")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
                     }
-                    Text("Os ajustes serão usados na exportação e no envio. Os arquivos de origem permanecem intactos.")
+                    Text(L("Os ajustes serão usados na exportação e no envio. Os arquivos de origem permanecem intactos."))
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     GroupBox {
                         VStack(alignment: .leading, spacing: 14) {
-                            Toggle("Definir data e hora", isOn: $draft.setDate)
+                            Toggle(L("Definir data e hora"), isOn: $draft.setDate)
                             if draft.setDate {
-                                DatePicker("Captura", selection: $draft.date).datePickerStyle(.field)
+                                DatePicker(L("Captura"), selection: $draft.date).datePickerStyle(.field)
                             }
-                            Text("Fuso desta edição: \(TimeZone.current.identifier). Informe a hora equivalente nesse fuso.")
+                            Text(L("Fuso desta edição: \(TimeZone.current.identifier). Informe a hora equivalente nesse fuso."))
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     } label: {
-                        Label("Data e hora", systemImage: "calendar").font(.headline)
+                        Label(L("Data e hora"), systemImage: "calendar").font(.headline)
                     }
                     GroupBox {
                         VStack(alignment: .leading, spacing: 14) {
-                            Toggle("Definir localização", isOn: $draft.setLocation)
+                            Toggle(L("Definir localização"), isOn: $draft.setLocation)
                             if draft.setLocation {
                                 HStack(alignment: .top, spacing: 12) {
-                                    coordinateField("Latitude", placeholder: "Ex.: −23,55052", text: $draft.latitude)
-                                    coordinateField("Longitude", placeholder: "Ex.: −46,63331", text: $draft.longitude)
+                                    coordinateField(L("Latitude"), placeholder: L("Ex.: −23,55052"), text: $draft.latitude)
+                                    coordinateField(L("Longitude"), placeholder: L("Ex.: −46,63331"), text: $draft.longitude)
                                 }
                             }
-                            Text("Desmarcar mantém os dados da origem.")
+                            Text(L("Desmarcar mantém os dados da origem."))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                     } label: {
-                        Label("Localização", systemImage: "mappin.and.ellipse").font(.headline)
+                        Label(L("Localização"), systemImage: "mappin.and.ellipse").font(.headline)
                     }
                     Label {
-                        Text("Sem data disponível, o envio continua bloqueado. Os ajustes salvos também serão aplicados se a foto já existir no Immich.")
+                        Text(L("Sem data disponível, o envio continua bloqueado. Os ajustes salvos também serão aplicados se a foto já existir no Immich."))
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
                         Image(systemName: "info.circle")
@@ -133,23 +133,23 @@ struct ReviewEditor: View {
 
     private func coordinateField(_ title: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            TextField(placeholder, text: text).textFieldStyle(.roundedBorder)
-                .accessibilityLabel(title)
+            Text(LV(title)).font(.caption).foregroundStyle(.secondary)
+            TextField(LV(placeholder), text: text).textFieldStyle(.roundedBorder)
+                .accessibilityLabel(LV(title))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var restoreButton: some View {
-        Button("Restaurar dados da origem") { do { try restore(); dismiss() } catch { draft.error = error.localizedDescription } }
+        Button(L("Restaurar dados da origem")) { do { try restore(); dismiss() } catch { draft.error = error.localizedDescription } }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
     }
 
     private var actionButtons: some View {
         HStack(spacing: 10) {
-            Button("Cancelar", action: dismiss).keyboardShortcut(.cancelAction)
-            Button("Salvar revisão") {
+            Button(L("Cancelar"), action: dismiss).keyboardShortcut(.cancelAction)
+            Button(L("Salvar revisão")) {
                 do {
                     var edit = MetadataOverride()
                     if draft.setDate, item.metadata.date == nil || abs(draft.date.timeIntervalSince(item.metadata.date!)) > 0.001 { edit.date = draft.date }

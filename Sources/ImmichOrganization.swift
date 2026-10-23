@@ -43,16 +43,16 @@ struct IMAgeAnalysis: Codable, Identifiable {
 
     static func compare(session: IMSession, albums: [IMAlbum], progress: @escaping IMProgress) async throws -> IMComparisonAnalysis {
         guard albums.count == 2, albums[0].id != albums[1].id else {
-            throw failure("Selecione dois álbuns diferentes para comparar.")
+            throw failure(L("Selecione dois álbuns diferentes para comparar."))
         }
         var assets: [String: IMAsset] = [:]
         var albumSets: [String: Set<String>] = [:]
         for (index, album) in albums.enumerated() {
-            progress("Lendo \(album.name)", index, albums.count)
+            progress(L("Lendo \(album.name)"), index, albums.count)
             let client = try session.reader(album)
             let ids = try await client.albumIDs(album.id)
             let union = Set(assets.keys).union(ids)
-            guard union.count <= 30000 else { throw failure("Limite de 30 mil itens por comparação. Escolha álbuns menores.") }
+            guard union.count <= 30000 else { throw failure(L("Limite de 30 mil itens por comparação. Escolha álbuns menores.")) }
             albumSets[album.id] = ids
             for id in ids.sorted() where assets[id] == nil {
                 var asset = try await client.asset(id)
@@ -62,7 +62,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
         }
         let eligible = assets.values.filter { $0.eligible(allowLive: false) }
         let groups = comparisonGroups(assets: Array(eligible), albums: albums, memberships: albumSets)
-        progress("Comparação pronta", assets.count, assets.count)
+        progress(L("Comparação pronta"), assets.count, assets.count)
         return IMComparisonAnalysis(id: UUID().uuidString, profileID: session.profileID, albums: albums, createdAt: Date(), groups: groups, total: assets.count, skipped: assets.count - eligible.count)
     }
 
@@ -82,19 +82,19 @@ struct IMAgeAnalysis: Codable, Identifiable {
 
     static func organize(session: IMSession, analysis: IMComparisonAnalysis, selections: [String: String], progress: @escaping IMProgress, report: @escaping IMReport) async throws {
         try validate(profileID: analysis.profileID, createdAt: analysis.createdAt, session: session)
-        guard analysis.albums.count == 2, Set(analysis.albums.map(\.id)).count == 2 else { throw failure("Comparação inválida; consulte novamente.") }
+        guard analysis.albums.count == 2, Set(analysis.albums.map(\.id)).count == 2 else { throw failure(L("Comparação inválida; consulte novamente.")) }
         let groupMap = Dictionary(uniqueKeysWithValues: analysis.groups.map { ($0.id, $0) })
         let albumIDs = Set(analysis.albums.map(\.id))
-        guard selections.allSatisfy({ groupMap[$0.key] != nil && ($0.value == "both" || albumIDs.contains($0.value)) }) else { throw failure("A seleção não pertence a esta comparação.") }
+        guard selections.allSatisfy({ groupMap[$0.key] != nil && ($0.value == "both" || albumIDs.contains($0.value)) }) else { throw failure(L("A seleção não pertence a esta comparação.")) }
         var additions: [LinkChange] = [], removals: [LinkChange] = [], keep: [Preservation] = []
         var snapshots: [IMAsset] = []
         for key in selections.keys.sorted() {
             let group = groupMap[key]!
-            guard !group.assets.isEmpty else { throw failure("Grupo vazio; consulte novamente.") }
+            guard !group.assets.isEmpty else { throw failure(L("Grupo vazio; consulte novamente.")) }
             let destinationIDs: Set<String> = selections[key] == "both" ? albumIDs : [selections[key]!]
             let copies = group.assets.sorted(by: order)
             for asset in copies {
-                guard asset.eligible(allowLive: false), asset.checksum == copies[0].checksum, asset.type == copies[0].type else { throw failure("O grupo contém itens incompatíveis; consulte novamente.") }
+                guard asset.eligible(allowLive: false), asset.checksum == copies[0].checksum, asset.type == copies[0].type else { throw failure(L("O grupo contém itens incompatíveis; consulte novamente.")) }
             }
             snapshots.append(contentsOf: copies)
             for album in analysis.albums {
@@ -117,16 +117,16 @@ struct IMAgeAnalysis: Codable, Identifiable {
 
     static func ageSearch(session: IMSession, person: IMPerson, source: IMAlbum?, destination: IMAlbum, minAge: Int, maxAge: Int, progress: @escaping IMProgress) async throws -> IMAgeAnalysis {
         try validateRange(minAge, maxAge)
-        guard source?.id != destination.id else { throw failure("Origem e destino precisam ser diferentes.") }
+        guard source?.id != destination.id else { throw failure(L("Origem e destino precisam ser diferentes.")) }
         let client = try session.owner(person.accountID)
         let currentPerson = try await client.person(person.id)
-        guard currentPerson.birthDate == person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure("Confira a data de nascimento da pessoa no Immich e consulte novamente.") }
+        guard currentPerson.birthDate == person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure(L("Confira a data de nascimento da pessoa no Immich e consulte novamente.")) }
         let accessible = try await client.albums()
-        guard accessible.contains(where: { $0.id == destination.id }), source == nil || accessible.contains(where: { $0.id == source!.id }) else { throw failure("A conta da pessoa precisa ter acesso aos álbuns escolhidos.") }
+        guard accessible.contains(where: { $0.id == destination.id }), source == nil || accessible.contains(where: { $0.id == source!.id }) else { throw failure(L("A conta da pessoa precisa ter acesso aos álbuns escolhidos.")) }
         let sources = source.map { [$0] } ?? accessible.filter { $0.id != destination.id }
-        guard !sources.isEmpty, sources.count <= 100 else { throw failure("Selecione uma origem; a busca permite de 1 a 100 álbuns de origem.") }
+        guard !sources.isEmpty, sources.count <= 100 else { throw failure(L("Selecione uma origem; a busca permite de 1 a 100 álbuns de origem.")) }
         let sourceIDs = Set(sources.map(\.id))
-        progress("Buscando fotos da pessoa", 0, 0)
+        progress(L("Buscando fotos da pessoa"), 0, 0)
         let results = try await client.search(personID: person.id, albumIDs: sourceIDs.sorted())
         var matches: [IMAsset] = [], skipped = 0
         var seen: Set<String> = []
@@ -135,7 +135,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
             asset.albums = try await session.memberships(asset.id)
             guard asset.albums.contains(where: { sourceIDs.contains($0.id) }) else { skipped += 1; continue }
             matches.append(asset)
-            progress("Conferindo álbuns e idade", seen.count, results.count)
+            progress(L("Conferindo álbuns e idade"), seen.count, results.count)
         }
         return IMAgeAnalysis(id: UUID().uuidString, profileID: session.profileID, accountID: person.accountID, person: person, source: source, destination: destination, minAge: minAge, maxAge: maxAge, createdAt: Date(), assets: matches.sorted(by: order), skipped: skipped, sourceAlbums: sources)
     }
@@ -143,24 +143,24 @@ struct IMAgeAnalysis: Codable, Identifiable {
     static func ageMove(session: IMSession, analysis: IMAgeAnalysis, selectedIDs: Set<String>, progress: @escaping IMProgress, report: @escaping IMReport) async throws {
         try validate(profileID: analysis.profileID, createdAt: analysis.createdAt, session: session)
         try validateRange(analysis.minAge, analysis.maxAge)
-        guard analysis.accountID == analysis.person.accountID, analysis.source?.id != analysis.destination.id else { throw failure("Análise de idade inválida; consulte novamente.") }
+        guard analysis.accountID == analysis.person.accountID, analysis.source?.id != analysis.destination.id else { throw failure(L("Análise de idade inválida; consulte novamente.")) }
         let byID = Dictionary(uniqueKeysWithValues: analysis.assets.map { ($0.id, $0) })
-        guard selectedIDs.isSubset(of: Set(byID.keys)) else { throw failure("A seleção não pertence a esta busca.") }
+        guard selectedIDs.isSubset(of: Set(byID.keys)) else { throw failure(L("A seleção não pertence a esta busca.")) }
         let client = try session.owner(analysis.accountID)
         let accessible = try await client.albums()
         let accessibleIDs = Set(accessible.map(\.id))
         let sourceAlbums = analysis.source.map { [$0] } ?? analysis.sourceAlbums
         let sourceIDs = Set(sourceAlbums.map(\.id))
-        guard !sourceIDs.contains(analysis.destination.id), sourceIDs.isSubset(of: accessibleIDs), accessibleIDs.contains(analysis.destination.id) else { throw failure("O acesso aos álbuns mudou; consulte novamente.") }
+        guard !sourceIDs.contains(analysis.destination.id), sourceIDs.isSubset(of: accessibleIDs), accessibleIDs.contains(analysis.destination.id) else { throw failure(L("O acesso aos álbuns mudou; consulte novamente.")) }
         let snapshots = selectedIDs.sorted().map { byID[$0]! }
         let revalidate = {
             let person = try await client.person(analysis.person.id)
-            guard person.birthDate == analysis.person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure("O nascimento da pessoa mudou; consulte novamente.") }
+            guard person.birthDate == analysis.person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure(L("O nascimento da pessoa mudou; consulte novamente.")) }
             for snapshot in snapshots {
                 let current = try await session.asset(snapshot)
                 let associated = try await client.matchesPerson(personID: analysis.person.id, assetID: snapshot.id, albumIDs: [])
                 try validateContent(snapshot, current)
-                guard associated, captureDay(current) == captureDay(snapshot), current.localDateTime == snapshot.localDateTime, current.fileCreatedAt == snapshot.fileCreatedAt, let age = capturedAge(current, birthday: birthday), (analysis.minAge...analysis.maxAge).contains(age) else { throw failure("Pessoa ou data da foto mudou; consulte novamente.") }
+                guard associated, captureDay(current) == captureDay(snapshot), current.localDateTime == snapshot.localDateTime, current.fileCreatedAt == snapshot.fileCreatedAt, let age = capturedAge(current, birthday: birthday), (analysis.minAge...analysis.maxAge).contains(age) else { throw failure(L("Pessoa ou data da foto mudou; consulte novamente.")) }
             }
         }
         try await revalidate()
@@ -168,7 +168,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
         var additions: [LinkChange] = [], removals: [LinkChange] = [], keep: [Preservation] = []
         for asset in snapshots {
             let linkedSources = asset.albums.filter { sourceIDs.contains($0.id) }
-            guard !linkedSources.isEmpty else { throw failure("A foto não está na origem; consulte novamente.") }
+            guard !linkedSources.isEmpty else { throw failure(L("A foto não está na origem; consulte novamente.")) }
             keep.append(Preservation(asset: asset, album: analysis.destination))
             if !asset.albums.contains(where: { $0.id == analysis.destination.id }) { additions.append(LinkChange(asset: asset, album: analysis.destination)) }
             removals.append(contentsOf: linkedSources.map { LinkChange(asset: asset, album: $0) })
@@ -177,18 +177,18 @@ struct IMAgeAnalysis: Codable, Identifiable {
     }
 
     static func validate(profileID: String, createdAt: Date, session: IMSession, now: Date = Date()) throws {
-        guard profileID == session.profileID, createdAt <= now.addingTimeInterval(60), now.timeIntervalSince(createdAt) <= 24 * 60 * 60 else { throw failure("A análise expirou ou pertence a outra conexão. Consulte novamente.") }
+        guard profileID == session.profileID, createdAt <= now.addingTimeInterval(60), now.timeIntervalSince(createdAt) <= 24 * 60 * 60 else { throw failure(L("A análise expirou ou pertence a outra conexão. Consulte novamente.")) }
     }
 
     static func validateRange(_ minimum: Int, _ maximum: Int) throws {
-        guard minimum >= 0, maximum >= minimum, maximum <= 150 else { throw failure("Informe idades inteiras entre 0 e 150, com mínimo menor ou igual ao máximo.") }
+        guard minimum >= 0, maximum >= minimum, maximum <= 150 else { throw failure(L("Informe idades inteiras entre 0 e 150, com mínimo menor ou igual ao máximo.")) }
     }
 
     private static func distinct(_ assets: [IMAsset]) throws -> [IMAsset] {
         var byID: [String: IMAsset] = [:]
         for asset in assets {
             if let previous = byID[asset.id] {
-                guard previous.checksum == asset.checksum, previous.ownerId == asset.ownerId, previous.type == asset.type else { throw failure("Há itens inconsistentes na seleção; consulte novamente.") }
+                guard previous.checksum == asset.checksum, previous.ownerId == asset.ownerId, previous.type == asset.type else { throw failure(L("Há itens inconsistentes na seleção; consulte novamente.")) }
             }
             byID[asset.id] = asset
         }
@@ -196,7 +196,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
     }
 
     private static func validateContent(_ old: IMAsset, _ current: IMAsset) throws {
-        guard current.id == old.id, current.ownerId == old.ownerId, current.type == old.type, current.checksum == old.checksum, !old.checksum.isEmpty, old.eligible(allowLive: false), current.eligible(allowLive: false) else { throw failure("Conteúdo, proprietário ou estado da foto mudou; consulte novamente.") }
+        guard current.id == old.id, current.ownerId == old.ownerId, current.type == old.type, current.checksum == old.checksum, !old.checksum.isEmpty, old.eligible(allowLive: false), current.eligible(allowLive: false) else { throw failure(L("Conteúdo, proprietário ou estado da foto mudou; consulte novamente.")) }
     }
 
     private static func validateSnapshots(session: IMSession, assets: [IMAsset], relevantAlbums: Set<String>) async throws {
@@ -207,7 +207,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
                 let memberships = try await session.memberships(snapshot.id)
                 let old = Set(snapshot.albums.map(\.id)).intersection(relevantAlbums)
                 let new = Set(memberships.map(\.id)).intersection(relevantAlbums)
-                guard old == new else { throw failure("Os vínculos dos álbuns mudaram; consulte novamente.") }
+                guard old == new else { throw failure(L("Os vínculos dos álbuns mudaram; consulte novamente.")) }
             }
         }
     }
@@ -218,7 +218,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
         let byID = Dictionary(uniqueKeysWithValues: currentAlbums.map { ($0.id, $0) })
         var writers: [String: IMClient] = [:]
         for change in additions + removals {
-            guard let album = byID[change.album.id], album.ownerID == change.album.ownerID else { throw failure("O álbum ou seu proprietário mudou; consulte novamente.") }
+            guard let album = byID[change.album.id], album.ownerID == change.album.ownerID else { throw failure(L("O álbum ou seu proprietário mudou; consulte novamente.")) }
             if writers[album.id] != nil { continue }
             let toAdd = additions.filter { $0.album.id == album.id }
             var permissions = Set<String>()
@@ -231,24 +231,24 @@ struct IMAgeAnalysis: Codable, Identifiable {
         // destination copies belonging to another owner.
         func checkPreserved() async throws {
             for keep in preserved {
-                guard let album = byID[keep.album.id], album.ownerID == keep.album.ownerID else { throw failure("O álbum de destino mudou.") }
+                guard let album = byID[keep.album.id], album.ownerID == keep.album.ownerID else { throw failure(L("O álbum de destino mudou.")) }
                 let current = try await session.asset(keep.asset)
                 try validateContent(keep.asset, current)
                 let ids = try await session.reader(album).albumIDs(album.id)
-                guard ids.contains(keep.asset.id) else { throw failure("A presença da foto no destino não foi confirmada; nenhuma outra remoção será feita.") }
+                guard ids.contains(keep.asset.id) else { throw failure(L("A presença da foto no destino não foi confirmada; nenhuma outra remoção será feita.")) }
             }
         }
         var completed = 0
         let total = additions.count + removals.count
         for change in additions {
             try await revalidate()
-            guard let client = writers[change.album.id] else { throw failure("Conta de destino indisponível.") }
+            guard let client = writers[change.album.id] else { throw failure(L("Conta de destino indisponível.")) }
             var record = IMActionRecord(action: "add", asset: change.asset, album: change.album, status: "preparing")
             try report(record)
             do {
                 try await client.add([change.asset.id], to: change.album.id)
                 let ids = try await client.albumIDs(change.album.id)
-                guard ids.contains(change.asset.id) else { throw failure("Inclusão não confirmada no destino.") }
+                guard ids.contains(change.asset.id) else { throw failure(L("Inclusão não confirmada no destino.")) }
                 record.status = "confirmed"
                 try report(record)
             } catch {
@@ -258,24 +258,24 @@ struct IMAgeAnalysis: Codable, Identifiable {
                 throw error
             }
             completed += 1
-            progress("Incluindo no destino", completed, total)
+            progress(L("Incluindo no destino"), completed, total)
         }
         try await revalidate()
         try await checkPreserved()
         for change in removals {
             try await revalidate()
             try await checkPreserved()
-            guard let client = writers[change.album.id] else { throw failure("Conta de origem indisponível.") }
+            guard let client = writers[change.album.id] else { throw failure(L("Conta de origem indisponível.")) }
             let current = try await session.asset(change.asset)
             try validateContent(change.asset, current)
             let ids = try await client.albumIDs(change.album.id)
-            guard ids.contains(change.asset.id) else { throw failure("O vínculo de origem mudou; consulte novamente.") }
+            guard ids.contains(change.asset.id) else { throw failure(L("O vínculo de origem mudou; consulte novamente.")) }
             var record = IMActionRecord(action: "unlink", asset: change.asset, album: change.album, status: "preparing")
             try report(record)
             do {
                 try await client.unlink([change.asset.id], from: change.album.id)
                 let remaining = try await client.albumIDs(change.album.id)
-                guard !remaining.contains(change.asset.id) else { throw failure("A remoção do vínculo não foi confirmada.") }
+                guard !remaining.contains(change.asset.id) else { throw failure(L("A remoção do vínculo não foi confirmada.")) }
                 try await checkPreserved()
                 record.status = "confirmed"
                 try report(record)
@@ -286,7 +286,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
                 throw error
             }
             completed += 1
-            progress("Removendo somente vínculos da origem", completed, total)
+            progress(L("Removendo somente vínculos da origem"), completed, total)
         }
     }
 
