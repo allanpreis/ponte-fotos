@@ -1,0 +1,5 @@
+"NSLocationWhenInUseUsageDescription" = "Identify the Wi-Fi network name to choose between the local and remote addresses of your Immich server. Your location is not used or stored.";
+"NSLocationUsageDescription" = "Identify your home Wi-Fi network to select the Immich connection.";
+"NSPhotoLibraryUsageDescription" = "Select and export originals to Immich and, when you confirm, import photos and videos from Immich into your Photos library with their dates and locations.";
+"NSLocalNetworkUsageDescription" = "Upload selected photos to your Immich server on the local network.";
+"NSRemovableVolumesUsageDescription" = "Read photos, videos and metadata from external drives you select for uploading to Immich.";
