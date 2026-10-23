@@ -8,6 +8,7 @@ private enum PFSettingsSection: String, CaseIterable, Identifiable {
     @Published var section: PFSettingsSection = .connection
 }
 struct PFSettingsView: View {
+    @ObservedObject private var localization = PFLocalization.shared
     @ObservedObject var model: LibraryModel
     @Binding var themeRaw: String
     @Binding var glassEnabled: Bool
@@ -18,7 +19,7 @@ struct PFSettingsView: View {
         VStack(alignment: .leading, spacing: 18) {
             Picker(L("Seção de configurações"), selection: $state.section) {
                 ForEach(PFSettingsSection.allCases) { Text(LV($0.rawValue)).tag($0) }
-            }.pickerStyle(.segmented).controlSize(.large).frame(maxWidth: 500).disabled(model.busy)
+            }.id(PFLocalization.languageCode).pickerStyle(.segmented).controlSize(.large).frame(maxWidth: 500).disabled(model.busy)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     switch state.section {
@@ -39,7 +40,7 @@ struct PFSettingsView: View {
                     PFSectionHeading(L("Seu servidor Immich"), subtitle: L("Configure os endereços e escolha como conectar."), systemImage: "network")
                     Picker(L("Modo de conexão"), selection: $model.profile.mode) {
                         ForEach(ConnectionMode.allCases) { Text($0.label).tag($0) }
-                    }.pickerStyle(.segmented).frame(maxWidth: 350)
+                    }.id(PFLocalization.languageCode).pickerStyle(.segmented).frame(maxWidth: 350)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), alignment: .top)], alignment: .leading, spacing: 16) {
                         field(L("URL local"), placeholder: "http://immich.local:2283", value: $model.profile.localAddress)
                         field(L("URL remota"), placeholder: "https://photos.example.com", value: $model.profile.remoteAddress)
@@ -96,11 +97,11 @@ struct PFSettingsView: View {
                     PFSectionHeading(L("Idioma do aplicativo"), subtitle: L("Escolha o idioma usado no Ponte Fotos."), systemImage: "globe")
                     Picker(L("Idioma"), selection: $languageRaw) {
                         ForEach(PFAppLanguage.allCases) { language in Text(language.title).tag(language.rawValue) }
-                    }.pickerStyle(.menu).frame(maxWidth: 360).disabled(model.busy)
+                    }.id(PFLocalization.languageCode).pickerStyle(.menu).frame(maxWidth: 360)
                         .onChange(of: languageRaw) { _, value in
                             PFLocalization.savePreference(PFAppLanguage(rawValue: value) ?? .system)
                         }
-                    Text(L("A alteração de idioma será aplicada na próxima vez que você abrir o aplicativo.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(L("O idioma muda imediatamente e a preferência fica salva neste Mac.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             PFCard {

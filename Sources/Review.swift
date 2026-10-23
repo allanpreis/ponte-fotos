@@ -13,7 +13,8 @@ enum UploadDestination: String, CaseIterable, Identifiable {
     @Published var setLocation: Bool
     @Published var latitude: String
     @Published var longitude: String
-    @Published var error = ""
+    @Published var errorMessage: PFMessage = ""
+    var error: String { get { errorMessage.text } set { errorMessage = .verbatim(newValue) } }
     init(metadata: CaptureMetadata) {
         setDate = metadata.date != nil; date = metadata.date ?? Date()
         setLocation = metadata.latitude != nil
@@ -22,6 +23,7 @@ enum UploadDestination: String, CaseIterable, Identifiable {
     }
 }
 struct ReviewEditor: View {
+    @ObservedObject private var localization = PFLocalization.shared
     let item: PhotoItem
     let save: (MetadataOverride) throws -> Void
     let restore: () throws -> Void
@@ -141,7 +143,7 @@ struct ReviewEditor: View {
     }
 
     private var restoreButton: some View {
-        Button(L("Restaurar dados da origem")) { do { try restore(); dismiss() } catch { draft.error = error.localizedDescription } }
+        Button(L("Restaurar dados da origem")) { do { try restore(); dismiss() } catch { draft.errorMessage = .error(error) } }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
     }
@@ -158,7 +160,7 @@ struct ReviewEditor: View {
                         if lat != item.metadata.latitude || lon != item.metadata.longitude { edit.latitude = lat; edit.longitude = lon }
                     }
                     try save(edit); dismiss()
-                } catch { draft.error = error.localizedDescription }
+                } catch { draft.errorMessage = .error(error) }
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)

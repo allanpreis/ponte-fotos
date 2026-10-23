@@ -23,7 +23,7 @@ enum ConnectionStore {
         let status = SecItemCopyMatching(item as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
         try check(status)
-        guard let data = result as? Data else { throw BridgeError(message: L("Não foi possível ler a conexão salva no Chaves.")) }
+        guard let data = result as? Data else { throw BridgeError(message: M("Não foi possível ler a conexão salva no Chaves.")) }
         return try JSONDecoder().decode(Connection.self, from: data)
     }
     static func remove() throws {
@@ -31,6 +31,6 @@ enum ConnectionStore {
         if status != errSecItemNotFound { try check(status) }
     }
     static func check(_ status: OSStatus) throws {
-        guard status == errSecSuccess else { throw BridgeError(message: L("Chaves do macOS: \(SecCopyErrorMessageString(status, nil) as String? ?? String(status)).")) }
+        guard status == errSecSuccess else { throw BridgeError(message: M("Chaves do macOS: \(SecCopyErrorMessageString(status, nil) as String? ?? String(status)).")) }
     }
 }

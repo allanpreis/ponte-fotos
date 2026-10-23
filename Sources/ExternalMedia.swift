@@ -9,6 +9,8 @@ struct ExternalMedia {
     let sidecar: URL?
     let metadata: CaptureMetadata
     let note: String
+    var localizedNote: PFMessage? = nil
+    var displayNote: String { localizedNote?.text ?? note }
     var isVideo: Bool { UTType(filenameExtension: url.pathExtension)?.conforms(to: .movie) == true || ["mov","mp4","m4v","avi","mkv","mts","m2ts","webm","3gp"].contains(url.pathExtension.lowercased()) }
 }
 struct ExternalVolume: Identifiable {
@@ -99,15 +101,15 @@ enum ExternalReader {
         return nil
     }
     static func read(_ url: URL) async throws -> ExternalMedia {
-        guard FileManager.default.isReadableFile(atPath: url.path) else { throw BridgeError(message: L("Arquivo indisponível ou sem permissão de leitura.")) }
+        guard FileManager.default.isReadableFile(atPath: url.path) else { throw BridgeError(message: M("Arquivo indisponível ou sem permissão de leitura.")) }
         var date: Date?, lat: Double?, lon: Double?
-        var notes: [String] = []
+        var notes: [PFMessage] = []
         if let source = CGImageSourceCreateWithURL(url as CFURL, nil), let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
             let exif = props[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
             let tiff = props[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
             if let value = (exif["DateTimeOriginal"] ?? exif["DateTimeDigitized"] ?? tiff["DateTime"]) as? String {
                 date = parseDate(value, offset: exif["OffsetTimeOriginal"] as? String)
-                if date != nil { notes.append(exif["OffsetTimeOriginal"] == nil ? L("EXIF · fuso não informado, usando Mac") : "EXIF") }
+                if date != nil { notes.append(exif["OffsetTimeOriginal"] == nil ? M("EXIF · fuso não informado, usando Mac") : "EXIF") }
             }
             if let gps = props[kCGImagePropertyGPSDictionary as String] as? [String: Any], let a = gps["Latitude"] as? Double, let b = gps["Longitude"] as? Double {
                 lat = a * ((gps["LatitudeRef"] as? String) == "S" ? -1 : 1)
@@ -124,7 +126,7 @@ enum ExternalReader {
                     }
                     if identifier.contains("location"), let location = isoLocation(value) { lat = location.0; lon = location.1 }
                 }
-            } else { notes.append(L("Metadados do vídeo não legíveis")) }
+            } else { notes.append(M("Metadados do vídeo não legíveis")) }
         }
         let companion = sidecar(url)
         if let companion {
@@ -141,14 +143,14 @@ enum ExternalReader {
                 if sidecarLatitude != nil || sidecarLongitude != nil {
                     guard let a = sidecarLatitude, let b = sidecarLongitude,
                           let parsedA = coordinate(a, latitude: true), let parsedB = coordinate(b, latitude: false) else {
-                        throw BridgeError(message: L("GPS inválido ou incompleto no XMP."))
+                        throw BridgeError(message: M("GPS inválido ou incompleto no XMP."))
                     }
                     lat = parsedA; lon = parsedB
                 }
-            } catch { throw BridgeError(message: L("XMP inválido em \(url.lastPathComponent). Revise o arquivo auxiliar antes de importar.")) }
+            } catch { throw BridgeError(message: M("XMP inválido em \(url.lastPathComponent). Revise o arquivo auxiliar antes de importar.")) }
         }
         if let a = lat, let b = lon, (!a.isFinite || !b.isFinite || abs(a) > 90 || abs(b) > 180) { lat = nil; lon = nil }
-        return ExternalMedia(url: url, sidecar: companion, metadata: CaptureMetadata(date: date, latitude: lat, longitude: lon, favorite: false), note: notes.joined(separator: " · "))
+        return ExternalMedia(url: url, sidecar: companion, metadata: CaptureMetadata(date: date, latitude: lat, longitude: lon, favorite: false), note: notes.map(\.text).joined(separator: " · "), localizedNote: .joined(notes, separator: " · "))
     }
     static func scan(_ folder: URL) async -> ExternalScanResult {
         var media: [ExternalMedia] = [], issues = 0
@@ -166,7 +168,7 @@ enum ExternalReader {
     static func mergedXMP(_ metadata: CaptureMetadata, sidecar: URL?) throws -> Data {
         guard let sidecar else { return Data(metadata.xmp().utf8) }
         let document = try XMLDocument(contentsOf: sidecar, options: [.nodeLoadExternalEntitiesNever])
-        guard let description = try document.nodes(forXPath: "//*[local-name()='Description']").first as? XMLElement else { throw BridgeError(message: L("XMP sem descrição RDF válida.")) }
+        guard let description = try document.nodes(forXPath: "//*[local-name()='Description']").first as? XMLElement else { throw BridgeError(message: M("XMP sem descrição RDF válida.")) }
         description.addNamespace(XMLNode.namespace(withName: "exif", stringValue: "http://ns.adobe.com/exif/1.0/") as! XMLNode)
         description.addNamespace(XMLNode.namespace(withName: "xmp", stringValue: "http://ns.adobe.com/xap/1.0/") as! XMLNode)
         var fields: [String: String] = [:]

@@ -7,6 +7,7 @@ import AppKit
 }
 
 struct PFReverseImportView: View {
+    @ObservedObject private var localization = PFLocalization.shared
     @ObservedObject var model: PFReverseImportModel
     let address: String
     let key: String
@@ -78,7 +79,7 @@ struct PFReverseImportView: View {
             Picker(L("Tipo de destino no Fotos"), selection: $model.destinationMode) {
                 Text(L("Álbum existente")).tag(PFPhotosDestinationMode.existing)
                 Text(L("Criar novo álbum")).tag(PFPhotosDestinationMode.new)
-            }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).disabled(working)
+            }.id(PFLocalization.languageCode).pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).disabled(working)
             if model.destinationMode == .existing {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { photosAlbumPicker; refreshPhotosAlbums }
@@ -101,8 +102,8 @@ struct PFReverseImportView: View {
     private var photosAlbumPicker: some View {
         Picker(L("Álbum de destino no Fotos"), selection: $model.destinationAlbumID) {
             Text(L("Selecione um álbum do Fotos")).tag("")
-            ForEach(model.photosAlbums) { album in Text(album.label).tag(album.id) }
-        }.labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
+            ForEach(model.photosAlbums) { album in Text(album.displayLabel).tag(album.id) }
+        }.id(PFLocalization.languageCode).labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
             .disabled(working || model.photosAlbums.isEmpty)
     }
 
@@ -119,7 +120,7 @@ struct PFReverseImportView: View {
                 ForEach(model.albums) { album in
                     Text(L("\(album.name) · \(album.count) itens")).tag(album.id)
                 }
-            }.labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
+            }.id(PFLocalization.languageCode).labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
                 .disabled(working || !connectionReady || model.albums.isEmpty)
         }
     }
@@ -183,7 +184,7 @@ struct PFReverseImportView: View {
                             Label(L("Sem localização disponível"), systemImage: "location.slash")
                         }
                     }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                    if let issue = item.issue, !issue.isEmpty {
+                    if let issue = item.displayIssue, !issue.isEmpty {
                         Label(issue, systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                     }
@@ -193,7 +194,7 @@ struct PFReverseImportView: View {
     }
 
     private func mediaBadge(_ item: PFReverseItem) -> some View {
-        PFBadge(item.isLive ? L("Live Photo · com movimento") : item.typeLabel,
+        PFBadge(item.isLive ? L("Live Photo · com movimento") : item.displayTypeLabel,
                 systemImage: item.isLive ? "livephoto" : "photo.on.rectangle", color: item.isLive ? .teal : PFTheme.accent)
     }
 
@@ -239,6 +240,7 @@ struct PFReverseImportView: View {
 }
 
 private struct PFReverseThumbnail: View {
+    @ObservedObject private var localization = PFLocalization.shared
     @ObservedObject var model: PFReverseImportModel
     let item: PFReverseItem
     let connectionReady: Bool

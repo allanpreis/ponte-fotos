@@ -11,8 +11,10 @@ final class IMWorkspaceModel: ObservableObject {
     @Published var busy = false
     @Published var canCancel = false
     private var operationTask: Task<Void, Never>?
-    @Published var progress = ""
-    @Published var error: String?
+    @Published var progressMessage: PFMessage = ""
+    var progress: String { get { progressMessage.text } set { progressMessage = .verbatim(newValue) } }
+    @Published var errorMessage: PFMessage?
+    var error: String? { get { errorMessage?.text } set { errorMessage = newValue.map(PFMessage.verbatim) } }
     @Published var duplicates: IMDuplicateAnalysis?
     @Published var comparison: IMComparisonAnalysis?
     @Published var age: IMAgeAnalysis?
@@ -38,7 +40,7 @@ final class IMWorkspaceModel: ObservableObject {
             self.address = address
             albums = []; people = []; duplicates = nil; comparison = nil; age = nil
             duplicateChoices = [:]; comparisonChoices = [:]; ageChoices = []; cache.removeAll()
-            error = L("O endereço de conexão mudou. Atualize os álbuns e faça uma nova consulta.")
+            errorMessage = M("O endereço de conexão mudou. Atualize os álbuns e faça uma nova consulta.")
         }
         connectionReady = ready
     }
@@ -50,7 +52,7 @@ final class IMWorkspaceModel: ObservableObject {
     }
     var session: IMSession { IMSession(address: address, profileID: profileID, credentials: credentials) }
     func name(_ id: String) -> String {
-        if let account = credentials.first(where: { $0.account.id == id }) { return account.account.name }
+        if let account = credentials.first(where: { $0.account.id == id }) { return account.account.displayName }
         func knownName(_ assets: [IMAsset]) -> String? {
             assets.first(where: { $0.ownerId == id && !($0.ownerName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.ownerName
         }
@@ -68,29 +70,29 @@ final class IMWorkspaceModel: ObservableObject {
             var changed = false
             for i in history.indices where history[i].status == "running" { history[i].status = "interrupted"; changed = true }
             if changed { try persistHistory() }
-        } catch { self.error = error.localizedDescription }
+        } catch { self.errorMessage = .error(error) }
     }
-    func run(_ message: String, cancellable: Bool = true, operation: @escaping () async throws -> Void) {
+    func run(_ message: PFMessage, cancellable: Bool = true, operation: @escaping () async throws -> Void) {
         guard !busy else { return }
-        guard connectionReady else { error = L("A conexão mudou ou ainda não foi validada. Feche esta janela e teste a conexão antes de consultar ou alterar o Immich."); return }
-        busy = true; error = nil; progress = message; canCancel = cancellable; onBusyChanged(true)
+        guard connectionReady else { errorMessage = M("A conexão mudou ou ainda não foi validada. Feche esta janela e teste a conexão antes de consultar ou alterar o Immich."); return }
+        busy = true; error = nil; progressMessage = message; canCancel = cancellable; onBusyChanged(true)
         operationTask = Task { @MainActor in
-            defer { busy = false; canCancel = false; operationTask = nil; onBusyChanged(false); progress = "" }
-            do { try await operation() } catch is CancellationError { } catch { self.error = error.localizedDescription }
+            defer { busy = false; canCancel = false; operationTask = nil; onBusyChanged(false); progressMessage = "" }
+            do { try await operation() } catch is CancellationError { } catch { self.errorMessage = .error(error) }
         }
     }
-    func cancelQuery() { guard canCancel else { return }; canCancel = false; progress = L("Cancelando consulta…"); operationTask?.cancel() }
-    func updateProgress(_ text: String, _ current: Int, _ total: Int) {
-        progress = total > 0 ? "\(text) · \(current)/\(total)" : text
+    func cancelQuery() { guard canCancel else { return }; canCancel = false; progressMessage = M("Cancelando consulta…"); operationTask?.cancel() }
+    func updateProgress(_ text: PFMessage, _ current: Int, _ total: Int) {
+        progressMessage = total > 0 ? M("\(text) · \(current)/\(total)") : text
     }
     func connect(key: String, persist: Bool) {
-        run(L("Verificando conta e permissões…")) {
+        run(M("Verificando conta e permissões…")) {
             let credential = try await IMManagementStore.verify(address: self.address, key: key)
             let permissions = try await IMClient(address: self.address, credential: credential).permissions()
             let minimum: Set<String> = ["asset.read", "album.read"]
             let missing = minimum.subtracting(permissions)
             guard permissions.contains("all") || missing.isEmpty else {
-                throw BridgeError(message: L("A chave de \(credential.account.name) precisa destas permissões para gerenciar fotos: \(missing.sorted().joined(separator: ", ")). Ajuste a chave no Immich e conecte novamente."))
+                throw BridgeError(message: M("A chave de \(credential.account.displayMessage) precisa destas permissões para gerenciar fotos: \(missing.sorted().joined(separator: ", ")). Ajuste a chave no Immich e conecte novamente."))
             }
             if persist { try IMManagementStore.saveCredential(credential, profileID: self.profileID) }
             self.credentials.removeAll { $0.account.id == credential.account.id }
@@ -103,10 +105,10 @@ final class IMWorkspaceModel: ObservableObject {
             try IMManagementStore.removeCredential(accountID: id, profileID: profileID)
             credentials.removeAll { $0.account.id == id }; scopes.removeValue(forKey: id); cache.removeAll()
             albums = []; people = []; duplicates = nil; comparison = nil; age = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.errorMessage = .error(error) }
     }
     func refresh() {
-        run(L("Atualizando álbuns e pessoas…")) {
+        run(M("Atualizando álbuns e pessoas…")) {
             let snapshot = self.session
             self.albums = try await snapshot.albums()
             self.people = try await snapshot.people()
@@ -114,7 +116,7 @@ final class IMWorkspaceModel: ObservableObject {
     }
     func scanDuplicates(_ selected: Set<String>) {
         let chosen = albums.filter { selected.contains($0.id) }
-        run(L("Procurando cópias idênticas…")) {
+        run(M("Procurando cópias idênticas…")) {
             let result = try await IMDuplicates.scan(session: self.session, albums: chosen, progress: self.updateProgress)
             self.duplicates = result
             self.duplicateChoices = Dictionary(uniqueKeysWithValues: result.groups.filter { $0.unavailableOwnerIDs.isEmpty }.map { ($0.id, $0.keepID) })
@@ -122,7 +124,7 @@ final class IMWorkspaceModel: ObservableObject {
     }
     func scanComparison(_ selected: Set<String>) {
         let chosen = albums.filter { selected.contains($0.id) }
-        run(L("Comparando álbuns…")) {
+        run(M("Comparando álbuns…")) {
             self.comparison = try await IMOrganization.compare(session: self.session, albums: chosen, progress: self.updateProgress)
             self.comparisonChoices = [:]
         }
@@ -130,7 +132,7 @@ final class IMWorkspaceModel: ObservableObject {
     func searchAge(personKey: String, sourceID: String, destinationID: String, min: Int, max: Int) {
         guard let person = people.first(where: { $0.key == personKey }), let destination = albums.first(where: { $0.id == destinationID }) else { return }
         let source = albums.first { $0.id == sourceID }
-        run(L("Buscando fotos por idade…")) {
+        run(M("Buscando fotos por idade…")) {
             let result = try await IMOrganization.ageSearch(session: self.session, person: person, source: source, destination: destination, minAge: min, maxAge: max, progress: self.updateProgress)
             self.age = result; self.ageChoices = Set(result.assets.map(\.id))
         }
@@ -146,7 +148,7 @@ final class IMWorkspaceModel: ObservableObject {
         try IMManagementStore.saveHistory(Array(history.prefix(20)), profileID: profileID)
     }
     func record(_ value: IMActionRecord, entryID: String) throws {
-        guard let i = history.firstIndex(where: { $0.id == entryID }) else { throw BridgeError(message: L("Histórico indisponível. Operação interrompida antes de continuar.")) }
+        guard let i = history.firstIndex(where: { $0.id == entryID }) else { throw BridgeError(message: M("Histórico indisponível. Operação interrompida antes de continuar.")) }
         if let j = history[i].records.firstIndex(where: { $0.id == value.id }) { history[i].records[j] = value }
         else { history[i].records.append(value) }
         try persistHistory()
@@ -157,7 +159,7 @@ final class IMWorkspaceModel: ObservableObject {
         let assets: [IMAsset]
         let title: String
         if kind == "duplicates", let duplicates {
-            guard !unsafeLiveRemoval else { error = L("Uma Live Photo seria enviada à lixeira. Escolha manter a Live Photo ou desmarque o grupo."); return }
+            guard !unsafeLiveRemoval else { errorMessage = M("Uma Live Photo seria enviada à lixeira. Escolha manter a Live Photo ou desmarque o grupo."); return }
             assets = duplicates.groups.filter { duplicateChoices[$0.id] != nil }.flatMap(\.assets); title = "Revisão de duplicatas"
         } else if kind == "comparison", let comparison {
             assets = comparison.groups.filter { comparisonChoices[$0.id] != nil }.flatMap(\.assets); title = "Organização de álbuns"
@@ -165,7 +167,7 @@ final class IMWorkspaceModel: ObservableObject {
             assets = age.assets.filter { ageChoices.contains($0.id) }; title = "Organização por idade"
         } else { return }
         let entry = IMHistoryEntry(title: title, kind: kind, assets: assets)
-        run(L("Preparando operação…"), cancellable: false) {
+        run(M("Preparando operação…"), cancellable: false) {
             self.history.insert(entry, at: 0); self.history = Array(self.history.prefix(20))
             do {
                 try self.persistHistory() // Fail closed before any server change.
@@ -184,7 +186,7 @@ final class IMWorkspaceModel: ObservableObject {
                 try self.persistHistory()
             } catch {
                 if let i = self.history.firstIndex(where: { $0.id == entry.id }) { self.history[i].status = "failed" }
-                do { try self.persistHistory() } catch { throw BridgeError(message: L("Não foi possível salvar o histórico. A operação foi interrompida; confira o Immich antes de repetir qualquer ação.")) }
+                do { try self.persistHistory() } catch { throw BridgeError(message: M("Não foi possível salvar o histórico. A operação foi interrompida; confira o Immich antes de repetir qualquer ação.")) }
                 throw error
             }
         }
@@ -219,6 +221,7 @@ fileprivate final class IMWorkspaceUIState: ObservableObject {
 }
 
 struct ImmichWorkspaceView: View {
+    @ObservedObject private var localization = PFLocalization.shared
     @StateObject private var model: IMWorkspaceModel
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var ui: IMWorkspaceUIState
@@ -239,7 +242,7 @@ struct ImmichWorkspaceView: View {
             header
             Picker(L("Área"), selection: $ui.tab) {
                 ForEach(["Álbuns", "Comparar álbuns", "Pessoa e idade", "Contas e API", "Histórico"], id: \.self) { Text(LV($0)).tag($0) }
-            }.pickerStyle(.segmented).controlSize(.large).disabled(model.busy)
+            }.id(PFLocalization.languageCode).pickerStyle(.segmented).controlSize(.large).disabled(model.busy)
             if model.busy { HStack { ProgressView().controlSize(.small); Text(model.progress).font(.callout); Spacer(); if model.canCancel { Button(L("Cancelar consulta")) { model.cancelQuery() } } } }
             if let error = model.error {
                 HStack(alignment: .top) { Image(systemName: "exclamationmark.triangle.fill"); Text(error).textSelection(.enabled); Spacer(); Button(L("Dispensar")) { model.error = nil } }.foregroundStyle(.red).padding(12).background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
@@ -417,11 +420,11 @@ struct ImmichWorkspaceView: View {
             Button(L("Atualizar álbuns e pessoas")) { model.refresh() }.disabled(model.credentials.isEmpty || !model.connectionReady)
             PFCard {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 16) {
-                GridRow { Text(L("Conta")); Picker(L("Conta"), selection: $ui.ageAccount) { Text(L("Todas as contas")).tag(""); ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) } }.labelsHidden().onChange(of: ui.ageAccount) { ui.personKey = "" } }
-                GridRow { Text(L("Pessoa")); Picker(L("Pessoa"), selection: $ui.personKey) { Text(L("Selecione uma pessoa")).tag(""); ForEach(model.people.filter { ui.ageAccount.isEmpty || $0.accountID == ui.ageAccount }, id: \.key) { Text("\($0.name) · \(model.name($0.accountID))").tag($0.key) } }.labelsHidden() }
+                GridRow { Text(L("Conta")); Picker(L("Conta"), selection: $ui.ageAccount) { Text(L("Todas as contas")).tag(""); ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().onChange(of: ui.ageAccount) { ui.personKey = "" } }
+                GridRow { Text(L("Pessoa")); Picker(L("Pessoa"), selection: $ui.personKey) { Text(L("Selecione uma pessoa")).tag(""); ForEach(model.people.filter { ui.ageAccount.isEmpty || $0.accountID == ui.ageAccount }, id: \.key) { Text("\($0.displayName) · \(model.name($0.accountID))").tag($0.key) } }.id(PFLocalization.languageCode).labelsHidden() }
                 GridRow { Text(L("Aniversário")); Text(model.people.first { $0.key == ui.personKey }?.birthDate ?? L("Cadastre a data de nascimento no Immich.")).foregroundStyle(.secondary) }
-                GridRow { Text(L("Origem")); Picker(L("Origem"), selection: $ui.sourceID) { Text(L("Todos os álbuns acessíveis")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.labelsHidden() }
-                GridRow { Text(L("Destino")); Picker(L("Destino"), selection: $ui.destinationID) { Text(L("Selecione um álbum")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.labelsHidden() }
+                GridRow { Text(L("Origem")); Picker(L("Origem"), selection: $ui.sourceID) { Text(L("Todos os álbuns acessíveis")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden() }
+                GridRow { Text(L("Destino")); Picker(L("Destino"), selection: $ui.destinationID) { Text(L("Selecione um álbum")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden() }
                 GridRow { Text(L("Idade em anos")); HStack { Stepper(L("De \(ui.minAge)"), value: $ui.minAge, in: 0...150).frame(maxWidth: 180); Spacer(minLength: 20); Stepper(L("Até \(ui.maxAge)"), value: $ui.maxAge, in: 0...150).frame(maxWidth: 180) } }
             }
             }
@@ -450,7 +453,7 @@ struct ImmichWorkspaceView: View {
                             Text("\(actionName(record.action)) · \(record.name)").fontWeight(.medium)
                             Text("\(statusName(record.status)) · \(model.name(record.ownerID))\(record.albumName.map { " · " + $0 } ?? "")").font(.caption).foregroundStyle(record.status == "uncertain" ? Color.orange : Color.secondary)
                             if let keepID = record.keepID, let keeper = entry.assets.first(where: { $0.id == keepID }) { Text(L("Cópia mantida: \(keeper.originalFileName) · \(model.name(keeper.ownerId))")).font(.caption).foregroundStyle(.green) }
-                            if let message = record.message { Text(message).font(.caption).textSelection(.enabled) }
+                            if let message = record.displayMessage { Text(message).font(.caption).textSelection(.enabled) }
                         }.padding(.vertical, 5)
                     }
                     DisclosureGroup(L("Prévia dos arquivos revisados (\(entry.assets.count))")) { IMHistoryPreviews(assets: entry.assets, model: model) }
@@ -541,6 +544,7 @@ struct ImmichWorkspaceView: View {
 }
 
 private struct IMAssetThumbnail: View {
+    @ObservedObject private var localization = PFLocalization.shared
     let asset: IMAsset
     @ObservedObject var model: IMWorkspaceModel
     @StateObject private var thumbnail = IMWorkspaceThumbnailState()
@@ -558,6 +562,7 @@ private final class IMWorkspaceThumbnailState: ObservableObject { @Published var
 @MainActor
 private final class IMHistoryPreviewState: ObservableObject { @Published var page = 0 }
 private struct IMHistoryPreviews: View {
+    @ObservedObject private var localization = PFLocalization.shared
     let assets: [IMAsset]
     @ObservedObject var model: IMWorkspaceModel
     @StateObject private var state = IMHistoryPreviewState()
@@ -584,6 +589,7 @@ private struct IMHistoryPreviews: View {
 
 /// Shared account editor, available both in Settings and in the management window.
 struct IMAccountSettingsView: View {
+    @ObservedObject private var localization = PFLocalization.shared
     @ObservedObject var model: IMWorkspaceModel
     @ObservedObject private var ui: IMWorkspaceUIState
     init(model: IMWorkspaceModel) { self.model = model; _ui = ObservedObject(wrappedValue: model.ui) }
@@ -598,7 +604,7 @@ struct IMAccountSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
                             Image(systemName: "person.crop.circle.fill").font(.system(size: 32)).foregroundStyle(PFTheme.accent)
-                            Text(account.name).font(.headline)
+                            Text(account.displayName).font(.headline)
                             Spacer()
                             Button(L("Desconectar")) { model.disconnect(account.id) }.foregroundStyle(.secondary)
                         }

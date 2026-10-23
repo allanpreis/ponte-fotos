@@ -18,7 +18,7 @@ enum ConnectionResolver {
         try profile.validate()
         let candidates = profile.candidates(ssid: ssid)
         guard !candidates.isEmpty else {
-            throw BridgeError(message: L("Configure uma URL disponível para o modo escolhido."))
+            throw BridgeError(message: M("Configure uma URL disponível para o modo escolhido."))
         }
         var lastUnavailable: ConnectionProbeError?
         for candidate in candidates {
@@ -27,12 +27,12 @@ enum ConnectionResolver {
                 let identity = try await probe(candidate.address, key)
                 try Task.checkCancellation()
                 if let expectedUserID, expectedUserID != identity.userID {
-                    throw BridgeError(message: L("Este endereço respondeu com outra conta ou servidor. A troca foi bloqueada. Confira as URLs e a chave."))
+                    throw BridgeError(message: M("Este endereço respondeu com outra conta ou servidor. A troca foi bloqueada. Confira as URLs e a chave."))
                 }
                 return ConnectionResolution(candidate: candidate, identity: identity)
             } catch let error as ConnectionProbeError {
                 guard error.canFallback else {
-                    throw BridgeError(message: error.localizedDescription)
+                    throw BridgeError(message: PFMessage.error(error))
                 }
                 lastUnavailable = error
             } catch is CancellationError {
@@ -40,9 +40,9 @@ enum ConnectionResolver {
             } catch let error as BridgeError {
                 throw error
             } catch {
-                throw BridgeError(message: error.localizedDescription)
+                throw BridgeError(message: PFMessage.error(error))
             }
         }
-        throw BridgeError(message: lastUnavailable?.localizedDescription ?? L("Nenhum endereço respondeu."))
+        throw BridgeError(message: lastUnavailable.map(PFMessage.error) ?? M("Nenhum endereço respondeu."))
     }
 }

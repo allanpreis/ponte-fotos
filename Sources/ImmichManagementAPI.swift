@@ -1,7 +1,11 @@
 import Foundation
 import Security
 
-struct IMAccount: Codable, Identifiable, Equatable { var id: String; var name: String }
+struct IMAccount: Codable, Identifiable, Equatable {
+    var id: String; var name: String
+    var displayMessage: PFMessage { name.isEmpty ? M("Conta Immich") : .verbatim(name) }
+    var displayName: String { displayMessage.text }
+}
 struct IMCredential { let account: IMAccount; let key: String }
 struct IMAlbum: Codable, Identifiable, Hashable {
     var id: String
@@ -32,18 +36,22 @@ struct IMAsset: Codable, Identifiable {
 }
 struct IMPerson: Codable, Identifiable {
     var id: String; var name: String; var birthDate: String?; var accountID: String
+    var displayName: String { name.isEmpty ? L("Pessoa sem nome") : name }
     var key: String { accountID + ":" + id }
 }
 struct IMActionRecord: Codable, Identifiable {
     var id = UUID().uuidString
     var action: String; var assetID: String; var name: String; var ownerID: String
     var keepID: String?; var albumID: String?; var albumName: String?; var status: String; var message: String?
+    var localizedMessage: PFMessage? = nil
+    var displayMessage: String? { localizedMessage?.text ?? message }
+    mutating func setMessage(_ value: PFMessage) { localizedMessage = value; message = value.text }
     init(action: String, asset: IMAsset, keepID: String? = nil, album: IMAlbum? = nil, status: String, message: String? = nil) {
         self.action = action; self.assetID = asset.id; self.name = asset.originalFileName; self.ownerID = asset.ownerId
         self.keepID = keepID; self.albumID = album?.id; self.albumName = album?.name; self.status = status; self.message = message
     }
 }
-typealias IMProgress = (String, Int, Int) -> Void
+typealias IMProgress = (PFMessage, Int, Int) -> Void
 typealias IMReport = (IMActionRecord) throws -> Void
 struct IMHistoryEntry: Codable, Identifiable {
     var id = UUID().uuidString; var date = Date(); var title: String; var kind: String
@@ -88,12 +96,13 @@ private struct IMRawAsset: Decodable {
 }
 private struct IMRawPerson: Decodable {
     let id: String; let name: String?; let birthDate: String?
-    func annotated(_ account: String) -> IMPerson { IMPerson(id: id, name: name?.isEmpty == false ? name! : L("Pessoa sem nome"), birthDate: birthDate, accountID: account) }
+    func annotated(_ account: String) -> IMPerson { IMPerson(id: id, name: name ?? "", birthDate: birthDate, accountID: account) }
 }
 
-private struct IMAccessError: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
+private struct IMAccessError: LocalizedError, PFMessageProviding {
+    let pfMessage: PFMessage
+    init(message: PFMessage) { pfMessage = message }
+    var errorDescription: String? { pfMessage.text }
 }
 
 struct IMClient {
@@ -109,7 +118,7 @@ struct IMClient {
         let base = try ImmichClient(address: address, key: credential.key).base
         var parts = URLComponents(url: base.appendingPathComponent(endpoint), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { parts.queryItems = query }
-        guard let url = parts.url else { throw BridgeError(message: L("Endereço da API inválido.")) }
+        guard let url = parts.url else { throw BridgeError(message: M("Endereço da API inválido.")) }
         var r = URLRequest(url: url); r.httpMethod = method; r.timeoutInterval = 20
         r.setValue(credential.key, forHTTPHeaderField: "x-api-key"); r.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body { r.httpBody = try JSONSerialization.data(withJSONObject: body); r.setValue("application/json", forHTTPHeaderField: "Content-Type") }
@@ -118,27 +127,27 @@ struct IMClient {
         catch is CancellationError { throw CancellationError() }
         catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
-            throw BridgeError(message: L("A consulta ao Immich não foi confirmada. Confira a rede e o histórico antes de repetir uma operação."))
+            throw BridgeError(message: M("A consulta ao Immich não foi confirmada. Confira a rede e o histórico antes de repetir uma operação."))
         }
         try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse else { throw BridgeError(message: L("Resposta inválida do Immich.")) }
+        guard let http = response as? HTTPURLResponse else { throw BridgeError(message: M("Resposta inválida do Immich.")) }
         guard (200..<300).contains(http.statusCode) else {
-            let message: String
+            let message: PFMessage
             switch http.statusCode {
-            case 401: message = L("Chave rejeitada pelo Immich. Reconecte a conta.")
-            case 403: message = L("Permissão insuficiente na conta \(credential.account.name). Confira os escopos e o acesso ao álbum.")
-            case 404: message = L("Álbum ou arquivo indisponível. Faça uma nova consulta.")
-            default: message = L("O Immich respondeu HTTP \(http.statusCode). Confira o histórico antes de repetir.")
+            case 401: message = M("Chave rejeitada pelo Immich. Reconecte a conta.")
+            case 403: message = M("Permissão insuficiente na conta \(credential.account.displayMessage). Confira os escopos e o acesso ao álbum.")
+            case 404: message = M("Álbum ou arquivo indisponível. Faça uma nova consulta.")
+            default: message = M("O Immich respondeu HTTP \(http.statusCode). Confira o histórico antes de repetir.")
             }
             if [401, 403, 404].contains(http.statusCode) { throw IMAccessError(message: message) }
             throw BridgeError(message: message)
         }
-        guard data.count <= 32 * 1024 * 1024 else { throw BridgeError(message: L("Resposta maior que o limite da consulta.")) }
+        guard data.count <= 32 * 1024 * 1024 else { throw BridgeError(message: M("Resposta maior que o limite da consulta.")) }
         return data
     }
     private func decode<T: Decodable>(_ type: T.Type, _ data: Data) throws -> T {
         do { return try JSONDecoder().decode(type, from: data) }
-        catch { throw BridgeError(message: L("Resposta do Immich incompatível. Atualize a análise antes de continuar.")) }
+        catch { throw BridgeError(message: M("Resposta do Immich incompatível. Atualize a análise antes de continuar.")) }
     }
     func asset(_ id: String) async throws -> IMAsset { try decode(IMRawAsset.self, await data("assets/" + id)).asset }
     func thumbnail(_ id: String) async throws -> Data { try await data("assets/" + id + "/thumbnail", query: [URLQueryItem(name: "size", value: "thumbnail")]) }
@@ -158,7 +167,7 @@ struct IMClient {
             try Task.checkCancellation()
             let items = try decode(Items.self, await data("timeline/bucket", query: query + [URLQueryItem(name: "timeBucket", value: bucket.timeBucket)]))
             ids.formUnion(items.id)
-            guard ids.count <= 30000 else { throw BridgeError(message: L("Limite de 30 mil itens por consulta. Escolha menos álbuns.")) }
+            guard ids.count <= 30000 else { throw BridgeError(message: M("Limite de 30 mil itens por consulta. Escolha menos álbuns.")) }
         }
         return ids
     }
@@ -170,10 +179,10 @@ struct IMClient {
             var added = 0
             for person in response.people where seen.insert(person.id).inserted { result.append(person.annotated(credential.account.id)); added += 1 }
             if response.hasNextPage == false || response.people.isEmpty || (response.hasNextPage == nil && result.count >= (response.total ?? Int.max)) { return result }
-            guard added > 0 else { throw BridgeError(message: L("A lista de pessoas repetiu uma página.")) }
+            guard added > 0 else { throw BridgeError(message: M("A lista de pessoas repetiu uma página.")) }
             page += 1
         }
-        throw BridgeError(message: L("Limite de páginas de pessoas atingido."))
+        throw BridgeError(message: M("Limite de páginas de pessoas atingido."))
     }
     func person(_ id: String) async throws -> IMPerson { try decode(IMRawPerson.self, await data("people/" + id)).annotated(credential.account.id) }
     func search(personID: String, albumID: String?) async throws -> [IMAsset] { try await search(personID: personID, albumIDs: albumID.map { [$0] } ?? []) }
@@ -187,9 +196,9 @@ struct IMClient {
             if let cursor { body["cursor"] = cursor }
             let response = try decode(Search.self, await data("search/metadata", method: "POST", body: body))
             for raw in response.assets.items { result[raw.id] = raw.asset }
-            guard result.count <= 30000 else { throw BridgeError(message: L("Limite de 30 mil arquivos por busca.")) }
+            guard result.count <= 30000 else { throw BridgeError(message: M("Limite de 30 mil arquivos por busca.")) }
             cursor = response.assets.nextCursor
-            if let cursor, !seen.insert(cursor).inserted { throw BridgeError(message: L("A busca repetiu a página. Faça nova consulta.")) }
+            if let cursor, !seen.insert(cursor).inserted { throw BridgeError(message: M("A busca repetiu a página. Faça nova consulta.")) }
         } while cursor != nil
         return Array(result.values).sorted { $0.id < $1.id }
     }
@@ -204,7 +213,7 @@ struct IMClient {
         struct Result: Decodable { let id: String; let success: Bool; let error: String? }
         let response = try decode([Result].self, await data("albums/" + albumID + "/assets", method: method, body: ["ids": ids]))
         for id in ids {
-            guard response.contains(where: { $0.id == id && ($0.success || (method == "PUT" && $0.error == "duplicate")) }) else { throw BridgeError(message: L("O Immich não confirmou a alteração de um vínculo. Confira o histórico e as permissões.")) }
+            guard response.contains(where: { $0.id == id && ($0.success || (method == "PUT" && $0.error == "duplicate")) }) else { throw BridgeError(message: M("O Immich não confirmou a alteração de um vínculo. Confira o histórico e as permissões.")) }
         }
     }
     func add(_ ids: [String], to albumID: String) async throws { try await albumMutation(ids, albumID: albumID, method: "PUT") }
@@ -223,11 +232,11 @@ struct IMSession {
         self.clients = credentials.map { IMClient(address: address, credential: $0, session: session) }
     }
     func owner(_ ownerID: String) throws -> IMClient {
-        guard let client = clients.first(where: { $0.credential.account.id == ownerID }) else { throw BridgeError(message: L("Conecte a conta proprietária de todas as cópias selecionadas antes de continuar.")) }
+        guard let client = clients.first(where: { $0.credential.account.id == ownerID }) else { throw BridgeError(message: M("Conecte a conta proprietária de todas as cópias selecionadas antes de continuar.")) }
         return client
     }
     func reader(_ album: IMAlbum) throws -> IMClient {
-        guard let client = clients.first(where: { album.readerIDs.contains($0.credential.account.id) || album.ownerID == $0.credential.account.id }) else { throw BridgeError(message: L("Nenhuma conta conectada tem acesso ao álbum \(album.name).")) }
+        guard let client = clients.first(where: { album.readerIDs.contains($0.credential.account.id) || album.ownerID == $0.credential.account.id }) else { throw BridgeError(message: M("Nenhuma conta conectada tem acesso ao álbum \(album.name).")) }
         return client
     }
     func writer(_ album: IMAlbum, requiring permissions: Set<String>, adding assets: [IMAsset]) async throws -> IMClient {
@@ -244,13 +253,13 @@ struct IMSession {
                 for snapshot in assets {
                     let current = try await client.asset(snapshot.id)
                     guard current.id == snapshot.id, current.ownerId == snapshot.ownerId, current.checksum == snapshot.checksum, current.type == snapshot.type else {
-                        throw BridgeError(message: L("Conteúdo ou proprietário da foto mudou; consulte novamente."))
+                        throw BridgeError(message: M("Conteúdo ou proprietário da foto mudou; consulte novamente."))
                     }
                 }
                 return client
             } catch is IMAccessError { continue }
         }
-        throw BridgeError(message: L("Nenhuma conta proprietária ou editora conectada tem os escopos e o acesso aos arquivos necessários para alterar o álbum \(album.name). Confira as permissões e consulte novamente."))
+        throw BridgeError(message: M("Nenhuma conta proprietária ou editora conectada tem os escopos e o acesso aos arquivos necessários para alterar o álbum \(album.name). Confira as permissões e consulte novamente."))
     }
     private func union(_ rows: [[IMAlbum]]) -> [IMAlbum] {
         var merged: [String: IMAlbum] = [:]
@@ -293,7 +302,7 @@ enum IMManagementStore {
         var value: CFTypeRef?; let status = SecItemCopyMatching(q as CFDictionary, &value)
         if status == errSecItemNotFound { return [] }
         try ConnectionStore.check(status)
-        guard let data = value as? Data else { throw BridgeError(message: L("Não foi possível carregar as contas do Chaves.")) }
+        guard let data = value as? Data else { throw BridgeError(message: M("Não foi possível carregar as contas do Chaves.")) }
         return try JSONDecoder().decode([StoredAccount].self, from: data).map { IMCredential(account: $0.account, key: $0.key) }
     }
     private static func save(_ values: [IMCredential], profileID: String) throws {
@@ -315,18 +324,18 @@ enum IMManagementStore {
     }
     static func verify(address: String, key: String) async throws -> IMCredential {
         let identity = try await ImmichClient(address: address, key: key).probe()
-        let placeholder = IMCredential(account: IMAccount(id: identity.userID, name: L("Conta Immich")), key: key)
+        let placeholder = IMCredential(account: IMAccount(id: identity.userID, name: ""), key: key)
         struct User: Decodable { let id: String; let name: String?; let email: String? }
         let data = try await IMClient(address: address, credential: placeholder).data("users/me")
         let user = try JSONDecoder().decode(User.self, from: data)
-        guard user.id.lowercased() == identity.userID else { throw BridgeError(message: L("A identidade da conta mudou durante a conexão.")) }
-        return IMCredential(account: IMAccount(id: identity.userID, name: user.name?.isEmpty == false ? user.name! : L("Conta Immich")), key: key)
+        guard user.id.lowercased() == identity.userID else { throw BridgeError(message: M("A identidade da conta mudou durante a conexão.")) }
+        return IMCredential(account: IMAccount(id: identity.userID, name: user.name ?? ""), key: key)
     }
     private static func historyURL(_ profileID: String) throws -> URL {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos/management", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         // Profiles generated by the app are UUIDs; never use a user string as a filesystem path.
-        guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: L("Perfil do servidor inválido. Salve a configuração de conexão.")) }
+        guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: M("Perfil do servidor inválido. Salve a configuração de conexão.")) }
         return directory.appendingPathComponent(profileID + ".json")
     }
     static func history(profileID: String) throws -> [IMHistoryEntry] {
