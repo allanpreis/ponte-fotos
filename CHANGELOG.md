@@ -2,6 +2,15 @@
 
 As mudanças são agrupadas por versão. [Releases e downloads](https://github.com/allanpreis/ponte-fotos/releases) · [Guia completo](docs/GUIA-COMPLETO.md)
 
+## 0.9.2 — 2026-10-23
+
+### 📶 Conexão automática e seleção estável
+
+- Avisos repetidos da mesma rede não provocam revalidação nem apagam a revisão do fluxo Immich → Fotos.
+- Atualizar os álbuns na mesma conexão preserva o álbum de origem pelo identificador; remoção exige nova escolha.
+- A confirmação de uma conexão válida não invalida novamente a consulta. Mudanças reais, chaves e perfis continuam protegidos.
+- Regressões sintéticas de notificações de rede e atualização de seleção, sem gravações reais no Fotos.
+
 ## 0.9.1 — 2026-10-22
 
 ### 🗂️ Destino no Fotos da Apple
