@@ -50,12 +50,42 @@ enum ExternalReader {
         for format in ["yyyy:MM:dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss"] { f.dateFormat = format; if let date = f.date(from: text) { return date } }
         return nil
     }
-    static func coordinate(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sign = trimmed.hasSuffix("S") || trimmed.hasSuffix("W") ? -1.0 : 1.0
-        let numbers = trimmed.trimmingCharacters(in: CharacterSet.letters).split(separator: ",").compactMap { Double($0) }
-        guard let degree = numbers.first else { return nil }
-        return (numbers.count > 1 ? abs(degree) + numbers[1] / 60 : abs(degree)) * (degree < 0 ? -1 : sign)
+    static func coordinate(_ text: String, latitude: Bool? = nil) -> Double? {
+        var value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cardinal: Character?
+        if let last = value.last, "NSEW".contains(last) {
+            cardinal = last
+            value.removeLast()
+            value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else { cardinal = nil }
+        if let latitude, let cardinal, !(latitude ? "NS" : "EW").contains(cardinal) { return nil }
+        let parts = value.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard (1...3).contains(parts.count) else { return nil }
+        func number(_ token: String, signed: Bool, integer: Bool = false) -> Double? {
+            let pattern = (signed ? "^[+-]?" : "^") + (integer ? "[0-9]+$" : #"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$"#)
+            guard token.range(of: pattern, options: .regularExpression) != nil,
+                  let number = Double(token), number.isFinite else { return nil }
+            return number
+        }
+        guard let degrees = number(parts[0], signed: true, integer: parts.count > 1) else { return nil }
+        var magnitude = abs(degrees)
+        if parts.count > 1 {
+            guard let minutes = number(parts[1], signed: false, integer: parts.count == 3), minutes < 60 else { return nil }
+            magnitude += minutes / 60
+        }
+        if parts.count == 3 {
+            guard let seconds = number(parts[2], signed: false), seconds < 60 else { return nil }
+            magnitude += seconds / 3600
+        }
+        let negative = parts[0].hasPrefix("-")
+        let cardinalNegative = cardinal == "S" || cardinal == "W"
+        if cardinal != nil {
+            if negative && !cardinalNegative { return nil }
+            if parts[0].hasPrefix("+") && cardinalNegative { return nil }
+        }
+        let limit = latitude == true || cardinal == "N" || cardinal == "S" ? 90.0 : 180.0
+        guard magnitude <= limit else { return nil }
+        return magnitude * ((negative || cardinalNegative) ? -1 : 1)
     }
     static func isoLocation(_ text: String) -> (Double,Double)? {
         let pattern = #"^([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)"#
@@ -107,7 +137,14 @@ enum ExternalReader {
                     return nil
                 }
                 if let text = value(["SubSecDateTimeOriginal","DateTimeOriginal","SubSecCreateDate","CreateDate","CreationDate","MediaCreateDate"]), let parsed = parseDate(text) { date = parsed; notes.append("XMP") }
-                if let a = value(["GPSLatitude"]), let b = value(["GPSLongitude"]), let parsedA = coordinate(a), let parsedB = coordinate(b) { lat = parsedA; lon = parsedB }
+                let sidecarLatitude = value(["GPSLatitude"]), sidecarLongitude = value(["GPSLongitude"])
+                if sidecarLatitude != nil || sidecarLongitude != nil {
+                    guard let a = sidecarLatitude, let b = sidecarLongitude,
+                          let parsedA = coordinate(a, latitude: true), let parsedB = coordinate(b, latitude: false) else {
+                        throw BridgeError(message: "GPS inválido ou incompleto no XMP.")
+                    }
+                    lat = parsedA; lon = parsedB
+                }
             } catch { throw BridgeError(message: "XMP inválido em \(url.lastPathComponent). Revise o arquivo auxiliar antes de importar.") }
         }
         if let a = lat, let b = lon, (!a.isFinite || !b.isFinite || abs(a) > 90 || abs(b) > 180) { lat = nil; lon = nil }

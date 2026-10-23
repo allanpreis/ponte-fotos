@@ -219,11 +219,12 @@ struct IMAgeAnalysis: Codable, Identifiable {
         var writers: [String: IMClient] = [:]
         for change in additions + removals {
             guard let album = byID[change.album.id], album.ownerID == change.album.ownerID else { throw failure("O álbum ou seu proprietário mudou; consulte novamente.") }
-            let client = try session.writer(album)
-            let permission = additions.contains { $0.album.id == album.id } ? "albumAsset.create" : "albumAsset.delete"
-            let permissions = try await client.permissions()
-            guard permissions.contains("all") || permissions.contains(permission) else { throw failure("A chave não permite \(permission) em \(album.name).") }
-            if removals.contains(where: { $0.album.id == album.id }), !permissions.contains("all"), !permissions.contains("albumAsset.delete") { throw failure("A chave não permite remover vínculos de \(album.name).") }
+            if writers[album.id] != nil { continue }
+            let toAdd = additions.filter { $0.album.id == album.id }
+            var permissions = Set<String>()
+            if !toAdd.isEmpty { permissions.insert("albumAsset.create") }
+            if removals.contains(where: { $0.album.id == album.id }) { permissions.insert("albumAsset.delete") }
+            let client = try await session.writer(album, requiring: permissions, adding: toAdd.map(\.asset))
             writers[album.id] = client
         }
         // Confirm every destination before the first unlink, including unchanged

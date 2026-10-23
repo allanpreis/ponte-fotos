@@ -290,7 +290,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let file = folder.appendingPathComponent(external.url.lastPathComponent)
             if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
-            try FileManager.default.copyItem(at: external.url, to: file)
+            try await TransferFileIO.copyOriginal(from: external.url, to: file)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
             let xmp = file.appendingPathExtension("xmp")
             try ExternalReader.mergedXMP(item.metadata, sidecar: external.sidecar).write(to: xmp, options: .atomic)
@@ -370,7 +370,7 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
                     // The paired video must exist before associating the still image.
                     let ordered = files.sorted { ($0.1.type == .pairedVideo ? 0 : 1) < ($1.1.type == .pairedVideo ? 0 : 1) }
                     for (index, resource, file, xmp) in ordered {
-                        let checksum = try ImmichClient.checksum(file)
+                        let checksum = try await TransferFileIO.checksum(file)
                         var result: UploadResult
                         if let previous = records.first(where: { $0.resourceIndex == index && $0.checksum == checksum }), (try? await client.matchesHistory(assetID: previous.result.id, checksum: checksum, userID: userID)) == true {
                             result = previous.result
@@ -569,7 +569,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.9.2").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.9.3").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())

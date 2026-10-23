@@ -91,6 +91,11 @@ private struct IMRawPerson: Decodable {
     func annotated(_ account: String) -> IMPerson { IMPerson(id: id, name: name?.isEmpty == false ? name! : "Pessoa sem nome", birthDate: birthDate, accountID: account) }
 }
 
+private struct IMAccessError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 struct IMClient {
     let credential: IMCredential
     let address: String
@@ -111,7 +116,11 @@ struct IMClient {
         let data: Data; let response: URLResponse
         do { (data, response) = try await session.data(for: r) }
         catch is CancellationError { throw CancellationError() }
-        catch { throw BridgeError(message: "A consulta ao Immich não foi confirmada. Confira a rede e o histórico antes de repetir uma operação.") }
+        catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            throw BridgeError(message: "A consulta ao Immich não foi confirmada. Confira a rede e o histórico antes de repetir uma operação.")
+        }
+        try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse else { throw BridgeError(message: "Resposta inválida do Immich.") }
         guard (200..<300).contains(http.statusCode) else {
             let message: String
@@ -121,6 +130,7 @@ struct IMClient {
             case 404: message = "Álbum ou arquivo indisponível. Faça uma nova consulta."
             default: message = "O Immich respondeu HTTP \(http.statusCode). Confira o histórico antes de repetir."
             }
+            if [401, 403, 404].contains(http.statusCode) { throw IMAccessError(message: message) }
             throw BridgeError(message: message)
         }
         guard data.count <= 32 * 1024 * 1024 else { throw BridgeError(message: "Resposta maior que o limite da consulta.") }
@@ -220,10 +230,27 @@ struct IMSession {
         guard let client = clients.first(where: { album.readerIDs.contains($0.credential.account.id) || album.ownerID == $0.credential.account.id }) else { throw BridgeError(message: "Nenhuma conta conectada tem acesso ao álbum \(album.name).") }
         return client
     }
-    func writer(_ album: IMAlbum) throws -> IMClient {
-        if let owner = clients.first(where: { $0.credential.account.id == album.ownerID }) { return owner }
-        guard let client = clients.first(where: { album.writerIDs.contains($0.credential.account.id) }) else { throw BridgeError(message: "Conecte uma conta proprietária ou editora do álbum \(album.name).") }
-        return client
+    func writer(_ album: IMAlbum, requiring permissions: Set<String>, adding assets: [IMAsset]) async throws -> IMClient {
+        let candidates = clients.filter { $0.credential.account.id == album.ownerID } + clients.filter {
+            $0.credential.account.id != album.ownerID && album.writerIDs.contains($0.credential.account.id)
+        }
+        for client in candidates {
+            try Task.checkCancellation()
+            do {
+                let granted = try await client.permissions()
+                guard granted.contains("all") || permissions.isSubset(of: granted) else { continue }
+                // An editor must also be able to see every asset being added.
+                // Validate all candidates before any album mutation starts.
+                for snapshot in assets {
+                    let current = try await client.asset(snapshot.id)
+                    guard current.id == snapshot.id, current.ownerId == snapshot.ownerId, current.checksum == snapshot.checksum, current.type == snapshot.type else {
+                        throw BridgeError(message: "Conteúdo ou proprietário da foto mudou; consulte novamente.")
+                    }
+                }
+                return client
+            } catch is IMAccessError { continue }
+        }
+        throw BridgeError(message: "Nenhuma conta proprietária ou editora conectada tem os escopos e o acesso aos arquivos necessários para alterar o álbum \(album.name). Confira as permissões e consulte novamente.")
     }
     private func union(_ rows: [[IMAlbum]]) -> [IMAlbum] {
         var merged: [String: IMAlbum] = [:]

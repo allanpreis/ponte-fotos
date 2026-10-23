@@ -127,7 +127,7 @@ struct ImmichClient {
     static func checksum(_ url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
         var hash = Insecure.SHA1()
-        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty { hash.update(data: data) }
+        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty { try Task.checkCancellation(); hash.update(data: data) }
         return Data(hash.finalize()).base64EncodedString()
     }
     func upload(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?) async throws -> UploadResult {
