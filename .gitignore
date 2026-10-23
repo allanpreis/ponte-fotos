@@ -65,3 +65,13 @@ test-results/
 # Miniaturas locais do editor de vídeo
 .thumbnails/
 .*.hf-transaction-*/
+
+# Materiais de manutenção preservados fora do repositório público
+/Tests/
+/promo/
+/tools/
+/docs/
+/test-*.sh
+/AGENTS.md
+/DESIGN.md
+/CHANGELOG.md

@@ -8,7 +8,7 @@ Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois se
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.3 corrige a leitura de GPS XMP com segundos, a escolha de contas editoras autorizadas e o aviso ao cancelar consultas. Preparação de cópias e checksum rodam fora da thread da interface. [Notas da versão](docs/releases/v0.9.3.md).
+A versão 0.9.3 corrige a leitura de GPS XMP com segundos, a escolha de contas editoras autorizadas e o aviso ao cancelar consultas. Preparação de cópias e checksum rodam fora da thread da interface. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3).
 
 ## 📥 Immich → Fotos da Apple
 
@@ -18,22 +18,22 @@ O app baixa os originais, verifica o checksum e usa o PhotoKit para criar os ite
 
 A opção **Atualizar álbuns do Fotos** lista somente destinos editáveis, sem criar ou alterar itens. Álbuns com nomes iguais são diferenciados na lista e selecionados pelo identificador. Um novo álbum é criado somente após confirmação e passa a ser o destino dos próximos lotes.
 
-Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbum sem baixar novamente, criar novas cópias ou removê-las dos álbuns anteriores. Um histórico local por perfil/conta evita repetir importações feitas pelo Ponte Fotos; ele não compara toda a biblioteca preexistente. Resultados sem confirmação final ficam bloqueados para evitar repetição automática. [Guia da importação](docs/GUIA-COMPLETO.md#-importar-do-immich-para-o-fotos-da-apple).
+Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbum sem baixar novamente, criar novas cópias ou removê-las dos álbuns anteriores. Um histórico local por perfil/conta evita repetir importações feitas pelo Ponte Fotos; ele não compara toda a biblioteca preexistente. Resultados sem confirmação final ficam bloqueados para evitar repetição automática.
 
 
 ## Apresentação
 
 https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
 
-[Assistir ou baixar o vídeo](docs/media/ponte-fotos-promo.mp4) · [Pôster](docs/media/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
+[Assistir ou baixar o vídeo](Assets/ponte-fotos-promo.mp4) · [Pôster](Assets/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
 
-A apresentação ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface. [Fonte do vídeo](promo/README.md).
+A apresentação ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface.
 
 ## Interface
 
-![Ponte Fotos: biblioteca e navegação](docs/media/library-093.png)
+![Ponte Fotos: biblioteca e navegação](Assets/library-093.png)
 
-![Importação do Immich com destino no Fotos da Apple](docs/media/reverse-import-093.png)
+![Importação do Immich com destino no Fotos da Apple](Assets/reverse-import-093.png)
 
 As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
 
@@ -41,7 +41,7 @@ As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
 
 Baixe o [Ponte Fotos 0.9.3 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📖 Guia completo com prints](docs/GUIA-COMPLETO.md) · [📝 Histórico de versões](CHANGELOG.md)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -54,8 +54,6 @@ Abra **Configurações** na barra lateral ou use **⌘,**:
 A tela principal mantém origem, destino, lista de mídia e ações sem um painel rolável de conexão. Em janelas menores, a lista conserva sua própria rolagem; formulários extensos rolam somente dentro de Configurações.
 
 A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
-
-As convenções de interface estão em [DESIGN.md](DESIGN.md).
 
 ## Recursos
 
@@ -78,7 +76,6 @@ As convenções de interface estão em [DESIGN.md](DESIGN.md).
 - Xcode Command Line Tools com o compilador Swift e SDK do macOS. Xcode completo também pode fornecer essas ferramentas.
 - Servidor Immich 3.x acessível e chave de API da conta correspondente. A integração foi desenvolvida com Immich 3.3.5; mudanças futuras na API podem exigir ajustes.
 - Espaço livre para preparar cópias temporárias e, quando solicitado, baixar originais do iCloud.
-- Python 3 somente para a fixture HTTP opcional dos testes de API.
 
 ## Instalar a partir do código
 
@@ -213,51 +210,18 @@ O `.gitignore` exclui `.env`, credenciais usuais, builds, bundles, arquivos comp
 
 O histórico da importação inversa fica em `~/Library/Application Support/PonteFotos/reverse-import/`, com acesso restrito e sem chaves da API.
 
-## Desenvolvimento e testes
-
-```sh
-zsh build.sh
-zsh test-connection.sh
-zsh test-management.sh
-zsh test-media.sh
-zsh test-appearance.sh
-zsh test-reverse.sh
-zsh test-fileio.sh
-plutil -lint Info.plist
-codesign --verify --deep --strict "build/Ponte Fotos.app"
-```
-
-Os testes usam arquivos sintéticos e interceptação HTTP em memória, sem depender de um Immich real ou de chaves do usuário. A suíte de mídia gera JPEG/MOV temporários; a codificação do vídeo requer codecs disponíveis no macOS e pode falhar em uma sandbox restrita.
-
-A fixture `Tests/api_fixture.py` é opcional, escuta somente em `127.0.0.1:18761` e é usada por `Tests/APISmoke.swift`; não é um servidor para produção. Testes automatizados não substituem a validação manual de PhotoKit, permissões, troca física de rede e compatibilidade com a versão do seu Immich.
-
-### Estrutura
+## Estrutura do repositório
 
 ```text
-Sources/
-  App.swift                   Interface principal e fluxo de envio
-  DesignSystem.swift          Temas, política de vidro e componentes visuais
-  SettingsView.swift          Conexão, contas e aparência
-  Metadata.swift              Metadados e modelos de mídia
-  ExternalMedia.swift         Leitura de pastas, imagens, vídeos e XMP
-  Review.swift                Revisão de data/GPS
-  Immich.swift                Cliente de envio e conferência
-  ConnectionStore.swift       Persistência no Chaves
-  NetworkConnection.swift     Perfil, SSID e observação da rede
-  ConnectionResolver.swift    Escolha e validação de endereço
-  ConnectionHistory.swift     Continuidade do envio entre URLs
-  ImmichManagementAPI.swift   API, contas e histórico de gestão
-  ImmichDuplicates.swift      Análise e revisão de duplicatas
-  ImmichOrganization.swift    Comparação e pessoa/idade
-  ImmichWorkspace.swift       Interface das cinco abas
-  ReverseImport.swift         Importação para o Fotos e histórico
-  ReverseImportView.swift     Interface da importação
-  TransferFileIO.swift        Cópia e checksum fora da interface
-Assets/                       Logo e ícones do app
-Tests/                        Testes e fixtures sintéticas
-Info.plist                    Versão, identificador e permissões
-build.sh                      Compilação e assinatura local
+Sources/       Código Swift do aplicativo
+Assets/        Logo, ícones, prints, vídeo e pôster da apresentação
+Info.plist     Versão, identificador e permissões do macOS
+build.sh       Compilação e assinatura local
+README.md      Instalação, recursos, uso e limitações
+.gitignore     Exclusões de builds, credenciais e dados locais
 ```
+
+O repositório público contém os arquivos necessários para compilar o aplicativo e exibir esta apresentação. As releases mantêm os downloads e o histórico de mudanças.
 
 ## Solução de problemas
 
@@ -277,7 +241,3 @@ build.sh                      Compilação e assinatura local
 Aplicativo em evolução, com assinatura local e testes automatizados. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Uma licença de redistribuição ainda não foi definida neste repositório.
-
-## 🚀 Publicação de versões
-
-Cada nova versão deve ser entregue com commit, tag e GitHub Release, incluindo pacote, checksum, notas e documentação atualizada. O procedimento está em [docs/RELEASING.md](docs/RELEASING.md).
