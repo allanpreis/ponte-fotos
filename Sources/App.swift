@@ -96,6 +96,10 @@ struct AlbumItem: Identifiable { let id: String; let title: String; let collecti
             }
         } catch { status = error.localizedDescription }
         edits = (try? JSONDecoder().decode([String: MetadataOverride].self, from: Data(contentsOf: url))) ?? [:]
+        network.onStatusChange = { [weak self] in
+            guard let self else { return }
+            self.wifiName = self.network.ssid; self.wifiStatus = self.network.locationStatus
+        }
         network.onChange = { [weak self] in self?.networkChanged() }
         network.start()
         showConnectionSettings = apiKey.isEmpty
@@ -491,7 +495,7 @@ struct ContentView: View {
         .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
         .onChange(of: model.apiKey) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
         .onChange(of: model.address) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
-        .onChange(of: model.serverReady) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
+        .onChange(of: model.serverReady) { _, ready in if !ready { reverseImport.invalidate() }; model.prepareManagementSession() }
         .onChange(of: model.busy) { _, busy in if !busy { model.prepareManagementSession() } }
         .onChange(of: reverseImport.busy || reverseImport.importing) { _, active in model.busy = active }
         .onChange(of: navigation.settings) { _, open in
@@ -565,7 +569,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Originais preservados", systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text("Live Photos, RAW e metadados\nacompanham suas memórias.").font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.9.1").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.9.2").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())

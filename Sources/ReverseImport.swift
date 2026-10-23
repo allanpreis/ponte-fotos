@@ -322,25 +322,37 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     @Published var showConfirmation = false
     @Published var done = 0
     @Published var total = 0
+    private var sourceContext: [String]?
+    private let connect: (String, String, String) async throws -> PFReverseRemote
     private var remote: PFReverseRemote?
     private let history: PFReverseHistory
     private let photos: PFReversePhotos
     private var assets: [String: PFReverseAsset] = [:]
     private var cancellationRequested = false
     private var generation = UUID()
-    init(history: PFReverseHistory = PFReverseDiskHistory(), photos: PFReversePhotos? = nil) { self.history = history; self.photos = photos ?? PFReversePhotoLibrary() }
+    init(history: PFReverseHistory = PFReverseDiskHistory(), photos: PFReversePhotos? = nil,
+         connect: @escaping (String, String, String) async throws -> PFReverseRemote = { address, key, profileID in
+             let credential = try await IMManagementStore.verify(address: address, key: key)
+             return PFReverseHTTP(client: IMClient(address: address, credential: credential), profileID: profileID)
+         }) {
+        self.history = history; self.photos = photos ?? PFReversePhotoLibrary(); self.connect = connect
+    }
     func load(address: String, key: String, profileID: String) async {
         guard !importing && !busy else { return }
         busy = true; defer { busy = false }
+        let context = [address, key, profileID]
+        let previousAlbum = sourceContext == context ? albumID : ""
         invalidateConnection()
         let token = generation
         do {
-            let credential = try await IMManagementStore.verify(address: address, key: key)
             guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: "Salve o perfil de conexão antes de importar.") }
-            let value = PFReverseHTTP(client: IMClient(address: address, credential: credential), profileID: profileID)
+            let value = try await connect(address, key, profileID)
             let rows = try await value.albums()
             guard token == generation else { return }
-            remote = value; albums = rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }; albumID = albums.first?.id ?? ""
+            remote = value; sourceContext = context
+            albums = rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            // An explicit refresh must not silently switch the user's source album.
+            albumID = previousAlbum.isEmpty ? (albums.first?.id ?? "") : (albums.contains { $0.id == previousAlbum } ? previousAlbum : "")
             status = "Escolha um álbum para revisar os originais."
         } catch { if token == generation { status = error.localizedDescription } }
     }
@@ -382,6 +394,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     }
     func invalidate() { invalidateConnection() }
     func invalidateConnection() {
+        sourceContext = nil
         generation = UUID(); cancellationRequested = true; showConfirmation = false
         if !importing { remote = nil; albums = []; items = []; selection = []; assets = [:] }
     }

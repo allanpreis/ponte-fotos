@@ -80,16 +80,38 @@ struct ConnectionProfile: Codable, Equatable {
     }
 }
 
+/// Only changes that can affect routing should invalidate a verified connection.
+/// macOS can send several path/authorization notifications for the same network.
+struct NetworkRoutingSnapshot: Equatable {
+    let status: NWPath.Status
+    let interfaces: Set<String>
+    let ssid: String?
+}
+
+struct NetworkRoutingChanges {
+    private var previous: NetworkRoutingSnapshot?
+
+    mutating func update(_ snapshot: NetworkRoutingSnapshot?) -> Bool {
+        // Wait for NWPathMonitor's first path before emitting an initial change.
+        guard let snapshot, snapshot != previous else { return false }
+        previous = snapshot
+        return true
+    }
+}
+
 @MainActor
 final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelegate, CWEventDelegate {
     @Published private(set) var ssid: String?
     @Published private(set) var locationStatus = "Permita Localização para identificar o Wi-Fi."
     var onChange: (() -> Void)?
+    var onStatusChange: (() -> Void)?
     private let locationManager = CLLocationManager()
     private let wifiClient = CWWiFiClient()
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "PonteFotos.network")
     private var started = false
+    private var path: NWPath?
+    private var routingChanges = NetworkRoutingChanges()
 
     override init() {
         super.init()
@@ -100,10 +122,11 @@ final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelega
     func start() {
         guard !started else { return }
         started = true
-        monitor.pathUpdateHandler = { [weak self] _ in
+        monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
+                self?.path = path
                 self?.refreshSSID()
-                self?.onChange?()
+                self?.notifyRoutingChange()
             }
         }
         wifiClient.delegate = self
@@ -115,9 +138,19 @@ final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelega
     func requestLocationPermission() {
         locationManager.requestWhenInUseAuthorization()
         refreshSSID()
+        notifyRoutingChange()
+    }
+
+    private func notifyRoutingChange() {
+        guard started, let path else { return }
+        let interfaces = Set(path.availableInterfaces.filter { path.usesInterfaceType($0.type) }
+            .map { "\($0.type):\($0.name)" })
+        let snapshot = NetworkRoutingSnapshot(status: path.status, interfaces: interfaces, ssid: ssid)
+        if routingChanges.update(snapshot) { onChange?() }
     }
 
     func refreshSSID() {
+        defer { onStatusChange?() }
         switch locationManager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
             ssid = wifiClient.interface()?.ssid()
@@ -138,14 +171,14 @@ final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelega
         Task { @MainActor [weak self] in
             self?.refreshSSID()
             if let self, self.started { try? self.wifiClient.startMonitoringEvent(with: .ssidDidChange) }
-            self?.onChange?()
+            self?.notifyRoutingChange()
         }
     }
 
     nonisolated func ssidDidChangeForWiFiInterface(withName interfaceName: String) {
         Task { @MainActor [weak self] in
             self?.refreshSSID()
-            self?.onChange?()
+            self?.notifyRoutingChange()
         }
     }
 
