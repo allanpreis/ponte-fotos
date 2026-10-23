@@ -48,7 +48,8 @@ final class FakeRemote: PFReverseRemote {
     let scope = String(repeating: "a", count: 64)
     var value: PFReverseAsset; var related: [String: PFReverseAsset] = [:]; var downloads = 0; var onDownload: (() async -> Void)?
     init(_ value: PFReverseAsset) { self.value = value }
-    func albums() async throws -> [IMAlbum] { [] }
+    var albumRows: [IMAlbum] = []
+    func albums() async throws -> [IMAlbum] { albumRows }
     func ids(album: String) async throws -> [String] { [value.id] }
     func asset(_ id: String) async throws -> PFReverseAsset { related[id] ?? value }
     func download(_ asset: PFReverseAsset, directory: URL) async throws -> URL {
@@ -221,6 +222,23 @@ final class FakeRemote: PFReverseRemote {
         let other = PFReverseHTTP(client: IMClient(address: "https://photos.example.com", credential: credential), profileID: "other")
         expect(local.scope == distant.scope && local.scope != other.scope, "stable profile across endpoint changes")
         model.invalidateConnection(); expect(model.items.isEmpty && model.selection.isEmpty, "invalidated session clears")
+        let refreshRemote = FakeRemote(value)
+        refreshRemote.albumRows = [IMAlbum(id: "a", name: "A", ownerID: "owner"), IMAlbum(id: "b", name: "B", ownerID: "owner")]
+        let refresh = PFReverseImportModel(history: MemoryHistory(), photos: FakePhotos(), connect: { _, _, _ in refreshRemote })
+        let profile = UUID().uuidString
+        await refresh.load(address: "https://photos.example.com", key: "synthetic", profileID: profile)
+        refresh.albumID = "b"
+        await refresh.loadAlbum()
+        await refresh.load(address: "https://photos.example.com", key: "synthetic", profileID: profile)
+        expect(refresh.albumID == "b" && refresh.albums.count == 2, "refresh retains selected source by ID")
+        refreshRemote.albumRows.removeAll { $0.id == "b" }
+        await refresh.load(address: "https://photos.example.com", key: "synthetic", profileID: profile)
+        expect(refresh.albumID.isEmpty, "removed source is not silently replaced")
+        refresh.albumID = "b"
+        await refresh.load(address: "https://other.example.com", key: "other", profileID: profile)
+        expect(refresh.albumID == "a", "changed connection discards old source context")
+        refresh.invalidateConnection()
+        expect(refresh.albums.isEmpty && refresh.items.isEmpty && refresh.selection.isEmpty, "real invalidation still clears source and review")
         print("Reverse import: \(checks) synthetic checks passed; no network or real Photos writes.")
     }
 }
