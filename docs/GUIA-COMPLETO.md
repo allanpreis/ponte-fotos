@@ -1,6 +1,6 @@
 # 🌸 Ponte Fotos — guia completo
 
-**Versão 0.9.1 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
+**Versão 0.9.2 · Apple Silicon · macOS 14 ou superior · Immich 3.x**
 
 O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. Você escolhe, revisa data e localização, define o destino e acompanha o envio. Também pode consultar duplicatas entre contas e organizar álbuns do servidor.
 
@@ -14,7 +14,7 @@ O Ponte Fotos conecta os originais do Fotos da Apple e de pastas ao seu Immich. 
 2. Confira o SHA-256 do ZIP com o arquivo de checksums anexado à mesma release:
 
    ```sh
-   shasum -a 256 Ponte-Fotos-0.9.1-arm64.zip
+   shasum -a 256 Ponte-Fotos-0.9.2-arm64.zip
    ```
 
 3. Extraia o ZIP e mova **Ponte Fotos.app** para Aplicativos ou para a pasta local `~/Applications`.
@@ -271,3 +271,8 @@ A operação não apaga nem modifica arquivos no Immich. A importação consome 
 **Fotos já importadas:** itens marcados como já presentes no Fotos podem ser selecionados novamente. O app usa o identificador salvo no histórico para adicioná-los ao destino, sem novo download nem nova cópia e sem removê-los dos álbuns anteriores. Essa ação não reaplica alterações de metadados feitas posteriormente no Immich. Ela depende do histórico deste app e não reconhece automaticamente fotos importadas por outros programas.
 
 Confira o destino na confirmação. Cancelar a confirmação não cria álbuns nem adiciona itens. Se houver interrupção com resultado incerto, confira o Fotos antes de repetir, especialmente ao criar um novo álbum. Não há garantia de retomada automática de criação de álbum após encerramento abrupto.
+
+
+### 📶 Estabilidade da seleção — 0.9.2
+
+Avisos repetidos de rede do macOS, sem mudança de rota ou Wi-Fi, não reiniciam a conexão automática. Ao atualizar explicitamente os álbuns do Immich na mesma conexão, o álbum escolhido permanece selecionado pelo ID. Se ele tiver sido removido, escolha outro; o app não substitui uma seleção removida silenciosamente. Mudanças reais de conexão continuam invalidando consultas por segurança.
