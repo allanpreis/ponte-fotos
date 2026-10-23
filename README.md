@@ -1,89 +1,92 @@
 <p align="center"><img src="Assets/AppLogo.png" alt="Ponte Fotos" width="112"></p>
 
+**English** · [Português (Brasil)](README.pt-BR.md)
+
 # Ponte Fotos
 
-Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
+A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Versão: 0.9.3 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Version: 0.9.3 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
-O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
+**Language:** this README is available in English and Brazilian Portuguese. The current app interface, screenshots, presentation video, and release notes are in Brazilian Portuguese. Instructions below retain the app's Portuguese control names, with English translations to help you find them.
 
-A versão 0.9.3 corrige a leitura de GPS XMP com segundos, a escolha de contas editoras autorizadas e o aviso ao cancelar consultas. Preparação de cópias e checksum rodam fora da thread da interface. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3).
+The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-## 📥 Immich → Fotos da Apple
+Version 0.9.3 fixes XMP GPS parsing with seconds, selection of authorized editor accounts, and cancellation messages for queries. Copy preparation and checksum calculation run off the UI thread. [Release notes (Portuguese)](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3).
 
-Na barra lateral, abra **Immich → Fotos**. Teste a conexão, atualize os álbuns, consulte um álbum e selecione os itens. Confira a data de captura, GPS e o indicador de Live Photo; escolha **Álbum existente** ou **Criar novo álbum** no destino e confirme a importação.
+## 📥 Immich → Apple Photos
 
-O app baixa os originais, verifica o checksum e usa o PhotoKit para criar os itens no Fotos deste Mac. O iCloud segue os ajustes do Fotos. Os originais do Immich permanecem intactos. Itens sem data válida/fuso explícito, localização inválida ou recursos indisponíveis ficam bloqueados. Live Photos exigem imagem e vídeo compatíveis. Pessoas reconhecidas e histórico de edições não são transferidos.
+Open **Immich → Fotos** (Immich → Photos) in the sidebar. Test the connection, refresh the albums, load an album, and select items. Check capture dates, GPS, and the Live Photo indicator; choose **Álbum existente** (Existing album) or **Criar novo álbum** (Create new album) as the destination, then confirm the import.
 
-A opção **Atualizar álbuns do Fotos** lista somente destinos editáveis, sem criar ou alterar itens. Álbuns com nomes iguais são diferenciados na lista e selecionados pelo identificador. Um novo álbum é criado somente após confirmação e passa a ser o destino dos próximos lotes.
+The app downloads originals, verifies their checksums, and uses PhotoKit to create items in Photos on this Mac. iCloud follows your Photos settings. Immich originals remain untouched. Items without a valid date and explicit time zone, with invalid locations, or with unavailable resources are blocked. Live Photos require a compatible image and video. Recognized people and editing history are not transferred.
 
-Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbum sem baixar novamente, criar novas cópias ou removê-las dos álbuns anteriores. Um histórico local por perfil/conta evita repetir importações feitas pelo Ponte Fotos; ele não compara toda a biblioteca preexistente. Resultados sem confirmação final ficam bloqueados para evitar repetição automática.
+**Atualizar álbuns do Fotos** (Refresh Photos albums) lists only editable destinations without creating or changing items. Albums with identical names are distinguished in the list and selected by identifier. A new album is created only after confirmation and becomes the destination for subsequent batches.
 
+Photos previously imported by the app can be selected and added to another album without downloading them again, creating more copies, or removing them from earlier albums. A local history for each profile/account prevents repeating imports made by Ponte Fotos; it does not compare your entire preexisting library. Results without final confirmation remain blocked to prevent automatic retries.
 
-## Apresentação
+## Presentation
 
 https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
 
-[Assistir ou baixar o vídeo](Assets/ponte-fotos-promo.mp4) · [Pôster](Assets/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
+[Watch or download the video](Assets/ponte-fotos-promo.mp4) · [Poster](Assets/ponte-fotos-poster.png) · 66 seconds · no audio · 1080p · Portuguese text.
 
-A apresentação ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface.
+The presentation illustrates transfers in both directions, metadata review, importing into existing or new Photos albums, adding previously imported items to albums without more copies, Live Photo protection, organization, and automatic connection selection. The diagrams use synthetic data and are not recordings of the interface.
 
 ## Interface
 
-![Ponte Fotos: biblioteca e navegação](Assets/library-093.png)
+![Ponte Fotos: library and navigation (Portuguese interface)](Assets/library-093.png)
 
-![Importação do Immich com destino no Fotos da Apple](Assets/reverse-import-093.png)
+![Importing from Immich into Apple Photos (Portuguese interface)](Assets/reverse-import-093.png)
 
-As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
+The screenshots use demo data without accessing personal libraries.
 
-## 📦 Instalar pela release
+## 📦 Install a release
 
-Baixe o [Ponte Fotos 0.9.3 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Download [Ponte Fotos 0.9.3 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.3/Ponte-Fotos-0.9.3-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.3) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
-## Visual e configurações
+## Appearance and settings
 
-Abra **Configurações** na barra lateral ou use **⌘,**:
+Open **Configurações** (Settings) in the sidebar or press **⌘,**:
 
-- **Conexão**: endereços local/remoto, modo Automático/Local/Remoto, Wi-Fi doméstico e chave principal.
-- **Contas e API**: contas adicionais usadas pela gestão; exige conexão validada e mantém chaves no Chaves do macOS.
-- **Aparência**: Claro, Escuro ou Sistema. A escolha é salva e aplicada também às janelas de revisão e gestão.
+- **Conexão** (Connection): local/remote addresses, **Automático/Local/Remoto** (Automatic/Local/Remote) mode, home Wi-Fi, and the main API key.
+- **Contas e API** (Accounts and API): additional accounts used for library management; requires a validated connection and stores keys in macOS Keychain.
+- **Aparência** (Appearance): **Claro**, **Escuro**, or **Sistema** (Light, Dark, or System). Your selection is saved and also applies to review and management windows.
 
-A tela principal mantém origem, destino, lista de mídia e ações sem um painel rolável de conexão. Em janelas menores, a lista conserva sua própria rolagem; formulários extensos rolam somente dentro de Configurações.
+The main screen keeps the source, destination, media list, and actions visible without a scrolling connection panel. In smaller windows, the list keeps its own scroll area; longer forms scroll only within Settings.
 
-A opção **Usar transparência e vidro** controla o acabamento da navegação. O Liquid Glass nativo é usado no macOS 26 ou superior; no macOS 14/15 são usados materiais translúcidos compatíveis. Desativar a opção ou ativar **Reduzir transparência** no macOS usa superfícies opacas. Fotos e formulários permanecem sólidos para manter a leitura. Tema e preferência de vidro são dados não sensíveis no UserDefaults; não são gravados junto de chaves de API.
+**Usar transparência e vidro** (Use transparency and glass) controls the navigation's appearance. Native Liquid Glass is used on macOS 26 or later; macOS 14/15 use compatible translucent materials. Turning this option off or enabling **Reduce transparency** in macOS uses opaque surfaces. Photos and forms remain solid for readability. Theme and glass preferences are nonsensitive UserDefaults values; they are not stored with API keys.
 
-## Recursos
+## Features
 
-| Área | O que faz |
+| Area | What it does |
 | --- | --- |
-| Biblioteca Apple | Lista fotos em páginas de 100 itens, permite seleção e pode baixar originais do iCloud mediante autorização. |
-| Pastas e discos | Lê recursivamente a pasta escolhida, incluindo subpastas, e identifica metadados de imagem, vídeo e XMP. |
-| Revisão | Permite completar ou corrigir data e GPS antes de preparar os arquivos para envio. |
-| Exportação | Exporta originais com XMP complementar, sem modificar a biblioteca Apple ou arquivos de origem. |
-| Upload | Envia para a linha do tempo, um álbum existente ou um novo álbum; confere checksum, data, GPS disponível e associação Live Photo. |
-| Conexão por rede | Alterna entre endereço local e remoto conforme o Wi-Fi configurado, com modos manuais disponíveis. |
-| Duplicatas | Encontra arquivos com checksum idêntico entre contas e álbuns selecionados, identifica Live Photos e permite revisar cópias estáticas excedentes. |
-| Comparação | Compara conteúdos de dois álbuns e organiza seus vínculos sem apagar os arquivos da biblioteca. |
-| Pessoa e idade | Seleciona imagens por pessoa, aniversário registrado no Immich e intervalo inclusivo de idade. |
-| Contas e histórico | Usa chaves por conta e registra as últimas 20 operações de gestão, incluindo resultados incertos. |
+| Apple library | Lists photos in pages of 100 items, supports selection, and can download iCloud originals with permission. |
+| Folders and drives | Recursively reads the selected folder, including subfolders, and identifies image, video, and XMP metadata. |
+| Review | Lets you complete or correct dates and GPS before preparing files for upload. |
+| Export | Exports originals with XMP sidecars without modifying the Apple library or source files. |
+| Upload | Uploads to the timeline, an existing album, or a new album; checks checksums, dates, available GPS, and Live Photo associations. |
+| Network connection | Switches between local and remote addresses based on the configured Wi-Fi, with manual modes available. |
+| Duplicates | Finds files with identical checksums across selected accounts and albums, identifies Live Photos, and lets you review extra still copies. |
+| Comparison | Compares the contents of two albums and organizes album membership without deleting library files. |
+| Person and age | Selects images by person, birth date recorded in Immich, and an inclusive age range. |
+| Accounts and history | Uses account-specific keys and records the last 20 management operations, including uncertain results. |
 
-## Requisitos
+## Requirements
 
-- Mac com Apple Silicon e macOS 14 ou superior. O script atual gera um executável `arm64`; Intel ainda não foi validado.
-- Xcode Command Line Tools com o compilador Swift e SDK do macOS. Xcode completo também pode fornecer essas ferramentas.
-- Servidor Immich 3.x acessível e chave de API da conta correspondente. A integração foi desenvolvida com Immich 3.3.5; mudanças futuras na API podem exigir ajustes.
-- Espaço livre para preparar cópias temporárias e, quando solicitado, baixar originais do iCloud.
+- An Apple Silicon Mac running macOS 14 or later. The current script builds an `arm64` executable; Intel has not been validated.
+- Xcode Command Line Tools with the Swift compiler and macOS SDK. Full Xcode can also provide these tools.
+- An accessible Immich 3.x server and an API key for the relevant account. The integration was developed with Immich 3.3.5; future API changes may require updates.
+- Free disk space to prepare temporary copies and, when requested, download iCloud originals.
 
-## Instalar a partir do código
+## Build and install from source
 
 ```sh
 xcode-select --install
 ```
 
-Se as ferramentas já estiverem instaladas, prossiga:
+If the tools are already installed, continue:
 
 ```sh
 git clone https://github.com/allanpreis/ponte-fotos.git
@@ -94,150 +97,151 @@ ditto "build/Ponte Fotos.app" "$HOME/Applications/Ponte Fotos.app"
 open "$HOME/Applications/Ponte Fotos.app"
 ```
 
-Encerre uma versão anterior do aplicativo antes de substituí-la. O build produz `build/Ponte Fotos.app` com assinatura local ad hoc. O projeto ainda não possui assinatura Developer ID, notarização ou instalador oficial; o macOS pode exigir autorização para abrir o aplicativo e voltar a pedir permissões após uma recompilação. Não há necessidade de desativar o Gatekeeper ou outras proteções do sistema.
+Quit any previous version of the app before replacing it. The build produces `build/Ponte Fotos.app` with a local ad hoc signature. The project does not yet have a Developer ID signature, notarization, or an official installer; macOS may require approval to open the app and may request permissions again after a rebuild. You do not need to disable Gatekeeper or other system protections.
 
-Não execute o bundle diretamente de uma pasta sincronizada que modifique seus atributos estendidos: isso pode invalidar a assinatura. Prefira uma pasta local de aplicativos.
+Do not run the bundle directly from a synced folder that changes its extended attributes: this can invalidate the signature. Use a local applications folder.
 
-## Primeira conexão
+## First connection
 
-1. Abra **Configurações → Conexão** no app (ou **⌘,**).
-2. Informe a URL do seu Immich e a chave de API da conta de destino. Use a URL base, sem credenciais ou parâmetros embutidos.
-3. Escolha o modo **Local** ou **Remoto** e clique em **Testar conexão**.
-4. Se quiser persistir os dados, use **Salvar configuração**. Eles são armazenados no Chaves do macOS.
+1. Open **Configurações → Conexão** in the app (or press **⌘,**).
+2. Enter your Immich URL and the destination account's API key. Use the base URL without embedded credentials or query parameters.
+3. Choose **Local** or **Remoto** mode and click **Testar conexão** (Test connection).
+4. To save the details, click **Salvar configuração** (Save configuration). They are stored in macOS Keychain.
 
-A configuração inicial do código publicado fica vazia. Exemplos de preenchimento: URL local `http://immich.local:2283`, URL remota `https://photos.example.com`, Wi-Fi `MinhaRede`. São exemplos fictícios; substitua pelos seus dados na interface.
+The published code starts with an empty configuration. Example values: local URL `http://immich.local:2283`, remote URL `https://photos.example.com`, Wi-Fi `MinhaRede`. These are fictional examples; replace them with your own details in the interface.
 
-O aplicativo não lê arquivos `.env`. Não é necessário criar um para compilar ou usar o projeto. Chaves, URLs privadas e nome de Wi-Fi não devem ser colocados no código ou enviados ao GitHub.
+The app does not read `.env` files. You do not need to create one to build or use the project. Never put API keys, private URLs, or your Wi-Fi name in the source code or upload them to GitHub.
 
-### Permissões de API
+### API permissions
 
-Conceda apenas as permissões necessárias para o fluxo que pretende usar. Uma chave não amplia os acessos da conta aos álbuns de outras pessoas.
+Grant only the permissions required for your intended workflow. An API key does not extend the account's access to other people's albums.
 
-| Operação | Permissões relevantes |
+| Operation | Relevant permissions |
 | --- | --- |
-| Conexão e envio | `server.version`, `user.read`, `asset.upload`, `asset.read` |
-| Consulta e miniaturas na gestão | `user.read`, `album.read`, `asset.read`, `asset.view` |
-| Pessoas | `person.read`, além das permissões de consulta |
-| Criar álbum no envio | `album.create` e permissões de consulta/organização correspondentes |
-| Adicionar/remover vínculos | `albumAsset.create`, `albumAsset.delete`, conforme a operação |
-| Duplicatas para lixeira | `asset.delete`, além da leitura e preservação de vínculos em álbuns |
-| Aplicar revisão a um recurso enviado | `asset.update`, quando necessário ao fluxo |
+| Connection and upload | `server.version`, `user.read`, `asset.upload`, `asset.read` |
+| Queries and thumbnails in library management | `user.read`, `album.read`, `asset.read`, `asset.view` |
+| People | `person.read`, in addition to query permissions |
+| Creating an album during upload | `album.create` and the relevant query/organization permissions |
+| Adding/removing album membership | `albumAsset.create`, `albumAsset.delete`, depending on the operation |
+| Moving duplicates to the trash | `asset.delete`, plus permissions to read and preserve album membership |
+| Applying reviewed metadata to an uploaded asset | `asset.update`, when required by the workflow |
 
-O servidor pode exigir escopos adicionais conforme a versão e o endpoint. Permissões ausentes ou falta de acesso ao recurso impedem a operação; confira a mensagem do app. Evite usar uma chave com `all` se não precisar de todas as funções.
+The server may require additional scopes depending on its version and the endpoint. Missing permissions or lack of access to an asset will block the operation; check the app's message. Avoid granting `all` if you do not need every feature.
 
-### Alternância automática de endereço
+### Automatic address selection
 
-Cadastre URL local, URL remota e nome exato do Wi-Fi doméstico e escolha **Automático**. Autorize **Localização** pelo botão do aplicativo: o macOS exige essa permissão para disponibilizar o nome da rede. O app usa o SSID para escolher o endereço; não consulta nem armazena sua posição.
+Enter the local URL, remote URL, and exact home Wi-Fi name, then choose **Automático**. Grant **Localização** (Location) permission using the app's button: macOS requires this permission to provide the network name. The app uses the SSID to choose the address; it does not query or store your location.
 
-- No Wi-Fi configurado, tenta a URL local; falhas de conectividade ou erros de servidor elegíveis podem levar à tentativa remota.
-- Em outra rede, sem Wi-Fi ou sem acesso ao SSID, usa a URL remota.
-- Erros de autenticação, servidor inválido ou identidade de conta divergente não provocam troca automática de destino.
-- Durante um envio, mantém o cliente daquele conjunto de recursos. Mudanças de rede são tratadas em um ponto seguro, com revalidação, sem retomada parcial por byte.
-- O histórico usa o perfil lógico e a conta para compartilhar continuidade entre as duas URLs.
+- On the configured Wi-Fi, it tries the local URL; connectivity failures or eligible server errors may trigger a remote attempt.
+- On another network, without Wi-Fi, or without SSID access, it uses the remote URL.
+- Authentication errors, an invalid server, or a mismatched account identity do not trigger an automatic destination switch.
+- During an upload, it keeps the client for the current set of resources. Network changes are handled at a safe point with revalidation; there is no byte-level partial resume.
+- History uses the logical profile and account to maintain continuity between both URLs.
 
-A conferência fixa o UUID da conta, não uma identidade criptográfica do servidor. Configure apenas endereços do mesmo servidor confiável. HTTP é aceito, mas envia chave e mídia sem criptografia de transporte; prefira HTTPS, especialmente fora da rede local.
+Validation pins the account UUID, not a cryptographic server identity. Configure only addresses belonging to the same trusted server. HTTP is accepted but sends the key and media without transport encryption; prefer HTTPS, especially outside your local network.
 
-## Enviar fotos e vídeos
+## Upload photos and videos
 
-1. Selecione **Biblioteca Apple** e **Abrir biblioteca**, concedendo acesso ao Fotos. Ou use **Escolher pasta…** e selecione a origem em um disco/pasta.
-2. Escolha itens e confira as indicações de data/GPS. A opção de baixar originais do iCloud depende do acesso à conta/biblioteca do próprio macOS.
-3. Use **Revisar selecionada** para completar data ou localização ausente. Sem data confiável, o envio exige revisão; o app não usa automaticamente a criação do arquivo como data de captura.
-4. Escolha o destino: sem álbum, álbum existente ou novo álbum.
-5. Envie uma pequena amostra e confira o resultado no Immich antes de um lote grande.
+1. Select **Biblioteca Apple** (Apple library) and **Abrir biblioteca** (Open library), granting access to Photos. Or use **Escolher pasta…** (Choose folder…) to select a source folder or drive.
+2. Select items and check the date/GPS indicators. Downloading iCloud originals depends on access to the account/library in macOS itself.
+3. Use **Revisar selecionada** (Review selected item) to complete missing dates or locations. Uploading without a reliable date requires review; the app does not automatically use file creation time as the capture date.
+4. Choose the destination: no album, an existing album, or a new album.
+5. Upload a small sample and check the result in Immich before sending a large batch.
 
-Originais preservam seus bytes; um XMP complementar carrega data e localização da biblioteca/revisão. O processo de preparação não modifica o arquivo de origem. O XMP associado de uma pasta é mesclado preservando campos adicionais.
+Originals retain their bytes; an XMP sidecar carries dates and locations from the library/review. Preparation does not modify the source file. An existing XMP sidecar from a folder is merged while preserving additional fields.
 
-Para Live Photos do Fotos da Apple, o vídeo de movimento é enviado primeiro e associado à imagem principal. HEIC e MOV de pastas externas são itens independentes: o app não presume um par apenas pelo nome. RAW e JPEG associados são preservados como recursos distintos, sem empilhamento automático.
+For Live Photos from Apple Photos, the motion video is uploaded first and associated with the main image. HEIC and MOV files from external folders are independent items: the app does not assume they are a pair based only on their names. Associated RAW and JPEG files are preserved as distinct resources without automatic stacking.
 
-**Pausar após este item** conclui o conjunto atual. Histórico e checksum ajudam a reutilizar recursos já enviados e ainda válidos. Interrupções podem produzir resultados pendentes ou incertos: confira no servidor antes de repetir.
+**Pausar após este item** (Pause after this item) finishes the current resource set. History and checksums help reuse previously uploaded resources that are still valid. Interruptions can leave pending or uncertain results: check the server before retrying.
 
-### Conferência dos metadados
+### Metadata verification
 
-O fluxo compara checksum, instante de captura (tolerância inferior a um segundo), GPS disponível (tolerância de 0,00001 grau) e associação do vídeo Live. Uma resposta tardia ou divergente permanece pendente/divergente, sem marcar sucesso indevido.
+The workflow compares checksums, capture instants (tolerance under one second), available GPS (tolerance of 0.00001 degrees), and Live Photo video associations. A late or mismatched response remains pending/mismatched instead of being incorrectly marked successful.
 
-O PhotoKit fornece um instante absoluto; a prévia usa o fuso do Mac e o XMP complementar usa UTC. Confira fotos de viagens e correções manuais na linha do tempo. O app exporta originais, sem prometer reproduzir edições, álbuns Apple, legendas, palavras-chave, rostos ou todos os metadados proprietários da Apple. Favorito é enviado, mas não faz parte dessa conferência.
+PhotoKit supplies an absolute instant; previews use the Mac's time zone, and XMP sidecars use UTC. Check travel photos and manual corrections in the timeline. The app exports originals without promising to reproduce edits, Apple albums, captions, keywords, faces, or all proprietary Apple metadata. Favorite status is sent but is not part of this verification.
 
-## Gerenciar o Immich
+## Manage Immich
 
-Com a conexão validada, abra **Gerenciar biblioteca** na barra lateral. Em **Contas e API**, clique em **Usar conta da conexão atual** ou adicione uma conta com a própria chave. Contas adicionais são salvas separadamente no Chaves; a conta atual pode ser usada apenas em memória nessa sessão.
+With a validated connection, open **Gerenciar biblioteca** (Manage library) in the sidebar. In **Contas e API**, click **Usar conta da conexão atual** (Use current connection account) or add an account with its own key. Additional accounts are saved separately in Keychain; the current account can be used only in memory for that session.
 
-### Álbuns e duplicatas
+### Albums and duplicates
 
-Selecione os álbuns e consulte. A comparação é por checksum exato e tipo de mídia, incluindo a imagem principal de Live Photos. Nome igual ou aparência semelhante, isoladamente, não comprovam duplicação. Arquivos recompactados, editados ou com bytes diferentes podem ficar fora do resultado.
+Select albums and run the query. Comparison uses exact checksums and media types, including the main image of Live Photos. Matching names or similar appearance alone do not establish duplication. Recompressed, edited, or otherwise byte-different files may be absent from the results.
 
-Cada cópia mostra conta, nome, formato, metadados e álbuns acessíveis. **Live Photo · com movimento** e **Foto estática** aparecem em blocos próprios. Uma Live Photo é sugerida para manter; o envio de qualquer Live Photo à lixeira é bloqueado. Grupos sem conta proprietária conectada também podem ser bloqueados.
+Each copy shows its account, name, format, metadata, and accessible albums. **Live Photo · com movimento** (Live Photo · with motion) and **Foto estática** (Still photo) appear in separate groups. A Live Photo is suggested for retention; moving any Live Photo to the trash is blocked. Groups without a connected owner account may also be blocked.
 
-Antes da lixeira, o app revalida conteúdo, proprietário, movimento, acesso e vínculos; adiciona e confirma os álbuns acessíveis na cópia mantida antes da primeira exclusão. A exclusão é recuperável no Immich (`force: false`); o aplicativo não esvazia a lixeira. Vínculos invisíveis às contas conectadas não podem ser preservados pelo app.
+Before moving items to the trash, the app revalidates content, ownership, motion, access, and album membership; it adds and confirms membership in accessible albums on the retained copy before the first deletion. Deletion is recoverable in Immich (`force: false`); the app does not empty the trash. It cannot preserve album membership invisible to the connected accounts.
 
-### Comparar álbuns
+### Compare albums
 
-Compara dois álbuns. Por padrão mostra conteúdos presentes nos dois; é possível incluir exclusivos. Para cada grupo, escolha deixar como está, manter nos dois ou reunir em um dos álbuns. Adições são confirmadas antes de remover vínculos de origem. Os arquivos permanecem na biblioteca do servidor.
+Compares two albums. By default, it shows content found in both; you can also include items exclusive to either album. For each group, choose to leave it unchanged, keep it in both albums, or gather it in one album. Additions are confirmed before source album membership is removed. Files remain in the server library.
 
-### Pessoa e idade
+### Person and age
 
-Selecione conta, pessoa, origem, destino e intervalo de idade. A pessoa precisa ter aniversário cadastrado no Immich. A seleção considera a data local de captura e os limites inclusivos; aniversário em 29 de fevereiro passa a 1º de março em ano não bissexto. A origem pode ser um álbum ou todos os álbuns acessíveis à conta, exceto o destino.
+Select an account, person, source, destination, and age range. The person must have a birth date recorded in Immich. Selection uses the local capture date and inclusive boundaries; a February 29 birthday is treated as March 1 in a non-leap year. The source can be one album or all albums accessible to the account, excluding the destination.
 
-Revise os resultados antes de organizar. O fluxo revalida aniversário, associação à pessoa, captura e conteúdo; mantém vínculos com outros álbuns que não fazem parte da origem selecionada.
+Review the results before organizing. The workflow revalidates the birth date, association with the person, capture date, and content; it retains membership in other albums outside the selected source.
 
-### Revisão e histórico
+### Review and history
 
-Toda alteração da gestão passa por uma tela de revisão e uma confirmação explícita. O histórico registra até 20 execuções e cada ação antes/depois da solicitação. Falha ou interrupção pode deixar uma parte confirmada e outra incerta: não há rollback geral nem repetição automática. Consulte o histórico e o Immich antes de agir novamente.
+Every management change goes through a review screen and explicit confirmation. History records up to 20 runs and each action before/after its request. A failure or interruption can leave some changes confirmed and others uncertain: there is no overall rollback or automatic retry. Check history and Immich before acting again.
 
-### Limites da gestão nesta versão
+### Management limits in this version
 
-- Até 100 álbuns e 30 mil itens únicos por análise.
-- Comparação e pessoa/idade excluem Live Photos, pilhas, arquivos offline e editados; a consulta de duplicatas inclui imagens Live com proteção contra descarte.
-- A conta proprietária pode ser exigida mesmo em operações de organização, de modo conservador.
-- Consultas podem ser canceladas; alterações não oferecem cancelamento no meio de uma chamada de rede.
-- Análises prontas não são restauradas depois de fechar a janela de gestão.
-- Criação/destinos extras de álbuns no fluxo de duplicatas e decisões em lote da comparação ainda não estão disponíveis.
-- Operações grandes podem ser lentas devido às revalidações de segurança.
+- Up to 100 albums and 30,000 unique items per analysis.
+- Comparison and person/age workflows exclude Live Photos, stacks, offline files, and edited files; duplicate queries include Live Photo images with protection against discarding them.
+- The owner account may be required even for organization operations, as a conservative safeguard.
+- Queries can be canceled; changes cannot be canceled in the middle of a network call.
+- Completed analyses are not restored after closing the management window.
+- Creating albums or selecting additional destination albums in the duplicates workflow, and bulk decisions in comparison, are not yet available.
+- Large operations can be slow because of safety revalidation.
 
-## Privacidade e armazenamento local
+## Privacy and local storage
 
-| Local | Conteúdo |
+| Location | Contents |
 | --- | --- |
-| Chaves do macOS | Perfil de conexão, URLs, SSID e chave principal; chaves adicionais da gestão em serviço separado. |
-| `~/Library/Application Support/PonteFotos/reviews.json` | Revisões de metadados. |
-| `~/Library/Application Support/PonteFotos/history/` | Histórico de envio, IDs e checksums. |
-| `~/Library/Application Support/PonteFotos/management/` | Histórico da gestão por perfil, salvo com modo de arquivo `0600`. |
-| `~/Library/Application Support/PonteFotos/staging/` | Cópias temporárias; uma interrupção abrupta pode deixar resíduos. |
-| Pasta escolhida para exportação | Originais e XMP exportados pelo usuário. |
+| macOS Keychain | Connection profile, URLs, SSID, and main key; additional management keys use a separate service. |
+| `~/Library/Application Support/PonteFotos/reviews.json` | Metadata reviews. |
+| `~/Library/Application Support/PonteFotos/history/` | Upload history, IDs, and checksums. |
+| `~/Library/Application Support/PonteFotos/management/` | Management history by profile, saved with file mode `0600`. |
+| `~/Library/Application Support/PonteFotos/staging/` | Temporary copies; abrupt interruption can leave files behind. |
+| Selected export folder | Originals and XMP sidecars exported by the user. |
 
-Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pessoais. Não os publique em issues, logs ou repositórios. **Esquecer conexão salva** remove a conexão principal do Chaves; os campos atuais permanecem na memória até fechar. Isso não remove automaticamente contas adicionais ou históricos locais.
+Histories, reviews, and exports may contain personal names, IDs, dates, and GPS. Do not publish them in issues, logs, or repositories. **Esquecer conexão salva** (Forget saved connection) removes the main connection from Keychain; current fields remain in memory until you close the app. This does not automatically remove additional accounts or local histories.
 
-O `.gitignore` exclui `.env`, credenciais usuais, builds, bundles, arquivos compactados e estado local. Ele não remove segredos já versionados e não substitui revisão antes de cada commit. O repositório contém apenas código, assets do aplicativo, documentação e fixtures sintéticas.
+The `.gitignore` excludes `.env`, common credentials, builds, bundles, archives, and local state. It does not remove secrets already tracked by Git or replace review before each commit. The repository contains application source code, app assets, and README documentation and media.
 
-O histórico da importação inversa fica em `~/Library/Application Support/PonteFotos/reverse-import/`, com acesso restrito e sem chaves da API.
+Reverse import history is stored in `~/Library/Application Support/PonteFotos/reverse-import/`, with restricted access and no API keys.
 
-## Estrutura do repositório
+## Repository structure
 
 ```text
-Sources/       Código Swift do aplicativo
-Assets/        Logo, ícones, prints, vídeo e pôster da apresentação
-Info.plist     Versão, identificador e permissões do macOS
-build.sh       Compilação e assinatura local
-README.md      Instalação, recursos, uso e limitações
-.gitignore     Exclusões de builds, credenciais e dados locais
+Sources/          Swift application source code
+Assets/           Logo, icons, screenshots, presentation video and poster
+Info.plist        Version, identifier, and macOS permissions
+build.sh          Build and local signing
+README.md         English installation, features, usage, and limitations
+README.pt-BR.md   Brazilian Portuguese documentation
+.gitignore        Excludes builds, credentials, and local data
 ```
 
-O repositório público contém os arquivos necessários para compilar o aplicativo e exibir esta apresentação. As releases mantêm os downloads e o histórico de mudanças.
+The public repository contains the files needed to build the app and display this presentation. Releases provide downloads and the change history.
 
-## Solução de problemas
+## Troubleshooting
 
-| Sintoma | O que conferir |
+| Symptom | What to check |
 | --- | --- |
-| Servidor não responde | Immich em execução, URL/porta, rota, DNS e firewall. O app não precisa que você altere o código para configurar o endereço. |
-| Wi-Fi indisponível | Permissão de Localização para o Ponte Fotos, Wi-Fi ativo e SSID exato; use um modo manual quando necessário. |
-| Biblioteca vazia ou acesso negado | Ajustes do Sistema → Privacidade e Segurança → Fotos; confirme acesso e biblioteca selecionada no Fotos. |
-| Original do iCloud indisponível | Acesso ao iCloud, internet, espaço livre e opção de baixar originais. |
-| Ação da gestão bloqueada | Chave da conta proprietária, permissões da API, acesso aos álbuns e exclusões de mídia do fluxo. |
-| Duplicatas visuais não aparecem | O método exige checksum exato; não faz reconhecimento perceptual de imagens semelhantes. |
-| Assinatura inválida | Recompile em pasta local, confira `codesign` e instale o bundle fora de sincronizadores. |
-| Resultado incerto | Confira histórico e servidor; não repita cegamente a operação. |
+| Server does not respond | Immich is running; URL/port, route, DNS, and firewall. You do not need to edit source code to configure the address. |
+| Wi-Fi unavailable | Location permission for Ponte Fotos, Wi-Fi enabled, and the exact SSID; use a manual mode when needed. |
+| Empty library or access denied | System Settings → Privacy & Security → Photos; confirm access and the library selected in Photos. |
+| iCloud original unavailable | iCloud access, internet, free space, and the option to download originals. |
+| Management action blocked | Owner account's key, API permissions, album access, and the workflow's media exclusions. |
+| Visually similar duplicates missing | The method requires exact checksums; it does not use perceptual recognition of similar images. |
+| Invalid signature | Rebuild in a local folder, check `codesign`, and install the bundle outside synced folders. |
+| Uncertain result | Check history and the server; do not blindly repeat the operation. |
 
-## Estado do projeto
+## Project status
 
-Aplicativo em evolução, com assinatura local e testes automatizados. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
+The app is under active development, with local signing and automated tests. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
-Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Uma licença de redistribuição ainda não foi definida neste repositório.
+This is an independent project with no official affiliation with Apple or Immich. A redistribution license has not yet been defined in this repository.
