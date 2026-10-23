@@ -6,13 +6,13 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 0.9.4 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 0.9.5 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
-**Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. Quit and reopen the app to apply a change. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
+**Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-Version 0.9.4 adds English and Brazilian Portuguese throughout the interface, status messages, review screens, and permission prompts, plus a saved language preference. Dates follow the selected language while retaining the Mac’s time zone. Existing transfer and organization safeguards remain in place. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4).
+Version 0.9.5 switches the app language immediately, including existing status messages and open review screens. Connections, selections, edited fields and operation progress are preserved. System is the first-launch default; choosing it again uses the Mac’s language rather than a cached app override. macOS-managed menus and permission dialogs may retain their launch language. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.5).
 
 ## 📥 Immich → Apple Photos
 
@@ -42,9 +42,9 @@ The screenshots use demo data without accessing personal libraries.
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 0.9.4 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.4/Ponte-Fotos-0.9.4-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 0.9.5 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.5/Ponte-Fotos-0.9.5-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.4) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.5) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
@@ -52,7 +52,7 @@ Open **Settings** in the sidebar or press **⌘,**:
 
 - **Connection**: local/remote addresses, **Automatic/Local/Remote** mode, home Wi-Fi, and the main API key.
 - **Accounts & API**: additional accounts used for library management; requires a validated connection and stores keys in macOS Keychain.
-- **Appearance**: **Light**, **Dark**, or **System** theme, glass effects, and **App language**. Theme choices apply to review and management windows. Language changes apply after restarting the app.
+- **Appearance**: **Light**, **Dark**, or **System** theme, glass effects, and **App language**. Theme choices apply to review and management windows. Language changes apply immediately, without restarting the app.
 
 The main screen keeps the source, destination, media list, and actions visible without a scrolling connection panel. In smaller windows, the list keeps its own scroll area; longer forms scroll only within Settings.
 
