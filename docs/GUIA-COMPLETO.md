@@ -39,15 +39,15 @@ O resultado fica em `build/Ponte Fotos.app`. O script atual compila para arm64; 
 
 ## 🧭 Conhecer a interface
 
-![Biblioteca do Ponte Fotos com dados de demonstração](media/library-v081.png)
+![Biblioteca do Ponte Fotos com dados de demonstração](media/library-093.png)
 
-A barra lateral separa **Biblioteca Apple**, **Discos e pastas**, **Gerenciar Immich** e **Configurações**. A biblioteca concentra origem, destino, seleção e ações; a lista de mídia possui sua própria rolagem. As configurações ficam em uma página dedicada para não ocupar o espaço das fotos.
+A barra lateral separa **Biblioteca Apple**, **Discos e pastas**, **Immich → Fotos**, **Gerenciar biblioteca** e **Configurações**. A biblioteca concentra origem, destino, seleção e ações; a lista de mídia possui sua própria rolagem. As configurações ficam em uma página dedicada para não ocupar o espaço das fotos.
 
 O app adapta grupos de controles para janelas menores; a janela principal parte de 900 × 650. Formulários longos rolam dentro de sua página e as ações de revisão permanecem acessíveis.
 
 ## 🔌 Conexão, APIs e Wi-Fi
 
-![Configurações e aparência com dados de demonstração](media/settings-v081.png)
+![Configurações e aparência com dados de demonstração](media/settings-093.png)
 
 Abra **Configurações** pela barra lateral ou por **⌘,**. Em **Conexão**, configure endereços, modo de conexão e chave principal. Estes valores são exemplos fictícios:
 
@@ -131,7 +131,7 @@ Para Live Photos do Fotos da Apple, o vídeo é enviado primeiro e associado à 
 
 ![Revisão de duplicatas Live Photo e estática com dados de demonstração](media/duplicates-v081.png)
 
-Com a conexão validada, abra **Gerenciar Immich → Álbuns**, selecione os álbuns e consulte duplicatas. Álbuns compartilhados aparecem uma vez.
+Com a conexão validada, abra **Gerenciar biblioteca → Álbuns**, selecione os álbuns e consulte duplicatas. Álbuns compartilhados aparecem uma vez.
 
 O método compara **checksum exato e tipo de mídia**, inclusive a imagem principal de Live Photos. Não é reconhecimento visual: mesma aparência ou mesmo nome isoladamente não comprovam duplicação; edições, recompressão e bytes diferentes podem impedir a correspondência.
 
@@ -180,13 +180,15 @@ zsh test-connection.sh
 zsh test-management.sh
 zsh test-media.sh
 zsh test-appearance.sh
+zsh test-reverse.sh
+zsh test-fileio.sh
 plutil -lint Info.plist
 codesign --verify --deep --strict "build/Ponte Fotos.app"
 ```
 
 Testes usam dados sintéticos e interceptação HTTP em memória. A suíte de mídia cria JPEG/MOV temporários e requer codecs disponíveis no macOS; uma sandbox restrita pode impedir a codificação. A fixture HTTP opcional usa Python 3 e escuta apenas em `127.0.0.1:18761`.
 
-Validação automatizada não substitui testes reais de PhotoKit, permissões, troca física de Wi-Fi e compatibilidade com o servidor. O servidor local já voltou a responder. Nesta atualização, os testes de gravação usam dependências sintéticas; não foram criados álbuns ou alteradas fotos reais durante a validação do novo seletor.
+Validação automatizada não substitui testes reais de PhotoKit, permissões, troca física de Wi-Fi e compatibilidade com o servidor. Os testes de gravação usam dependências sintéticas. A validação automatizada não comprova gravações em uma fototeca real.
 
 ## ⚠️ Limites conhecidos
 
@@ -221,15 +223,14 @@ O ícone usa a área inteira do enquadramento fornecido pelo macOS, sem a imagem
 
 Ao selecionar **Configurações → Aparência → Sistema**, a janela passa imediatamente a seguir o macOS. Não é necessário reiniciar. Janelas e painéis herdam a aparência do aplicativo.
 
-![Tema escuro na prévia isolada](media/appearance-dark-082.png)
-![Sistema adotando o tema claro sem reiniciar](media/appearance-system-082.png)
+![Aparência do aplicativo](media/appearance-093.png)
 
-Prints de prévia isolada, sem chaves, fotos ou endereços reais. Testes AppKit também cobrem retorno de Claro para Sistema; a troca global do macOS não foi alterada durante o teste visual.
+As imagens usam dados de demonstração.
 
 
 ## 📥 Importar do Immich para o Fotos da Apple
 
-![Prévia isolada da importação](media/reverse-import-090.png)
+![Prévia isolada da importação](media/reverse-import-093.png)
 
 1. Teste a conexão em **Configurações** e abra **Immich → Fotos**, na seção Immich da barra lateral.
 2. Clique em **Atualizar álbuns**, selecione o álbum de origem e consulte os itens. Abrir a página não inicia downloads de originais nem importações.
@@ -260,13 +261,13 @@ A operação não apaga nem modifica arquivos no Immich. A importação consome 
 
 ### 🗂️ Escolher um álbum existente ou criar um novo — 0.9.1
 
-![Destino existente em prévia isolada](media/destination-existing-091.png)
+![Destino existente em prévia isolada](media/reverse-import-093.png)
 
 **Álbum existente:** clique em **Atualizar álbuns do Fotos**. A primeira consulta pode pedir acesso ao Fotos. Só são listados álbuns comuns que permitem adicionar conteúdo; álbuns inteligentes e destinos não editáveis ficam de fora. Consultar a lista não cria nem altera fotos ou álbuns. Nomes repetidos recebem um complemento para diferenciá-los; a operação usa o identificador exato do álbum, nunca uma busca pelo nome. Se o destino for removido ou perder permissão, a operação é bloqueada e você deve atualizar a lista.
 
 **Criar novo álbum:** informe o nome e confirme a importação. Será criado um álbum novo, mesmo que outro já tenha o mesmo nome. Dentro do lote, o álbum é criado uma vez e todos os itens vão para ele. Após a primeira operação confirmada, o app seleciona o álbum criado como existente para os próximos lotes.
 
-![Novo álbum em prévia isolada](media/destination-new-091.png)
+![Novo álbum em prévia isolada](media/destination-new-093.png)
 
 **Fotos já importadas:** itens marcados como já presentes no Fotos podem ser selecionados novamente. O app usa o identificador salvo no histórico para adicioná-los ao destino, sem novo download nem nova cópia e sem removê-los dos álbuns anteriores. Essa ação não reaplica alterações de metadados feitas posteriormente no Immich. Ela depende do histórico deste app e não reconhece automaticamente fotos importadas por outros programas.
 

@@ -1,6 +1,6 @@
 # 📦 Publicação de versões
 
-Preferência do mantenedor: **toda nova versão do Ponte Fotos deve ter commit no repositório e uma GitHub Release correspondente**. Não entregar apenas o commit. Cada release deve permitir instalar a versão e entender suas mudanças e limitações.
+**Toda nova versão do Ponte Fotos deve ter commit no repositório e uma GitHub Release correspondente**. Cada release deve permitir instalar a versão e entender suas mudanças e limitações.
 
 ## Preparar
 
@@ -43,7 +43,7 @@ Verifique o ZIP extraído, sua versão e assinatura. O app é arm64 para macOS 1
 3. Use `docs/releases/vX.Y.Z.md` como corpo da release. Links e imagens nele devem ser absolutos para funcionar fora da árvore do repositório.
 4. Anexe o ZIP e `SHA256SUMS.txt`. Confira que os nomes e o hash correspondem ao pacote final.
 5. Abra a release publicada, confira texto, imagens, links e arquivos. Faça o download público e compare o SHA-256; confirme que a tag resolve para o commit correto.
-6. Atualize a memória de continuidade com versão, commit/tag, URL pública, validação e pendências, sem segredos.
+6. Registre versão, commit/tag, validação e limitações nas notas da release.
 
 Não reutilize uma tag já publicada para uma versão diferente. Corrija um pacote com nova versão e release; preserve o histórico de mudanças. Não anuncie atualizador automático, notarização ou suporte Intel enquanto não forem implementados e validados.
 
