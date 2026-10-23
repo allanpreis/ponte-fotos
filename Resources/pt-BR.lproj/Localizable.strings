@@ -25,7 +25,6 @@
 "1 selecionado" = "1 selecionado";
 "A Live Photo está protegida para preservar o movimento. Mantenha a Live Photo ou desmarque o grupo." = "A Live Photo está protegida para preservar o movimento. Mantenha a Live Photo ou desmarque o grupo.";
 "A Live Photo é sugerida para manter. Cada cópia mostra sua conta, formato e álbuns atuais." = "A Live Photo é sugerida para manter. Cada cópia mostra sua conta, formato e álbuns atuais.";
-"A alteração de idioma será aplicada na próxima vez que você abrir o aplicativo." = "A alteração de idioma será aplicada na próxima vez que você abrir o aplicativo.";
 "A análise expirou ou pertence a outra conexão. Consulte novamente." = "A análise expirou ou pertence a outra conexão. Consulte novamente.";
 "A busca repetiu a página. Faça nova consulta." = "A busca repetiu a página. Faça nova consulta.";
 "A chave de %@ precisa de: %@." = "A chave de %@ precisa de: %@.";
@@ -511,3 +510,5 @@
 "Álbuns" = "Álbuns";
 "Álbuns: " = "Álbuns: ";
 "Área" = "Área";
+"O idioma muda imediatamente e a preferência fica salva neste Mac." = "O idioma muda imediatamente e a preferência fica salva neste Mac.";
+"%@ · %@/%@" = "%@ · %@/%@";
