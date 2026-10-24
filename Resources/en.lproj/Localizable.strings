@@ -512,3 +512,46 @@
 "Área" = "Area";
 "O idioma muda imediatamente e a preferência fica salva neste Mac." = "The language changes immediately and your preference is saved on this Mac.";
 "%@ · %@/%@" = "%@ · %@/%@";
+
+"Diagnóstico de mídia" = "Media diagnostics";
+"A inspeção lê o original sem alterar a biblioteca. Para itens do Fotos, uma cópia temporária poderá ser baixada do iCloud conforme a opção de acesso aos originais." = "Inspection reads the original without changing the library. For Photos items, a temporary copy may be downloaded from iCloud according to the original access setting.";
+"Inspecionando o original…" = "Inspecting the original…";
+"Reconhecer o formato ou abrir uma prévia não comprova compatibilidade de importação, reprodução HDR, Dolby Vision ou edições de câmera lenta. Os arquivos são transferidos sem conversão." = "Recognising a format or opening a preview does not establish import compatibility, HDR playback, Dolby Vision or slow-motion edits. Files are transferred without conversion.";
+"Inspecionar original" = "Inspect original";
+"Original indisponível para inspeção." = "Original unavailable for inspection.";
+"Não foi possível inspecionar o original: %@" = "Could not inspect the original: %@";
+"Formato: %@" = "Format: %@";
+"Prévia local disponível; importação no Fotos ainda não verificada." = "Local preview available; Photos import has not been verified.";
+"Prévia local indisponível; isso não determina se o Fotos aceita o original." = "Local preview unavailable; this does not determine whether Photos accepts the original.";
+"Modelo de cor: %@" = "Colour model: %@";
+"Profundidade declarada: %@ bits" = "Declared depth: %@ bits";
+"Perfil de cor: %@" = "Colour profile: %@";
+"Função de transferência: %@" = "Transfer function: %@";
+"Primárias de cor: %@" = "Colour primaries: %@";
+"Sinalização HDR PQ detectada; reprodução e preservação no Fotos não verificadas." = "HDR PQ signalling detected; playback and preservation in Photos have not been verified.";
+"Sinalização HDR HLG detectada; reprodução e preservação no Fotos não verificadas." = "HDR HLG signalling detected; playback and preservation in Photos have not been verified.";
+"HDR não determinado por esta inspeção; ausência de sinalização não comprova SDR." = "HDR not determined by this inspection; missing signalling does not establish SDR.";
+"Dolby Vision e câmera lenta: compatibilidade não verificada." = "Dolby Vision and slow motion: compatibility not verified.";
+"Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos." = "Presence, date, location and Live Photo type verified in Photos. Original content and HDR playback have not been verified.";
+"O item criado não foi encontrado no Fotos." = "The created item was not found in Photos.";
+"A data no Fotos difere da origem ou está ausente." = "The date in Photos differs from the source or is missing.";
+"A localização no Fotos difere da origem ou está ausente." = "The location in Photos differs from the source or is missing.";
+"O tipo Live Photo no Fotos difere da origem." = "The Live Photo type in Photos differs from the source.";
+"Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir." = "Verification in Photos could not be completed. Check the library before trying again.";
+"Conferência pendente. Confira o Fotos antes de repetir." = "Verification pending. Check Photos before trying again.";
+
+"Tipo detectado no arquivo: %@" = "Type detected in file: %@";
+
+"Extensão do nome: %@" = "Filename extension: %@";
+"Não determinado" = "Undetermined";
+
+"Inspeção incompleta: %@" = "Inspection incomplete: %@";
+"A inspeção aceita somente arquivos locais." = "Inspection accepts local files only.";
+"O original não pôde ser lido pelo decodificador de imagens deste Mac." = "The original could not be read by this Mac’s image decoder.";
+"Nenhuma faixa de vídeo legível foi encontrada." = "No readable video track was found.";
+
+"Conferir novamente no Fotos" = "Recheck in Photos";
+
+"A prévia não pôde ser decodificada neste Mac." = "The preview could not be decoded on this Mac.";
+
+"Fechar" = "Close";
