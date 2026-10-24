@@ -30,6 +30,10 @@ Use the info button beside a source item to inspect its original locally. Inspec
 
 After a new Immich → Photos import, the app checks that the created item is visible and that its capture date, available location and Live Photo subtype match the source. A mismatch or inconclusive result keeps the history pending and blocks repeat imports until the library is checked. Previously imported items are checked before being added to another album. These checks do not re-export or compare the original stored in Photos, and do not validate HDR playback.
 
+![Media diagnostics](Assets/diagnostics-en-096.png)
+
+Interface preview with synthetic data; no real transfer is shown.
+
 ## Presentation
 
 https://github.com/user-attachments/assets/937288e1-6684-49f7-9696-dfd71f2f05e8

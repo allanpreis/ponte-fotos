@@ -31,6 +31,10 @@ Use o botão de informação ao lado de um item de origem para inspecionar o ori
 
 Depois de uma nova importação Immich → Fotos, o app confere presença do item criado, data de captura, localização disponível e subtipo Live Photo. Divergências ou resultados inconclusivos mantêm o histórico pendente e bloqueiam novas tentativas até conferir a biblioteca. Itens previamente importados são conferidos antes de adicioná-los a outro álbum. Essa conferência não reexporta nem compara o original armazenado no Fotos e não valida reprodução HDR.
 
+![Diagnóstico de mídia](Assets/diagnostics-en-096.png)
+
+Prévia da interface em inglês com dados sintéticos; não mostra uma transferência real.
+
 ## Apresentação
 
 https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
