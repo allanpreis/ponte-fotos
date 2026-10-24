@@ -1,0 +1,49 @@
+name: macOS build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Resources/**'
+      - 'Assets/**'
+      - 'Info.plist'
+      - 'build.sh'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'Sources/**'
+      - 'Resources/**'
+      - 'Assets/**'
+      - 'Info.plist'
+      - 'build.sh'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate build script and app metadata
+        run: |
+          zsh -n build.sh
+          plutil -lint Info.plist
+      - name: Build Apple Silicon app
+        run: zsh build.sh
+      - name: Verify app bundle
+        run: |
+          codesign --verify --deep --strict --verbose=2 "build/Ponte Fotos.app"
+          plutil -lint "build/Ponte Fotos.app/Contents/Info.plist"
+          lipo -verify_arch arm64 "build/Ponte Fotos.app/Contents/MacOS/PonteFotos"
