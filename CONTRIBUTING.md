@@ -18,6 +18,10 @@ The output is `build/Ponte Fotos.app`, signed locally with an ad hoc signature. 
 6. Explain the problem, resulting behavior, validation and known limitations in the pull request.
 Preserve original media, explicit confirmation for library changes, checksum verification and honest pending/error states. Do not claim PhotoKit, HDR, Live Photo or server compatibility based only on a successful build.
 ## Project and licensing status
-Ponte Fotos is independent and is not affiliated with Apple or Immich. A redistribution license has not yet been selected; this guide does not grant additional licensing rights. Licensing terms should be clarified with the maintainer before submitting substantial code contributions.
+Ponte Fotos is independent and is not affiliated with Apple or Immich. The project is licensed under the [MIT License](LICENSE). Contributions are submitted under the same license. Preserve applicable copyright and third-party notices.
+## Automated build
+
+[macOS build](https://github.com/allanpreis/ponte-fotos/actions/workflows/ci.yml) compiles the app and checks its metadata, arm64 architecture and ad hoc signature. It does not access a Photos library or an Immich server, and is not an end-to-end media compatibility test.
+
 ## Em português
 Você pode abrir issues e pull requests em português. Informe versões e passos para reproduzir, use amostras sintéticas e remova dados pessoais. Para mudanças no código, faça uma alteração pequena, compile com `zsh build.sh` e descreva exatamente o que foi validado.

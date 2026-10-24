@@ -4,6 +4,13 @@
 
 # Ponte Fotos
 
+[![Release](https://img.shields.io/github/v/release/allanpreis/ponte-fotos)](https://github.com/allanpreis/ponte-fotos/releases/latest)
+[![macOS build](https://github.com/allanpreis/ponte-fotos/actions/workflows/ci.yml/badge.svg)](https://github.com/allanpreis/ponte-fotos/actions/workflows/ci.yml)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-111111?logo=apple)](#requirements)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**[Download](https://github.com/allanpreis/ponte-fotos/releases/latest) · [Installation](#-install-a-release) · [Contribute](CONTRIBUTING.md) · [Report a bug](https://github.com/allanpreis/ponte-fotos/issues/new/choose)**
+
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
 **Version: 0.9.6 · macOS 14 or later · Apple Silicon · Immich 3.x**
@@ -254,4 +261,10 @@ The public repository contains the files needed to build the app and display thi
 
 The app is under active development, with local signing and automated tests. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
-This is an independent project with no official affiliation with Apple or Immich. A redistribution license has not yet been defined in this repository.
+This is an independent project with no official affiliation with Apple or Immich. Licensed under the [MIT License](LICENSE).
+
+## Community and credits
+
+Created and maintained by [Allan Reis](https://github.com/allanpreis). See the [contributors](https://github.com/allanpreis/ponte-fotos/graphs/contributors). Code, documentation, translation, accessibility and testing contributions are welcome.
+
+[Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md) · [Release history](https://github.com/allanpreis/ponte-fotos/releases)

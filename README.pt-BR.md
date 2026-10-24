@@ -4,6 +4,13 @@
 
 # Ponte Fotos
 
+[![Release](https://img.shields.io/github/v/release/allanpreis/ponte-fotos)](https://github.com/allanpreis/ponte-fotos/releases/latest)
+[![macOS build](https://github.com/allanpreis/ponte-fotos/actions/workflows/ci.yml/badge.svg)](https://github.com/allanpreis/ponte-fotos/actions/workflows/ci.yml)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-111111?logo=apple)](#requisitos)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**[Baixar](https://github.com/allanpreis/ponte-fotos/releases/latest) · [Instalação](#-instalar-pela-release) · [Contribuir](CONTRIBUTING.md) · [Relatar erro](https://github.com/allanpreis/ponte-fotos/issues/new/choose)**
+
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
 **Versão: 0.9.6 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
@@ -255,4 +262,10 @@ O repositório público contém os arquivos necessários para compilar o aplicat
 
 Aplicativo em evolução, com assinatura local e testes automatizados. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
-Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Uma licença de redistribuição ainda não foi definida neste repositório.
+Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distribuído sob a [licença MIT](LICENSE).
+
+## Comunidade e créditos
+
+Criado e mantido por [Allan Reis](https://github.com/allanpreis). Veja os [contribuidores](https://github.com/allanpreis/ponte-fotos/graphs/contributors). Contribuições de código, documentação, tradução, acessibilidade e testes são bem-vindas.
+
+[Como contribuir](CONTRIBUTING.md) · [Código de conduta](CODE_OF_CONDUCT.md) · [Segurança](SECURITY.md) · [Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
