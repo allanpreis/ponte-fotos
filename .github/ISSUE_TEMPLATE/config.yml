@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security / Segurança
+    url: https://github.com/allanpreis/ponte-fotos/blob/main/SECURITY.md
+    about: Read the private reporting policy before sharing vulnerability details.

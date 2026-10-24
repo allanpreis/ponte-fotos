@@ -1,0 +1,25 @@
+name: Feature request / Sugerir melhoria
+description: Explain a problem and the improvement you would like to see.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: "English e português são bem-vindos. Use fictional examples and do not include private library or account data."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case / Problema ou necessidade
+      description: Who encounters this and what are they trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / Comportamento proposto
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and compatibility / Alternativas e compatibilidade
+      description: Mention existing workarounds and relevant macOS, Immich or media constraints.
