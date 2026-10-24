@@ -512,3 +512,46 @@
 "Área" = "Área";
 "O idioma muda imediatamente e a preferência fica salva neste Mac." = "O idioma muda imediatamente e a preferência fica salva neste Mac.";
 "%@ · %@/%@" = "%@ · %@/%@";
+
+"Diagnóstico de mídia" = "Diagnóstico de mídia";
+"A inspeção lê o original sem alterar a biblioteca. Para itens do Fotos, uma cópia temporária poderá ser baixada do iCloud conforme a opção de acesso aos originais." = "A inspeção lê o original sem alterar a biblioteca. Para itens do Fotos, uma cópia temporária poderá ser baixada do iCloud conforme a opção de acesso aos originais.";
+"Inspecionando o original…" = "Inspecionando o original…";
+"Reconhecer o formato ou abrir uma prévia não comprova compatibilidade de importação, reprodução HDR, Dolby Vision ou edições de câmera lenta. Os arquivos são transferidos sem conversão." = "Reconhecer o formato ou abrir uma prévia não comprova compatibilidade de importação, reprodução HDR, Dolby Vision ou edições de câmera lenta. Os arquivos são transferidos sem conversão.";
+"Inspecionar original" = "Inspecionar original";
+"Original indisponível para inspeção." = "Original indisponível para inspeção.";
+"Não foi possível inspecionar o original: %@" = "Não foi possível inspecionar o original: %@";
+"Formato: %@" = "Formato: %@";
+"Prévia local disponível; importação no Fotos ainda não verificada." = "Prévia local disponível; importação no Fotos ainda não verificada.";
+"Prévia local indisponível; isso não determina se o Fotos aceita o original." = "Prévia local indisponível; isso não determina se o Fotos aceita o original.";
+"Modelo de cor: %@" = "Modelo de cor: %@";
+"Profundidade declarada: %@ bits" = "Profundidade declarada: %@ bits";
+"Perfil de cor: %@" = "Perfil de cor: %@";
+"Função de transferência: %@" = "Função de transferência: %@";
+"Primárias de cor: %@" = "Primárias de cor: %@";
+"Sinalização HDR PQ detectada; reprodução e preservação no Fotos não verificadas." = "Sinalização HDR PQ detectada; reprodução e preservação no Fotos não verificadas.";
+"Sinalização HDR HLG detectada; reprodução e preservação no Fotos não verificadas." = "Sinalização HDR HLG detectada; reprodução e preservação no Fotos não verificadas.";
+"HDR não determinado por esta inspeção; ausência de sinalização não comprova SDR." = "HDR não determinado por esta inspeção; ausência de sinalização não comprova SDR.";
+"Dolby Vision e câmera lenta: compatibilidade não verificada." = "Dolby Vision e câmera lenta: compatibilidade não verificada.";
+"Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos." = "Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos.";
+"O item criado não foi encontrado no Fotos." = "O item criado não foi encontrado no Fotos.";
+"A data no Fotos difere da origem ou está ausente." = "A data no Fotos difere da origem ou está ausente.";
+"A localização no Fotos difere da origem ou está ausente." = "A localização no Fotos difere da origem ou está ausente.";
+"O tipo Live Photo no Fotos difere da origem." = "O tipo Live Photo no Fotos difere da origem.";
+"Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir." = "Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir.";
+"Conferência pendente. Confira o Fotos antes de repetir." = "Conferência pendente. Confira o Fotos antes de repetir.";
+
+"Tipo detectado no arquivo: %@" = "Tipo detectado no arquivo: %@";
+
+"Extensão do nome: %@" = "Extensão do nome: %@";
+"Não determinado" = "Não determinado";
+
+"Inspeção incompleta: %@" = "Inspeção incompleta: %@";
+"A inspeção aceita somente arquivos locais." = "A inspeção aceita somente arquivos locais.";
+"O original não pôde ser lido pelo decodificador de imagens deste Mac." = "O original não pôde ser lido pelo decodificador de imagens deste Mac.";
+"Nenhuma faixa de vídeo legível foi encontrada." = "Nenhuma faixa de vídeo legível foi encontrada.";
+
+"Conferir novamente no Fotos" = "Conferir novamente no Fotos";
+
+"A prévia não pôde ser decodificada neste Mac." = "A prévia não pôde ser decodificada neste Mac.";
+
+"Fechar" = "Fechar";
