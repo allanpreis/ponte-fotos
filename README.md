@@ -6,13 +6,13 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 0.9.5 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 0.9.6 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-Version 0.9.5 switches the app language immediately, including existing status messages and open review screens. Connections, selections, edited fields and operation progress are preserved. System is the first-launch default; choosing it again uses the Mac’s language rather than a cached app override. macOS-managed menus and permission dialogs may retain their launch language. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.5).
+Version 0.9.6 adds media diagnostics and post-import verification in Apple Photos, with an explicit recheck action for pending results. The app reports format and preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.6).
 
 ## 📥 Immich → Apple Photos
 
@@ -23,6 +23,12 @@ The app downloads originals, verifies their checksums, and uses PhotoKit to crea
 **Refresh Photos albums** lists only editable destinations without creating or changing items. Albums with identical names are distinguished in the list and selected by identifier. A new album is created only after confirmation and becomes the destination for subsequent batches.
 
 Photos previously imported by the app can be selected and added to another album without downloading them again, creating more copies, or removing them from earlier albums. A local history for each profile/account prevents repeating imports made by Ponte Fotos; it does not compare your entire preexisting library. Results without final confirmation remain blocked to prevent automatic retries.
+
+## Media diagnostics and import verification
+
+Use the info button beside a source item to inspect its original locally. Inspection reports the format, local preview availability, available colour properties and PQ/HLG video signalling. JXL files are included in folder scans, but recognition or a working preview does not establish Photos import support. Inspecting Photos resources may download temporary originals from iCloud according to the access setting. Temporary copies are removed afterwards. HDR image gain maps, Dolby Vision and slow-motion editing behaviour are not validated.
+
+After a new Immich → Photos import, the app checks that the created item is visible and that its capture date, available location and Live Photo subtype match the source. A mismatch or inconclusive result keeps the history pending and blocks repeat imports until the library is checked. Previously imported items are checked before being added to another album. These checks do not re-export or compare the original stored in Photos, and do not validate HDR playback.
 
 ## Presentation
 
@@ -42,9 +48,9 @@ The screenshots use demo data without accessing personal libraries.
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 0.9.5 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.5/Ponte-Fotos-0.9.5-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 0.9.6 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.6/Ponte-Fotos-0.9.6-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.5) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.6) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
