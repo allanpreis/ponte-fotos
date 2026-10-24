@@ -40,7 +40,7 @@ struct ExternalScanResult { let media: [ExternalMedia]; let issues: Int }
 enum ExternalReader {
     static func supported(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
-        if ["jpg","jpeg","heic","heif","png","tif","tiff","gif","webp","avif","dng","cr2","cr3","nef","arw","raf","orf","rw2","pef","srw","mov","mp4","m4v","avi","mkv","mts","m2ts","webm","3gp"].contains(ext) { return true }
+        if ["jxl","jpg","jpeg","heic","heif","png","tif","tiff","gif","webp","avif","dng","cr2","cr3","nef","arw","raf","orf","rw2","pef","srw","mov","mp4","m4v","avi","mkv","mts","m2ts","webm","3gp"].contains(ext) { return true }
         guard let type = UTType(filenameExtension: ext) else { return false }
         return type.conforms(to: .image) || type.conforms(to: .movie)
     }

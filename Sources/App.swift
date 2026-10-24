@@ -88,6 +88,7 @@ struct AlbumItem: Identifiable {
     }
     @Published var edits: [String: MetadataOverride] = [:]
     @Published var editing: PhotoItem?
+    @Published var inspectingMedia: PhotoItem?
     @Published var destination: UploadDestination = .timeline
     @Published var remoteAlbums: [ImmichAlbum] = []
     @Published var remoteAlbumID = ""
@@ -519,6 +520,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pfOpenSettings)) { _ in
             if !model.busy { navigation.settings = true }
         }
+        .sheet(item: $model.inspectingMedia) { item in
+            PFMediaDiagnosticsView(item: item, model: model)
+        }
         .sheet(item: $model.editing) { item in
             ReviewEditor(item: item, metadata: model.metadata(for: item), save: { try model.saveReview($0, id: item.id) }, restore: { try model.saveReview(nil, id: item.id) }, dismiss: { model.editing = nil })
                 .environment(\.pfGlassEnabled, glassEnabled)
@@ -583,7 +587,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label(L("Originais preservados"), systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text(L("Live Photos, RAW e metadados\nacompanham suas memórias.")).font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.9.5").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos 0.9.6").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
@@ -694,6 +698,7 @@ struct ContentView: View {
                 else { Label(L("Sem localização"), systemImage: "location.slash").font(.caption).foregroundStyle(.orange) }
                 Text(model.results[item.id] ?? L("Pronto para revisar")).font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(maxWidth: 170, alignment: .trailing)
             }
+            Button { model.inspectingMedia = item } label: { Image(systemName: "info.circle") }.buttonStyle(.borderless).help(L("Diagnóstico de mídia")).accessibilityLabel(L("Diagnóstico de mídia"))
             Button { model.editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help(L("Revisar data e localização")).accessibilityLabel(L("Revisar \(item.title)"))
         }.padding(.vertical, 8)
     }

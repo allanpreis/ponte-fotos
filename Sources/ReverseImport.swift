@@ -13,6 +13,8 @@ struct PFReverseItem: Identifiable, Equatable {
     let latitude: Double?
     let longitude: Double?
     let isLive: Bool
+    var canRecheck = false
+    var verification: PFImportVerification? = nil
     var isImported = false
     var issue: String?
     var localizedType: PFMessage? = nil
@@ -21,6 +23,29 @@ struct PFReverseItem: Identifiable, Equatable {
     var displayIssue: String? { localizedIssue?.text ?? issue }
     mutating func setIssue(_ value: PFMessage) { localizedIssue = value; issue = value.text }
     var selectable: Bool { issue == nil }
+}
+
+// This verifies PhotoKit metadata, not exported original bytes or HDR playback.
+struct PFImportVerification: Equatable {
+    let problems: [PFMessage]
+    var isVerified: Bool { problems.isEmpty }
+    var summary: PFMessage {
+        isVerified ? M("Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos.") : PFMessage.joined(problems, separator: " ")
+    }
+    static func evaluate(expected: PFReverseItem, present: Bool, date: Date?, latitude: Double?, longitude: Double?, isLive: Bool) -> Self {
+        guard present else { return Self(problems: [M("O item criado não foi encontrado no Fotos.")]) }
+        var problems: [PFMessage] = []
+        if let expectedDate = expected.captureDate {
+            if date.map({ abs($0.timeIntervalSince(expectedDate)) < 1 }) != true { problems.append(M("A data no Fotos difere da origem ou está ausente.")) }
+        } else if date != nil { problems.append(M("A data no Fotos difere da origem ou está ausente.")) }
+        let coordinatesMatch: Bool
+        if let expectedLat = expected.latitude, let expectedLon = expected.longitude, let latitude, let longitude {
+            coordinatesMatch = latitude.isFinite && longitude.isFinite && abs(latitude - expectedLat) < 0.00001 && abs(longitude - expectedLon) < 0.00001
+        } else { coordinatesMatch = expected.latitude == nil && expected.longitude == nil && latitude == nil && longitude == nil }
+        if !coordinatesMatch { problems.append(M("A localização no Fotos difere da origem ou está ausente.")) }
+        if isLive != expected.isLive { problems.append(M("O tipo Live Photo no Fotos difere da origem.")) }
+        return Self(problems: problems)
+    }
 }
 
 struct PFReverseAsset: Decodable {
@@ -184,6 +209,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     var canRead: Bool { get }
     func authorize() async throws
     func exists(_ id: String) -> Bool
+    func verify(id: String, asset: PFReverseAsset) async throws -> PFImportVerification
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws
     func listAlbums() async throws -> [PFPhotosAlbum]
     func prepareDestination(_ destination: PFPhotosDestination) throws
@@ -197,6 +223,19 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         guard status == .authorized else { throw BridgeError(message: M("Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.")) }
     }
     func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
+    func verify(id: String, asset: PFReverseAsset) async throws -> PFImportVerification {
+        // PhotoKit can briefly lag the completed changes transaction. Only missing
+        // visibility is retried, for at most one second; metadata mismatches are final.
+        for attempt in 0..<3 {
+            if let found = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject {
+                return .evaluate(expected: asset.item, present: true, date: found.creationDate,
+                                 latitude: found.location?.coordinate.latitude, longitude: found.location?.coordinate.longitude,
+                                 isLive: found.mediaSubtypes.contains(.photoLive))
+            }
+            if attempt < 2 { try await Task.sleep(nanoseconds: 500_000_000) }
+        }
+        return .evaluate(expected: asset.item, present: false, date: nil, latitude: nil, longitude: nil, isLive: false)
+    }
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws {
         if let paired {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -386,7 +425,10 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 try Task.checkCancellation(); guard generation == token else { return }
                 let asset = try await remote.asset(id)
                 var item = asset.item
-                if records.contains(where: { $0.assetID == id && $0.pending }) { item.setIssue(M("Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente.")) }
+                if let pending = records.last(where: { $0.assetID == id && $0.pending }) {
+                    item.setIssue(M("Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente."))
+                    item.canRecheck = pending.photosID?.isEmpty == false
+                }
                 if photos.canRead, let record = records.last(where: { $0.assetID == id && $0.checksum == asset.checksum && !$0.pending }), let photosID = record.photosID {
                     item.isImported = photos.exists(photosID)
                 }
@@ -399,6 +441,43 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             rows = rows.filter { !pairedIDs.contains($0.id) }
             assets = loaded; items = rows; statusMessage = M("\(rows.count) originais encontrados. Selecione os itens para importar.")
         } catch { if generation == token { statusMessage = PFMessage.error(error) } }
+    }
+    // Explicit recovery reads an already-known PhotoKit identifier. It never
+    // downloads originals, creates assets or changes album membership.
+    func recheck(id: String) async {
+        guard !busy && !importing && !loadingDestinations, let remote,
+              items.contains(where: { $0.id == id && $0.canRecheck }) else { return }
+        busy = true; defer { busy = false }
+        let token = generation
+        do {
+            let records = try history.load(scope: remote.scope)
+            guard let pending = records.last(where: { $0.assetID == id && $0.pending }),
+                  let photosID = pending.photosID, !photosID.isEmpty else { return }
+            let asset = try await remote.asset(id)
+            guard token == generation else { return }
+            guard asset.id == id, asset.item.selectable, asset.checksum == pending.checksum else {
+                throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar."))
+            }
+            try await photos.authorize()
+            guard token == generation else { return }
+            let report = try await photos.verify(id: photosID, asset: asset)
+            guard token == generation else { return }
+            recordVerification(report, id: id)
+            guard report.isVerified else { statusMessage = report.summary; return }
+            // Re-read after suspension: never overwrite a different recovery result.
+            var current = try history.load(scope: remote.scope)
+            guard let index = current.lastIndex(where: { $0.assetID == id && $0.pending && $0.photosID == photosID && $0.checksum == pending.checksum }) else { return }
+            current[index].pending = false
+            try history.save(current, scope: remote.scope)
+            if let row = items.firstIndex(where: { $0.id == id }) {
+                items[row].issue = nil; items[row].localizedIssue = nil; items[row].canRecheck = false
+                items[row].isImported = true
+            }
+            statusMessage = report.summary
+        } catch {
+            guard token == generation else { return }
+            statusMessage = PFMessage.error(error)
+        }
     }
     func thumbnail(id: String) async -> NSImage? {
         guard let remote = remote as? PFReverseHTTP, assets[id] != nil else { return nil }
@@ -439,6 +518,24 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: M("Há um resultado pendente para este item. Confira o Fotos antes de repetir.")) }
                 if let previous = records.last(where: { $0.assetID == asset.id && $0.checksum == asset.checksum }), let id = previous.photosID, photos.exists(id) {
                     if cancellationRequested || generation != token { return }
+                    let verification: PFImportVerification
+                    do { verification = try await photos.verify(id: id, asset: asset) }
+                    catch {
+                        let report = PFImportVerification(problems: [M("Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir.")])
+                        recordVerification(report, id: asset.id)
+                        if let index = records.lastIndex(where: { $0.assetID == asset.id && $0.photosID == id }) { records[index].pending = true }
+                        try history.save(records, scope: remote.scope)
+                        setCanRecheck(true, id: asset.id)
+                        throw error
+                    }
+                    recordVerification(verification, id: asset.id)
+                    guard verification.isVerified else {
+                        if let index = records.lastIndex(where: { $0.assetID == asset.id && $0.photosID == id }) { records[index].pending = true }
+                        try history.save(records, scope: remote.scope)
+                        setCanRecheck(true, id: asset.id)
+                        throw BridgeError(message: verification.summary)
+                    }
+                    if cancellationRequested || generation != token { return }
                     let albumID = try await photos.addExisting(id: id, destination: target)
                     rememberResolvedAlbum(id: albumID, destination: target)
                     target = .existing(id: albumID, title: target.title)
@@ -466,12 +563,33 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 let result = try await photos.create(asset: asset, original: file, paired: paired, destination: target)
                 rememberResolvedAlbum(id: result.albumID, destination: target)
                 target = .existing(id: result.albumID, title: target.title)
-                records[records.count - 1].photosID = result.assetID; records[records.count - 1].pending = false
+                records[records.count - 1].photosID = result.assetID
                 try history.save(records, scope: remote.scope)
+                setCanRecheck(true, id: asset.id)
+                let verification: PFImportVerification
+                do { verification = try await photos.verify(id: result.assetID, asset: asset) }
+                catch {
+                    let report = PFImportVerification(problems: [M("Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir.")])
+                    recordVerification(report, id: asset.id)
+                    throw error
+                }
+                recordVerification(verification, id: asset.id)
+                guard verification.isVerified else { throw BridgeError(message: verification.summary) }
+                records[records.count - 1].pending = false
+                try history.save(records, scope: remote.scope)
+                setCanRecheck(false, id: asset.id)
                 markImported(asset.id); done += 1
             }
             statusMessage = M("\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados.")
         } catch { statusMessage = PFMessage.error(error) + M(" Importação interrompida; confira os itens e o histórico antes de repetir.") }
+    }
+    private func setCanRecheck(_ value: Bool, id: String) {
+        if let index = items.firstIndex(where: { $0.id == id }) { items[index].canRecheck = value }
+    }
+    private func recordVerification(_ report: PFImportVerification, id: String) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].verification = report
+        if !report.isVerified { items[index].setIssue(M("Conferência pendente. Confira o Fotos antes de repetir.")); selection.remove(id) }
     }
     private func rememberResolvedAlbum(id: String, destination: PFPhotosDestination) {
         guard case .new = destination else { return }

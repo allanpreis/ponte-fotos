@@ -184,6 +184,15 @@ struct PFReverseImportView: View {
                             Label(L("Sem localização disponível"), systemImage: "location.slash")
                         }
                     }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    if item.canRecheck {
+                        Button(L("Conferir novamente no Fotos")) { Task { await model.recheck(id: item.id) } }
+                            .disabled(working || !connectionReady)
+                    }
+                    if let verification = item.verification {
+                        Label(verification.summary.text, systemImage: verification.isVerified ? "checkmark.shield" : "exclamationmark.shield")
+                            .font(.caption).foregroundStyle(verification.isVerified ? Color.green : Color.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if let issue = item.displayIssue, !issue.isEmpty {
                         Label(issue, systemImage: "exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
