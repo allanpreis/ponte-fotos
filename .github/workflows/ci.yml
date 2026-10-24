@@ -46,4 +46,4 @@ jobs:
         run: |
           codesign --verify --deep --strict --verbose=2 "build/Ponte Fotos.app"
           plutil -lint "build/Ponte Fotos.app/Contents/Info.plist"
-          lipo -verify_arch arm64 "build/Ponte Fotos.app/Contents/MacOS/PonteFotos"
+          lipo "build/Ponte Fotos.app/Contents/MacOS/PonteFotos" -verify_arch arm64
