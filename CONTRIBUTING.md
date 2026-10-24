@@ -4,7 +4,7 @@ Contributions in English and Português (Brasil) are welcome: bug reports, docum
 Search existing issues first. Include the app version, macOS version, Mac architecture, Immich version, steps to reproduce, expected behavior and actual result. For media issues, include the format and use a synthetic or explicitly shareable sample. Explain the problem a feature would solve.
 Never publish API keys, private server URLs, account identifiers, personal photos, GPS coordinates or unredacted histories and logs.
 ## Build locally
-The current build targets Apple Silicon and macOS 14 or later. Install Xcode Command Line Tools, then run from the repository root:
+The current build targets Apple Silicon and macOS 14 or later. Use Xcode 26 or later with the macOS 26 SDK as your active developer toolchain, then run from the repository root. Older SDKs cannot compile Liquid Glass APIs; the app still targets macOS 14:
 ```sh
 zsh build.sh
 ```

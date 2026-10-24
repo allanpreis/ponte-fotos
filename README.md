@@ -93,7 +93,7 @@ The main screen keeps the source, destination, media list, and actions visible w
 ## Requirements
 
 - An Apple Silicon Mac running macOS 14 or later. The current script builds an `arm64` executable; Intel has not been validated.
-- Xcode Command Line Tools with the Swift compiler and macOS SDK. Full Xcode can also provide these tools.
+- Xcode 26 or later with the macOS 26 SDK, selected as the active developer toolchain. The app deployment target remains macOS 14; older SDKs cannot compile the Liquid Glass APIs.
 - An accessible Immich 3.x server and an API key for the relevant account. The integration was developed with Immich 3.3.5; future API changes may require updates.
 - Free disk space to prepare temporary copies and, when requested, download iCloud originals.
 

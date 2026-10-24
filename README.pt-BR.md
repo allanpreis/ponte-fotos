@@ -94,7 +94,7 @@ A opção **Usar transparência e vidro** controla o acabamento da navegação. 
 ## Requisitos
 
 - Mac com Apple Silicon e macOS 14 ou superior. O script atual gera um executável `arm64`; Intel ainda não foi validado.
-- Xcode Command Line Tools com o compilador Swift e SDK do macOS. Xcode completo também pode fornecer essas ferramentas.
+- Xcode 26 ou superior com o SDK do macOS 26, selecionado como ambiente ativo de desenvolvimento. O aplicativo continua compatível com macOS 14; SDKs antigos não compilam as APIs de Liquid Glass.
 - Servidor Immich 3.x acessível e chave de API da conta correspondente. A integração foi desenvolvida com Immich 3.3.5; mudanças futuras na API podem exigir ajustes.
 - Espaço livre para preparar cópias temporárias e, quando solicitado, baixar originais do iCloud.
 
