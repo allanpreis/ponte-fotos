@@ -1,0 +1,46 @@
+name: Bug report / Relatar erro
+description: Report a reproducible problem using synthetic or redacted data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "English e português são bem-vindos. Never share API keys, personal photos, GPS, private URLs or unredacted logs. For vulnerabilities, read SECURITY.md."
+  - type: input
+    id: app-version
+    attributes:
+      label: Ponte Fotos version / Versão
+      placeholder: "0.9.6"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: macOS version and Mac architecture / macOS e arquitetura
+      placeholder: "macOS 15, Apple Silicon"
+    validations:
+      required: true
+  - type: input
+    id: immich-version
+    attributes:
+      label: Immich version / Versão do Immich
+      description: Enter N/A for a local-only workflow. Do not include your server address.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce / Passos para reproduzir
+      description: Include the workflow and media format when relevant; use synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result / Resultado observado
+      description: Include a redacted error message or screenshot if useful. Remove names, dates, GPS and credentials.
+    validations:
+      required: true
