@@ -601,3 +601,5 @@
 "1 reutilizado" = "1 reused";
 
 "%@ reutilizados" = "%@ reused";
+
+"Pausar após itens em andamento" = "Pause after active items";
