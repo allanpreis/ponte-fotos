@@ -138,7 +138,13 @@ struct ImmichClient {
     static func checksum(_ url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
         var hash = Insecure.SHA1()
-        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty { try Task.checkCancellation(); hash.update(data: data) }
+        // Drain Foundation's temporary read buffers per chunk, including for large originals.
+        while try autoreleasepool(invoking: {
+            try Task.checkCancellation()
+            guard let data = try handle.read(upToCount: 1_048_576), !data.isEmpty else { return false }
+            hash.update(data: data)
+            return true
+        }) {}
         return Data(hash.finalize()).base64EncodedString()
     }
     func upload(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?, checksum: String? = nil) async throws -> UploadResult {
@@ -281,10 +287,12 @@ enum PFUploadFileIO {
                 try output.write(contentsOf: headers[index])
                 let input = try FileHandle(forReadingFrom: part.1)
                 do {
-                    while let chunk = try input.read(upToCount: 1_048_576), !chunk.isEmpty {
+                    while try autoreleasepool(invoking: {
                         try Task.checkCancellation()
+                        guard let chunk = try input.read(upToCount: 1_048_576), !chunk.isEmpty else { return false }
                         try output.write(contentsOf: chunk)
-                    }
+                        return true
+                    }) {}
                     try input.close()
                 } catch { try? input.close(); throw error }
                 try output.write(contentsOf: Data("\r\n".utf8))
