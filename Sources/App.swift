@@ -100,6 +100,19 @@ struct AlbumItem: Identifiable {
     var transferAccountID: String? { transferConnection?.credential.account.id }
     @Published private(set) var primaryAccountName = ""
     var primaryAccountLabel: String { primaryAccountName.isEmpty ? L("Conta principal") : primaryAccountName }
+    // The primary API key and a saved management key can identify the same person.
+    // Collapse only the menu presentation; their credentials and scopes stay separate.
+    private var primaryTransferAccountUUID: UUID? { verifiedUserID.flatMap(UUID.init(uuidString:)) }
+    var additionalTransferMenuAccounts: [IMAccount] {
+        guard let primaryID = primaryTransferAccountUUID else { return transferAccounts }
+        return transferAccounts.filter { UUID(uuidString: $0.id) != primaryID }
+    }
+    var primaryTransferMenuSelectionID: String {
+        guard let primaryID = primaryTransferAccountUUID,
+              UUID(uuidString: selectedTransferAccountID) == primaryID,
+              additionalCredentials.contains(where: { $0.account.id == selectedTransferAccountID }) else { return "" }
+        return selectedTransferAccountID
+    }
     var transferAccountLabel: String {
         guard let credential = transferConnection?.credential else { return L("Conta não validada") }
         return selectedTransferAccountID.isEmpty ? primaryAccountLabel : credential.account.displayName
@@ -833,7 +846,7 @@ struct ContentView: View {
                 Button(model.scanning ? L("Parar análise") : L("Pausar após este item")) { model.stopRequested = true; model.cancelScan() }
             } else {
                 Button(L("Exportar XMP…"), systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
-                Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(PFPrimaryButtonStyle()).disabled(!model.canSend)
+                Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.bordered).disabled(!model.canSend)
             }
         }.controlSize(.large)
     }

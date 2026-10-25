@@ -21,8 +21,8 @@ struct PFTransferAccountPicker: View {
     }
     var body: some View {
         Menu {
-            Button(model.primaryAccountLabel) { model.selectedTransferAccountID = "" }
-            ForEach(model.transferAccounts) { account in
+            Button(model.primaryAccountLabel) { model.selectedTransferAccountID = model.primaryTransferMenuSelectionID }
+            ForEach(model.additionalTransferMenuAccounts) { account in
                 Button(account.displayName) { model.selectedTransferAccountID = account.id }
             }
             Divider()

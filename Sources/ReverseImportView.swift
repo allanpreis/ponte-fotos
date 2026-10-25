@@ -246,7 +246,7 @@ struct PFReverseImportView: View {
                     ui.confirmingImport = true
                 } label: {
                     Label(L("Importar para o Fotos…"), systemImage: "square.and.arrow.down")
-                }.buttonStyle(PFPrimaryButtonStyle()).controlSize(.large)
+                }.buttonStyle(.bordered).controlSize(.large)
                     .disabled(working || !connectionReady || eligibleSelection.isEmpty || !model.isDestinationValid)
             }
         }
