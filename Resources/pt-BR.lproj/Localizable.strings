@@ -575,3 +575,29 @@
 "Selecione uma conta válida antes de transferir." = "Selecione uma conta válida antes de transferir.";
 "A conta selecionada não tem as permissões necessárias: %@." = "A conta selecionada não tem as permissões necessárias: %@.";
 "Destino: %@ · %@ → %@. Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação." = "Destino: %@ · %@ → %@. Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação.";
+
+"Espaço livre insuficiente para preparar este arquivo. Libere espaço e tente novamente." = "Espaço livre insuficiente para preparar este arquivo. Libere espaço e tente novamente.";
+
+"O tamanho dos arquivos excede o limite suportado." = "O tamanho dos arquivos excede o limite suportado.";
+
+"Checksum SHA-1 inválido." = "Checksum SHA-1 inválido.";
+
+"Não foi possível validar a consulta de duplicatas. Nenhum arquivo foi considerado existente." = "Não foi possível validar a consulta de duplicatas. Nenhum arquivo foi considerado existente.";
+
+"Consultando arquivos existentes por hash…" = "Consultando arquivos existentes por hash…";
+
+"%@ itens conferidos · %@ recursos enviados · %@ reutilizados" = "%@ itens conferidos · %@ recursos enviados · %@ reutilizados";
+
+"O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar." = "O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar.";
+
+"1 item conferido" = "1 item conferido";
+
+"%@ itens conferidos" = "%@ itens conferidos";
+
+"1 recurso enviado" = "1 recurso enviado";
+
+"%@ recursos enviados" = "%@ recursos enviados";
+
+"1 reutilizado" = "1 reutilizado";
+
+"%@ reutilizados" = "%@ reutilizados";
