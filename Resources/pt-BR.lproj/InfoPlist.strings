@@ -1,5 +1,3 @@
-"NSLocationWhenInUseUsageDescription" = "Identificar o nome do Wi-Fi para escolher entre os endereços local e remoto do seu Immich. Sua posição não é usada nem armazenada.";
-"NSLocationUsageDescription" = "Identificar o Wi-Fi de casa para selecionar a conexão do Immich.";
 "NSPhotoLibraryUsageDescription" = "Selecionar e exportar originais para o Immich e, quando você confirmar, importar fotos e vídeos do Immich para sua biblioteca do Fotos com data e localização.";
 "NSLocalNetworkUsageDescription" = "Enviar as fotos selecionadas para o seu servidor Immich na rede local.";
 "NSRemovableVolumesUsageDescription" = "Ler fotos, vídeos e metadados de discos externos que você selecionar para enviar ao Immich.";
