@@ -555,3 +555,23 @@
 "A prévia não pôde ser decodificada neste Mac." = "The preview could not be decoded on this Mac.";
 
 "Fechar" = "Close";
+"Valide a conta para transferir." = "Validate the account before transferring.";
+"Conta não validada" = "Account not validated";
+"Conta desta transferência" = "Account for this transfer";
+"Validar conta" = "Validate account";
+"Atualizar contas" = "Refresh accounts";
+"Teste a conexão principal ou selecione uma conta cadastrada." = "Test the primary connection or select a saved account.";
+"A conta ou a rede mudou durante a validação. Valide novamente." = "The account or network changed during validation. Validate again.";
+"URLs e chave salvas no Chaves do macOS." = "URLs and key saved in macOS Keychain.";
+"Modo Local: somente a URL local." = "Local mode: local URL only.";
+"Modo Remoto: somente a URL remota." = "Remote mode: remote URL only.";
+"URL local indisponível; URL remota validada. %@" = "Local URL unavailable; remote URL validated. %@";
+"URL local disponível e identidade validada." = "Local URL available and identity validated.";
+"URL local não configurada; URL remota validada." = "Local URL not configured; remote URL validated.";
+"A conta ou o endereço mudou. Atualize os álbuns e revise a seleção antes de importar." = "The account or address changed. Refresh albums and review the selection before importing.";
+"Atualize os álbuns para validar a conta e o endereço de origem." = "Refresh albums to validate the source account and address.";
+"Origem: %@ · %@." = "Source: %@ · %@.";
+"No modo Automático, o app valida primeiro a URL local e tenta a remota somente se a local estiver indisponível. Local e Remoto usam exclusivamente o endereço escolhido." = "In Automatic mode, the app validates the local URL first and tries the remote URL only when the local URL is unavailable. Local and Remote use only the chosen address.";
+"Selecione uma conta válida antes de transferir." = "Select a valid account before transferring.";
+"A conta selecionada não tem as permissões necessárias: %@." = "The selected account does not have the required permissions: %@.";
+"Destino: %@ · %@ → %@. Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação." = "Destination: %@ · %@ → %@. Live Photos include video; RAW includes the available original resources. Saved manual reviews will also apply to photos already in Immich. The preview displays times in this Mac’s time zone; the historical capture time zone still needs validation.";
