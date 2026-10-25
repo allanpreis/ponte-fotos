@@ -13,13 +13,21 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.7 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.8 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
+A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.8).
+
+## Operações grandes — primeira entrega
+
+A versão 0.9.8 prepara janelas de até oito mídias completas, com alvo flexível de 128 MiB. A última mídia inteira pode ultrapassar esse alvo. Imagens comuns existentes podem ser consultadas por SHA-1 em lotes e reutilizadas somente após revalidar identidade, proprietário, checksum, disponibilidade e ausência de associação Live. Vídeos e Live Photos mantêm o envio normal; o vídeo pareado continua antes da imagem. O hash calculado é reaproveitado no envio e a preparação multipart roda fora da interface. Há conferência do espaço livre conhecido antes de copiar/montar temporários, com reserva; tamanhos PhotoKit desconhecidos e mudanças no espaço ainda podem causar falhas de gravação.
+
+Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
+
+Esta é a primeira parte da etapa 2. Envios paralelos, estimativa do espaço de todo um lote do Fotos e benchmark completo de vazão continuam pendentes; não há promessa de ganho real de velocidade. [Validação e limites](docs/releases/v0.9.8.md).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -29,7 +37,7 @@ O menu de conta abaixo de Configurações na barra lateral permite escolher uma 
 
 A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia atual, incluindo todos os recursos de uma Live Photo, e exige revalidação antes de continuar. A retomada ocorre por item, sem retomada parcial de bytes.
 
-O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.7.
+O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.8.
 
 A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](docs/releases/v0.9.7.md).
 
@@ -64,17 +72,17 @@ Este vídeo ilustrativo é anterior à 0.9.7 e não mostra o menu de conta atual
 
 ## Interface
 
-![Ponte Fotos: biblioteca e navegação](Assets/library-pt-097.png)
+![Ponte Fotos: biblioteca e navegação](Assets/library-pt-098.png)
 
 ![Importação do Immich com destino no Fotos da Apple](Assets/reverse-import-093.png)
 
-A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.7 com dados sintéticos. A captura de importação ilustra a interface anterior da 0.9.3. Nenhuma delas mostra transferência real ou acessa uma biblioteca pessoal.
+A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.8 com dados sintéticos. A captura de importação ilustra a interface anterior da 0.9.3. Nenhuma delas mostra transferência real ou acessa uma biblioteca pessoal.
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.7 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.7/Ponte-Fotos-0.9.7-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.8 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.8/Ponte-Fotos-0.9.8-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.8) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
