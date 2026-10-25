@@ -13,17 +13,29 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.6 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.7 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.6 adiciona diagnóstico de mídia e conferência após importar no Fotos da Apple, com reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.6).
+A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
+
+## Contas por transferência e conexão por disponibilidade
+
+O menu de conta abaixo de Configurações na barra lateral permite escolher uma conta para enviar e importar sem substituir a conexão principal. Mostra o nome e a foto de perfil circular quando disponível, com iniciais ou ícone de pessoa como alternativa. A foto é opcional e seu cache existe somente na memória; falta de permissão para a imagem ou falha no download não bloqueia transferências. IDs e chaves de API não aparecem como nomes no menu. A conta escolhida, o endereço do servidor e o álbum aparecem antes da confirmação; identidade e permissões de API necessárias são revalidadas antes das operações. Os históricos continuam separados por perfil e conta.
+
+**Automático** tenta primeiro a URL local configurada e só tenta a remota se o serviço local estiver indisponível. **Local** e **Remoto** usam exclusivamente a respectiva URL. O app valida a API do Immich e a conta esperada, sem aceitar apenas ping ou qualquer resposta HTTP bem-sucedida, e informa o motivo do endereço escolhido. Nome de Wi-Fi e a permissão de Localização usada para lê-lo deixam de ser necessários; o tratamento de GPS das fotos permanece disponível. URLs, identificadores de perfil, contas e históricos existentes são preservados; um campo SSID antigo pode continuar armazenado, mas é ignorado.
+
+A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia atual, incluindo todos os recursos de uma Live Photo, e exige revalidação antes de continuar. A retomada ocorre por item, sem retomada parcial de bytes.
+
+O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões principais de transferência usam azul opaco mais discreto com texto branco nos temas claro e escuro. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.7.
+
+A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](docs/releases/v0.9.7.md).
 
 ## 📥 Immich → Fotos da Apple
 
-Na barra lateral, abra **Immich → Fotos**. Teste a conexão, atualize os álbuns, consulte um álbum e selecione os itens. Confira a data de captura, GPS e o indicador de Live Photo; escolha **Álbum existente** ou **Criar novo álbum** no destino e confirme a importação.
+Na barra lateral, abra **Immich → Fotos**. Teste a conexão, escolha a conta de origem no menu de conta da barra lateral, atualize os álbuns, consulte um álbum e selecione os itens. Confira a data de captura, GPS e o indicador de Live Photo; escolha **Álbum existente** ou **Criar novo álbum** no destino e confirme a importação.
 
 O app baixa os originais, verifica o checksum e usa o PhotoKit para criar os itens no Fotos deste Mac. O iCloud segue os ajustes do Fotos. Os originais do Immich permanecem intactos. Itens sem data válida/fuso explícito, localização inválida ou recursos indisponíveis ficam bloqueados. Live Photos exigem imagem e vídeo compatíveis. Pessoas reconhecidas e histórico de edições não são transferidos.
 
@@ -48,28 +60,28 @@ https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
 
 [Assistir ou baixar o vídeo](Assets/ponte-fotos-promo.mp4) · [Pôster](Assets/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
 
-A apresentação ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface.
+Este vídeo ilustrativo é anterior à 0.9.7 e não mostra o menu de conta atual nem o roteamento por disponibilidade. Ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface.
 
 ## Interface
 
-![Ponte Fotos: biblioteca e navegação](Assets/library-093.png)
+![Ponte Fotos: biblioteca e navegação](Assets/library-pt-097.png)
 
 ![Importação do Immich com destino no Fotos da Apple](Assets/reverse-import-093.png)
 
-As imagens usam dados de demonstração, sem acesso a bibliotecas pessoais.
+A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.7 com dados sintéticos. A captura de importação ilustra a interface anterior da 0.9.3. Nenhuma delas mostra transferência real ou acessa uma biblioteca pessoal.
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.6 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.6/Ponte-Fotos-0.9.6-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.7 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.7/Ponte-Fotos-0.9.7-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.6) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
 Abra **Configurações** na barra lateral ou use **⌘,**:
 
-- **Conexão**: endereços local/remoto, modo Automático/Local/Remoto, Wi-Fi doméstico e chave principal.
-- **Contas e API**: contas adicionais usadas pela gestão; exige conexão validada e mantém chaves no Chaves do macOS.
+- **Conexão**: endereços local/remoto, modo Automático/Local/Remoto e chave principal. O app dispensa nome de Wi-Fi e permissão de Localização para conectar.
+- **Contas e API**: cadastro de contas adicionais no Chaves do macOS após validar a conexão principal. Escolha uma conta cadastrada no menu abaixo de **Configurações** na barra lateral; cadastrá-la não substitui a chave principal nem a seleciona automaticamente para transferências.
 - **Aparência**: tema Claro, Escuro ou Sistema, efeitos de vidro e **Idioma do aplicativo**. O tema também vale para revisão e gestão. O idioma muda imediatamente, sem reiniciar o app.
 
 A tela principal mantém origem, destino, lista de mídia e ações sem um painel rolável de conexão. Em janelas menores, a lista conserva sua própria rolagem; formulários extensos rolam somente dentro de Configurações.
@@ -85,11 +97,11 @@ A opção **Usar transparência e vidro** controla o acabamento da navegação. 
 | Revisão | Permite completar ou corrigir data e GPS antes de preparar os arquivos para envio. |
 | Exportação | Exporta originais com XMP complementar, sem modificar a biblioteca Apple ou arquivos de origem. |
 | Upload | Envia para a linha do tempo, um álbum existente ou um novo álbum; confere checksum, data, GPS disponível e associação Live Photo. |
-| Conexão por rede | Alterna entre endereço local e remoto conforme o Wi-Fi configurado, com modos manuais disponíveis. |
+| Conexão por rede | Tenta a URL local antes da remota por disponibilidade no modo Automático; Local e Remoto permanecem exclusivos. |
 | Duplicatas | Encontra arquivos com checksum idêntico entre contas e álbuns selecionados, identifica Live Photos e permite revisar cópias estáticas excedentes. |
 | Comparação | Compara conteúdos de dois álbuns e organiza seus vínculos sem apagar os arquivos da biblioteca. |
 | Pessoa e idade | Seleciona imagens por pessoa, aniversário registrado no Immich e intervalo inclusivo de idade. |
-| Contas e histórico | Usa chaves por conta e registra as últimas 20 operações de gestão, incluindo resultados incertos. |
+| Contas e histórico | Usa chaves por conta e registra as últimas 20 operações de gestão, incluindo resultados incertos. O app também permite selecionar uma conta cadastrada para transferir, com históricos separados por perfil/conta. |
 
 ## Requisitos
 
@@ -123,12 +135,12 @@ Não execute o bundle diretamente de uma pasta sincronizada que modifique seus a
 
 1. Abra **Configurações → Conexão** no app (ou **⌘,**).
 2. Informe a URL do seu Immich e a chave de API da conta de destino. Use a URL base, sem credenciais ou parâmetros embutidos.
-3. Escolha o modo **Local** ou **Remoto** e clique em **Testar conexão**.
+3. Escolha **Automático**, **Local** ou **Remoto**, informe as URLs correspondentes ao modo e clique em **Testar conexão**.
 4. Se quiser persistir os dados, use **Salvar configuração**. Eles são armazenados no Chaves do macOS.
 
-A configuração inicial do código publicado fica vazia. Exemplos de preenchimento: URL local `http://immich.local:2283`, URL remota `https://photos.example.com`, Wi-Fi `MinhaRede`. São exemplos fictícios; substitua pelos seus dados na interface.
+A configuração inicial do código publicado fica vazia. Exemplos de preenchimento: URL local `http://immich.local:2283`, URL remota `https://photos.example.com`. São exemplos fictícios; substitua pelos seus dados na interface.
 
-O aplicativo não lê arquivos `.env`. Não é necessário criar um para compilar ou usar o projeto. Chaves, URLs privadas e nome de Wi-Fi não devem ser colocados no código ou enviados ao GitHub.
+O aplicativo não lê arquivos `.env`. Não é necessário criar um para compilar ou usar o projeto. Chaves e URLs privadas não devem ser colocados no código ou enviados ao GitHub.
 
 ### Permissões de API
 
@@ -137,7 +149,9 @@ Conceda apenas as permissões necessárias para o fluxo que pretende usar. Uma c
 | Operação | Permissões relevantes |
 | --- | --- |
 | Conexão e envio | `server.version`, `user.read`, `asset.upload`, `asset.read` |
+| Importação do Immich para o Fotos | `user.read`, `asset.read`, `asset.download`, `album.read`; prévias também exigem a permissão correspondente de miniaturas |
 | Consulta e miniaturas na gestão | `user.read`, `album.read`, `asset.read`, `asset.view` |
+| Foto de perfil opcional da conta | `userProfileImage.read`; não é exigida para enviar ou importar, que continuam com iniciais ou ícone |
 | Pessoas | `person.read`, além das permissões de consulta |
 | Criar álbum no envio | `album.create` e permissões de consulta/organização correspondentes |
 | Adicionar/remover vínculos | `albumAsset.create`, `albumAsset.delete`, conforme a operação |
@@ -148,13 +162,14 @@ O servidor pode exigir escopos adicionais conforme a versão e o endpoint. Permi
 
 ### Alternância automática de endereço
 
-Cadastre URL local, URL remota e nome exato do Wi-Fi doméstico e escolha **Automático**. Autorize **Localização** pelo botão do aplicativo: o macOS exige essa permissão para disponibilizar o nome da rede. O app usa o SSID para escolher o endereço; não consulta nem armazena sua posição.
+No aplicativo atual, informe URL local e/ou remota e escolha o modo de conexão. O roteamento não consulta SSID nem solicita Localização.
 
-- No Wi-Fi configurado, tenta a URL local; falhas de conectividade ou erros de servidor elegíveis podem levar à tentativa remota.
-- Em outra rede, sem Wi-Fi ou sem acesso ao SSID, usa a URL remota.
-- Erros de autenticação, servidor inválido ou identidade de conta divergente não provocam troca automática de destino.
-- Durante um envio, mantém o cliente daquele conjunto de recursos. Mudanças de rede são tratadas em um ponto seguro, com revalidação, sem retomada parcial por byte.
-- O histórico usa o perfil lógico e a conta para compartilhar continuidade entre as duas URLs.
+- **Automático** tenta primeiro a URL local, seja por Wi-Fi, Ethernet ou VPN, e depois a remota diante de falha elegível de conectividade/indisponibilidade do serviço. Uma URL configurada é suficiente nesse modo.
+- **Local** usa somente a URL local; **Remoto** usa somente a remota. Ausência da URL em um modo exclusivo é erro de configuração.
+- Cada candidato precisa responder como Immich com a conta esperada. Erros de autenticação, servidor inválido ou conta divergente bloqueiam a operação sem tentar outro destino.
+- Endereço escolhido e motivo ficam visíveis. Há revalidação antes das transferências e depois de mudanças de rede ou falhas relevantes.
+- A transferência mantém o cliente fixo durante o lote. Mudança de rota conclui o conjunto de recursos da mídia atual, pausa antes da próxima e exige revalidação. A prévia de importação deve ser atualizada se mudar conta/endereço de origem.
+- Identificadores de perfil, contas, URLs e históricos existentes são preservados. O histórico continua separado por perfil lógico e conta entre os dois endereços.
 
 A conferência fixa o UUID da conta, não uma identidade criptográfica do servidor. Configure apenas endereços do mesmo servidor confiável. HTTP é aceito, mas envia chave e mídia sem criptografia de transporte; prefira HTTPS, especialmente fora da rede local.
 
@@ -163,7 +178,7 @@ A conferência fixa o UUID da conta, não uma identidade criptográfica do servi
 1. Selecione **Fotos da Apple** na barra lateral e conceda acesso ao Fotos. Ou selecione **Discos e pastas** e escolha a origem em um disco/pasta.
 2. Escolha itens e confira as indicações de data/GPS. A opção de baixar originais do iCloud depende do acesso à conta/biblioteca do próprio macOS.
 3. Use **Revisar** para completar data ou localização ausente. Sem data confiável, o envio exige revisão; o app não usa automaticamente a criação do arquivo como data de captura.
-4. Escolha o destino: sem álbum, álbum existente ou novo álbum.
+4. Escolha a conta da transferência no menu da barra lateral e o destino: sem álbum, álbum existente ou novo álbum. Confira a conta e o servidor exibidos antes de confirmar.
 5. Envie uma pequena amostra e confira o resultado no Immich antes de um lote grande.
 
 Originais preservam seus bytes; um XMP complementar carrega data e localização da biblioteca/revisão. O processo de preparação não modifica o arquivo de origem. O XMP associado de uma pasta é mesclado preservando campos adicionais.
@@ -218,14 +233,14 @@ Toda alteração da gestão passa por uma tela de revisão e uma confirmação e
 
 | Local | Conteúdo |
 | --- | --- |
-| Chaves do macOS | Perfil de conexão, URLs, SSID e chave principal; chaves adicionais da gestão em serviço separado. |
+| Chaves do macOS | Perfil de conexão, URLs e chave principal; chaves das contas adicionais em serviço separado. Um SSID antigo pode permanecer armazenado para migração, mas é ignorado pelo aplicativo atual. |
 | `~/Library/Application Support/PonteFotos/reviews.json` | Revisões de metadados. |
 | `~/Library/Application Support/PonteFotos/history/` | Histórico de envio, IDs e checksums. |
 | `~/Library/Application Support/PonteFotos/management/` | Histórico da gestão por perfil, salvo com modo de arquivo `0600`. |
 | `~/Library/Application Support/PonteFotos/staging/` | Cópias temporárias; uma interrupção abrupta pode deixar resíduos. |
 | Pasta escolhida para exportação | Originais e XMP exportados pelo usuário. |
 
-Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pessoais. Não os publique em issues, logs ou repositórios. **Esquecer conexão** remove a conexão principal do Chaves; os campos atuais permanecem na memória até fechar. Isso não remove automaticamente contas adicionais ou históricos locais.
+Fotos de perfil são buscadas na conexão Immich selecionada e validada e mantidas somente na memória do processo; não são salvas junto de chaves ou históricos. Históricos, revisões e exportações podem conter nomes, IDs, datas e GPS pessoais. Não os publique em issues, logs ou repositórios. **Esquecer conexão** remove a conexão principal do Chaves; os campos atuais permanecem na memória até fechar. Isso não remove automaticamente contas adicionais ou históricos locais.
 
 O `.gitignore` exclui `.env`, credenciais usuais, builds, bundles, arquivos compactados e estado local. Ele não remove segredos já versionados e não substitui revisão antes de cada commit. O repositório contém os fontes do aplicativo, seus recursos visuais e a mídia usada pelos READMEs.
 
@@ -250,7 +265,7 @@ O repositório público contém os arquivos necessários para compilar o aplicat
 | Sintoma | O que conferir |
 | --- | --- |
 | Servidor não responde | Immich em execução, URL/porta, rota, DNS e firewall. O app não precisa que você altere o código para configurar o endereço. |
-| Wi-Fi indisponível | Permissão de Localização para o Ponte Fotos, Wi-Fi ativo e SSID exato; use um modo manual quando necessário. |
+| Endereço ou conta incorretos | Confira Automático/Local/Remoto, URLs configuradas e conta selecionada para transferir. A conexão dispensa nome de Wi-Fi e Localização. Atualize os álbuns após mudar a origem. |
 | Biblioteca vazia ou acesso negado | Ajustes do Sistema → Privacidade e Segurança → Fotos; confirme acesso e biblioteca selecionada no Fotos. |
 | Original do iCloud indisponível | Acesso ao iCloud, internet, espaço livre e opção de baixar originais. |
 | Ação da gestão bloqueada | Chave da conta proprietária, permissões da API, acesso aos álbuns e exclusões de mídia do fluxo. |

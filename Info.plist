@@ -1,21 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleDevelopmentRegion</key><string>en</string>
-<key>CFBundleLocalizations</key><array><string>en</string><string>pt-BR</string></array>
-<key>CFBundleExecutable</key><string>PonteFotos</string>
-<key>CFBundleIdentifier</key><string>br.allan.pontefotos</string>
-<key>CFBundleName</key><string>Ponte Fotos</string>
-<key>CFBundleIconFile</key><string>AppIcon082</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.9.6</string>
-<key>CFBundleVersion</key><string>0.9.6</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
-<key>NSHighResolutionCapable</key><true/>
-<key>NSLocationWhenInUseUsageDescription</key><string>Identificar o nome do Wi-Fi para escolher entre os endereços local e remoto do seu Immich. Sua posição não é usada nem armazenada.</string>
-<key>NSLocationUsageDescription</key><string>Identificar o Wi-Fi de casa para selecionar a conexão do Immich.</string>
-<key>NSPhotoLibraryUsageDescription</key><string>Selecionar e exportar originais para o Immich e, quando você confirmar, importar fotos e vídeos do Immich para sua biblioteca do Fotos com data e localização.</string>
-<key>NSLocalNetworkUsageDescription</key><string>Enviar as fotos selecionadas para o seu servidor Immich na rede local.</string>
-<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
-<key>NSRemovableVolumesUsageDescription</key><string>Ler fotos, vídeos e metadados de discos externos que você selecionar para enviar ao Immich.</string>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>PonteFotos</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon082</string>
+	<key>CFBundleIdentifier</key>
+	<string>br.allan.pontefotos</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>pt-BR</string>
+	</array>
+	<key>CFBundleName</key>
+	<string>Ponte Fotos</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.9.7</string>
+	<key>CFBundleVersion</key>
+	<string>0.9.7.2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Enviar as fotos selecionadas para o seu servidor Immich na rede local.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Selecionar e exportar originais para o Immich e, quando você confirmar, importar fotos e vídeos do Immich para sua biblioteca do Fotos com data e localização.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Ler fotos, vídeos e metadados de discos externos que você selecionar para enviar ao Immich.</string>
+</dict>
+</plist>
