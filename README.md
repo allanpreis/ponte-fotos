@@ -29,7 +29,7 @@ The account menu below Settings in the sidebar lets you select an account for up
 
 A transfer freezes its connection for the batch. A network change pauses after the current media item, including all Live Photo resources, and requires revalidation before continuing. This is an item-level restart, without partial-byte resume.
 
-Account selection uses the same row sizing as sidebar navigation. Primary transfer buttons use an opaque, restrained blue with white text in both light and dark themes. Existing presentation video illustrates earlier versions; the updated screenshots below show 0.9.7.
+Account selection uses the same row sizing as sidebar navigation. Transfer buttons use the native macOS bordered style, matching the other toolbar actions in both appearances. Existing presentation video illustrates earlier versions; the updated screenshots below show 0.9.7.
 
 Validation for 0.9.7 includes synthetic routing/account/history tests and real JPEG/Live Photo uploads through a dedicated test account. Repeating the upload and rechecking the previously imported Photos items created no new copies; independent downloads matched the server and approved samples. Fresh Photos original creation and physical Remote/VPN access were not exercised in this round. [Validation details and limits](docs/releases/v0.9.7.md).
 

@@ -29,7 +29,7 @@ O menu de conta abaixo de Configurações na barra lateral permite escolher uma 
 
 A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia atual, incluindo todos os recursos de uma Live Photo, e exige revalidação antes de continuar. A retomada ocorre por item, sem retomada parcial de bytes.
 
-O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões principais de transferência usam azul opaco mais discreto com texto branco nos temas claro e escuro. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.7.
+O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.7.
 
 A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](docs/releases/v0.9.7.md).
 
