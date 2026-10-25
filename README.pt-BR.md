@@ -27,7 +27,7 @@ A versão 0.9.8 prepara janelas de até oito mídias completas, com alvo flexív
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-A versão 0.9.9 processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](docs/releases/v0.9.9.md).
+A versão 0.9.9 processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.9).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -39,7 +39,7 @@ A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia
 
 O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.9.
 
-A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](docs/releases/v0.9.7.md).
+A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
 
 ## 📥 Immich → Fotos da Apple
 

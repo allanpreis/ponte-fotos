@@ -27,7 +27,7 @@ Version 0.9.8 prepares small windows of up to eight complete media items with a 
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-Version 0.9.9 processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](docs/releases/v0.9.9.md).
+Version 0.9.9 processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.9).
 
 ## Transfer accounts and connection availability
 
@@ -39,7 +39,7 @@ A transfer freezes its connection for the batch. A network change pauses after t
 
 Account selection uses the same row sizing as sidebar navigation. Transfer buttons use the native macOS bordered style, matching the other toolbar actions in both appearances. Existing presentation video illustrates earlier versions; the updated screenshots below show 0.9.9.
 
-Validation for 0.9.7 includes synthetic routing/account/history tests and real JPEG/Live Photo uploads through a dedicated test account. Repeating the upload and rechecking the previously imported Photos items created no new copies; independent downloads matched the server and approved samples. Fresh Photos original creation and physical Remote/VPN access were not exercised in this round. [Validation details and limits](docs/releases/v0.9.7.md).
+Validation for 0.9.7 includes synthetic routing/account/history tests and real JPEG/Live Photo uploads through a dedicated test account. Repeating the upload and rechecking the previously imported Photos items created no new copies; independent downloads matched the server and approved samples. Fresh Photos original creation and physical Remote/VPN access were not exercised in this round. [Validation details and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
 
 ## 📥 Immich → Apple Photos
 
