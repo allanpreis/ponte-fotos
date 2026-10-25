@@ -21,6 +21,33 @@ struct PhotoItem: Identifiable {
     var fileNames: String { external?.url.path ?? resources.map(\.originalFilename).joined(separator: " + ") }
 }
 struct ResourceDescriptor { let type: PHAssetResourceType; let originalFilename: String }
+struct PFPreparedUploadResource {
+    let index: Int
+    let resource: ResourceDescriptor
+    let file: URL
+    let sidecar: URL
+    let checksum: String
+    let bytes: Int64
+    let token: String
+}
+struct PFPreparedUploadItem {
+    let position: Int
+    let item: PhotoItem
+    let resources: [PFPreparedUploadResource]
+    let folder: URL
+}
+struct PFUploadMetrics {
+    var preparedBytes: Int64 = 0
+    var uploadedBytes: Int64 = 0
+    var uploadedResources = 0
+    var reusedResources = 0
+    var completedItems = 0
+    var lookupRequests = 0
+    var preparationSeconds = 0.0
+    var lookupSeconds = 0.0
+    var transferSeconds = 0.0
+    var verificationSeconds = 0.0
+}
 struct AlbumItem: Identifiable {
     let id: String; let title: String; let collection: PHAssetCollection?
     var fallback: PFMessage? = nil
@@ -59,6 +86,7 @@ struct AlbumItem: Identifiable {
     @Published var profile = ConnectionProfile()
     var connectionLabel: String { get { connectionLabelMessage.text } set { connectionLabelMessage = .verbatim(newValue) } }
     @Published var connectionLabelMessage = M("Conexão não testada")
+    @Published private(set) var connectionIndicatorMessage = M("Conexão não testada")
     @Published var showConnectionSettings = false
     private let network = NetworkObserver()
     private var networkTask: Task<Void, Never>?
@@ -80,8 +108,19 @@ struct AlbumItem: Identifiable {
     private var offset = 0
     private var fetched: PHFetchResult<PHAsset>?
     private var verifiedConnection = ""
+    private let workspaceOverride: URL?
+    private let uploadClientFactory: (String, String) throws -> ImmichClient
+    @Published private(set) var uploadMetrics: PFUploadMetrics?
+    var uploadMetricsMessage: PFMessage? {
+        guard let metrics = uploadMetrics else { return nil }
+        let verified = metrics.completedItems == 1 ? M("1 item conferido") : M("\(metrics.completedItems) itens conferidos")
+        let uploaded = metrics.uploadedResources == 1 ? M("1 recurso enviado") : M("\(metrics.uploadedResources) recursos enviados")
+        let reused = metrics.reusedResources == 1 ? M("1 reutilizado") : M("\(metrics.reusedResources) reutilizados")
+        return verified + " · " + uploaded + " · " + reused
+    }
     private var workspace: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos", isDirectory: true)
+        if let workspaceOverride { return workspaceOverride }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos", isDirectory: true)
     }
     @Published var edits: [String: MetadataOverride] = [:]
     @Published var editing: PhotoItem?
@@ -186,7 +225,9 @@ struct AlbumItem: Identifiable {
          credentialLoader: @escaping (String) throws -> [IMCredential] = { try IMManagementStore.credentials(profileID: $0) },
          transferResolver: @escaping (ConnectionProfile, IMCredential, Set<String>) async throws -> PFTransferConnection = {
              try await PFTransferConnection.resolve(profile: $0, credential: $1, requiredPermissions: $2)
-         }) {
+         }, workspaceOverride: URL? = nil,
+         uploadClientFactory: @escaping (String, String) throws -> ImmichClient = { try ImmichClient(address: $0, key: $1) }) {
+        self.workspaceOverride = workspaceOverride; self.uploadClientFactory = uploadClientFactory
         self.credentialLoader = credentialLoader; self.transferResolver = transferResolver
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos/reviews.json")
         do {
@@ -369,6 +410,7 @@ struct AlbumItem: Identifiable {
             verifiedConnection = address + "\n" + apiKey
             serverReady = true
             connectionLabelMessage = resolution.reason
+            connectionIndicatorMessage = M(resolution.candidate.kind == "Local" ? "URL local" : "URL remota")
             statusMessage = M("Conexão com \(resolution.identity.serverVersion) OK.")
             if connectionSaved {
                 try ConnectionStore.save(address: address, key: apiKey, profile: profile, userID: resolution.identity.userID)
@@ -459,13 +501,14 @@ struct AlbumItem: Identifiable {
     func sendSelected() async {
         guard canSend, transferReady else { statusMessage = M("Teste a conexão antes de enviar."); return }
         busy = true; uploading = true; progress = 0; stopRequested = false
+        uploadMetrics = PFUploadMetrics()
         defer { uploading = false; busy = false }
         do {
             let permissions = PFTransferConnection.uploadPermissions(addingToAlbum: destination != .timeline, creatingAlbum: destination == .new, applyingReview: chosen.contains { edits[$0.id]?.hasChanges == true })
             try await validateTransfer(requiredPermissions: permissions)
             guard let resolved = transferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
             // Freeze endpoint, account and key through every resource in this batch.
-            let client = try ImmichClient(address: resolved.address, key: resolved.credential.key)
+            let client = try uploadClientFactory(resolved.address, resolved.credential.key)
             let userID = resolved.userID
             let transferProfile = profile
             var targetAlbumID: String?
@@ -477,67 +520,129 @@ struct AlbumItem: Identifiable {
                 remoteAlbums.append(album); remoteAlbumID = album.id
                 destination = .existing; targetAlbumID = album.id
             }
-            let staging = workspace.appendingPathComponent("staging", isDirectory: true)
+            let staging = workspace.appendingPathComponent("staging", isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
             let history = workspace.appendingPathComponent("history", isDirectory: true)
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            // Only this batch's staging is owned here. Never remove older staging or originals.
+            defer { try? FileManager.default.removeItem(at: staging) }
             let batch = chosen
-            for (position, item) in batch.enumerated() {
-                if stopRequested { break }
-                resultsMessages[item.id] = M("Preparando…")
-                let folder = staging.appendingPathComponent(item.id.replacingOccurrences(of: "/", with: "_"))
-                do {
-                    let files = try await prepare(item, root: staging)
-                    let recordURL = ConnectionHistory.recordURL(directory: history, profileID: transferProfile.id, userID: userID, itemID: item.id)
-                    let legacy = ConnectionHistory.legacyURLs(directory: history, addresses: [transferProfile.localAddress, transferProfile.remoteAddress, resolved.address], itemID: item.id)
-                    var records = ConnectionHistory.load([recordURL] + legacy)
-                    var videoID: String?
-                    var allVerified = true
-                    var albumAssetIDs: [String] = []
-                    // The paired video must exist before associating the still image.
-                    let ordered = files.sorted { ($0.1.type == .pairedVideo ? 0 : 1) < ($1.1.type == .pairedVideo ? 0 : 1) }
-                    for (index, resource, file, xmp) in ordered {
-                        let checksum = try await TransferFileIO.checksum(file)
-                        var result: UploadResult
-                        if let previous = records.first(where: { $0.resourceIndex == index && $0.checksum == checksum }), (try? await client.matchesHistory(assetID: previous.result.id, checksum: checksum, userID: userID)) == true {
-                            result = previous.result
-                            try ConnectionHistory.save(records, to: recordURL)
-                        } else {
-                            statusMessage = M("Enviando \(resource.originalFilename)…")
-                            result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil)
-                            records.removeAll { $0.resourceIndex == index }
-                            records.append(TransferRecord(resourceIndex: index, checksum: checksum, result: result))
-                            try JSONEncoder().encode(records).write(to: recordURL, options: .atomic)
-                            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
+            var nextPosition = 0
+            while nextPosition < batch.count && !stopRequested {
+                var window: [PFPreparedUploadItem] = []
+                var windowBytes: Int64 = 0
+                // At most 8 complete media items and 128 MiB before the last item.
+                // A single large media item is never split merely to meet the window target.
+                while nextPosition < batch.count && window.count < 8 && windowBytes < 128 * 1024 * 1024 && !stopRequested {
+                    let position = nextPosition
+                    let item = batch[position]
+                    resultsMessages[item.id] = M("Preparando…")
+                    let started = ProcessInfo.processInfo.systemUptime
+                    do {
+                        _ = try PFUploadFileIO.checkCapacity(fileSizes: [], availableBytes: PFUploadFileIO.availableCapacity(at: staging))
+                        let files = try await prepare(item, root: staging)
+                        var resources: [PFPreparedUploadResource] = []
+                        for (index, resource, file, sidecar) in files {
+                            let checksum = try await TransferFileIO.checksum(file)
+                            let bytes = try PFUploadFileIO.size(of: file)
+                            let (sum, overflow) = windowBytes.addingReportingOverflow(bytes)
+                            guard !overflow else { throw BridgeError(message: M("O tamanho dos arquivos excede o limite suportado.")) }
+                            windowBytes = sum
+                            resources.append(PFPreparedUploadResource(index: index, resource: resource, file: file, sidecar: sidecar, checksum: checksum, bytes: bytes, token: "\(position):\(index)"))
                         }
-                        if let edit = edits[item.id], edit.hasChanges {
-                            statusMessage = M("Aplicando sua revisão no Immich…")
-                            try await client.applyReview(edit, to: result.id)
-                        }
-                        if resource.type != .pairedVideo { albumAssetIDs.append(result.id) }
-                        if resource.type == .pairedVideo { videoID = result.id }
-                        statusMessage = M("Conferindo data, localização e associação…")
-                        var verified = false
-                        for attempt in 0..<6 {
-                            let remote = try await client.info(result.id)
-                            if item.metadata.verify(remote, liveVideoID: resource.type == .photo ? videoID : nil) { verified = true; break }
-                            if attempt < 5 { try await Task.sleep(nanoseconds: 2_000_000_000) }
-                        }
-                        if !verified { allVerified = false }
+                        window.append(PFPreparedUploadItem(position: position, item: item, resources: resources, folder: staging.appendingPathComponent(item.id.replacingOccurrences(of: "/", with: "_"))))
+                        uploadMetrics?.preparationSeconds += ProcessInfo.processInfo.systemUptime - started
+                        nextPosition += 1
+                    } catch {
+                        resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
+                        stopRequested = true
                     }
-                    if let targetAlbumID {
-                        statusMessage = M("Adicionando ao álbum…")
-                        try await client.addToAlbum(targetAlbumID, assetIDs: albumAssetIDs)
-                    }
-                    let checked = M("Data conferida") + (item.metadata.latitude != nil ? M(" · GPS conferido") : M(" · sem GPS informado")) + (item.live ? M(" · Live conferido") : "")
-                    resultsMessages[item.id] = (allVerified ? checked : M("Enviado/existente · conferência pendente ou divergente")) + (targetAlbumID != nil ? M(" · no álbum") : "")
-                } catch {
-                    resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
-                    // A failed resource may already exist remotely; pause rather than replay blindly.
-                    stopRequested = true; pendingNetworkChange = true
                 }
-                try? FileManager.default.removeItem(at: folder)
-                withAnimation { progress = Double(position + 1) / Double(batch.count) }
+                uploadMetrics?.preparedBytes += windowBytes
+                if stopRequested { break }
+                let candidates = window.filter { !$0.item.live }.flatMap { $0.resources }.filter { $0.resource.type == .photo }.map { PFUploadCheckInput(token: $0.token, checksum: $0.checksum) }
+                statusMessage = M("Consultando arquivos existentes por hash…")
+                let lookupStarted = ProcessInfo.processInfo.systemUptime
+                let duplicates = try await client.bulkUploadCheck(candidates)
+                uploadMetrics?.lookupSeconds += ProcessInfo.processInfo.systemUptime - lookupStarted
+                uploadMetrics?.lookupRequests += (candidates.count + 199) / 200
+                for prepared in window {
+                    if stopRequested { break }
+                    let item = prepared.item, position = prepared.position, folder = prepared.folder
+                    do {
+                        let recordURL = ConnectionHistory.recordURL(directory: history, profileID: transferProfile.id, userID: userID, itemID: item.id)
+                        let legacy = ConnectionHistory.legacyURLs(directory: history, addresses: [transferProfile.localAddress, transferProfile.remoteAddress, resolved.address], itemID: item.id)
+                        var records = ConnectionHistory.load([recordURL] + legacy)
+                        var videoID: String?
+                        var allVerified = true
+                        var albumAssetIDs: [String] = []
+                        // The paired video must exist before associating the still image.
+                        let ordered = prepared.resources.sorted { ($0.resource.type == .pairedVideo ? 0 : 1) < ($1.resource.type == .pairedVideo ? 0 : 1) }
+                        for preparedResource in ordered {
+                            let index = preparedResource.index, resource = preparedResource.resource
+                            let file = preparedResource.file, xmp = preparedResource.sidecar, checksum = preparedResource.checksum
+                            if duplicates?[preparedResource.token]?.isTrashed == true { throw PFUploadCheckError.rejectedResource }
+                            var result: UploadResult
+                            if let previous = records.first(where: { $0.resourceIndex == index && $0.checksum == checksum }), try await client.matchesHistory(assetID: previous.result.id, checksum: checksum, userID: userID) {
+                                result = previous.result
+                                try ConnectionHistory.save(records, to: recordURL)
+                                uploadMetrics?.reusedResources += 1
+                            } else if !item.live && resource.type == .photo, let candidate = duplicates?[preparedResource.token],
+                                      try await client.verifyUploadCandidate(candidate, checksum: checksum, userID: userID) {
+                                result = UploadResult(id: candidate.assetID, status: "duplicate")
+                                records.removeAll { $0.resourceIndex == index }
+                                records.append(TransferRecord(resourceIndex: index, checksum: checksum, result: result))
+                                try ConnectionHistory.save(records, to: recordURL)
+                                uploadMetrics?.reusedResources += 1
+                            } else {
+                                statusMessage = M("Enviando \(resource.originalFilename)…")
+                                let started = ProcessInfo.processInfo.systemUptime
+                                result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil, checksum: checksum)
+                                uploadMetrics?.transferSeconds += ProcessInfo.processInfo.systemUptime - started
+                                if result.status == "duplicate" {
+                                    guard try await client.matchesHistory(assetID: result.id, checksum: checksum, userID: userID) else {
+                                        throw BridgeError(message: M("O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar."))
+                                    }
+                                }
+                                if result.status == "duplicate" { uploadMetrics?.reusedResources += 1 }
+                                else { uploadMetrics?.uploadedResources += 1; uploadMetrics?.uploadedBytes += preparedResource.bytes }
+                                records.removeAll { $0.resourceIndex == index }
+                                records.append(TransferRecord(resourceIndex: index, checksum: checksum, result: result))
+                                try JSONEncoder().encode(records).write(to: recordURL, options: .atomic)
+                                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
+                            }
+                            if let edit = edits[item.id], edit.hasChanges {
+                                statusMessage = M("Aplicando sua revisão no Immich…")
+                                try await client.applyReview(edit, to: result.id)
+                            }
+                            if resource.type != .pairedVideo { albumAssetIDs.append(result.id) }
+                            if resource.type == .pairedVideo { videoID = result.id }
+                            statusMessage = M("Conferindo data, localização e associação…")
+                            var verified = false
+                            let verificationStarted = ProcessInfo.processInfo.systemUptime
+                            for attempt in 0..<6 {
+                                let remote = try await client.info(result.id)
+                                if item.metadata.verify(remote, liveVideoID: resource.type == .photo ? videoID : nil) { verified = true; break }
+                                if attempt < 5 { try await Task.sleep(nanoseconds: 2_000_000_000) }
+                            }
+                            uploadMetrics?.verificationSeconds += ProcessInfo.processInfo.systemUptime - verificationStarted
+                            if !verified { allVerified = false }
+                        }
+                        if let targetAlbumID {
+                            statusMessage = M("Adicionando ao álbum…")
+                            try await client.addToAlbum(targetAlbumID, assetIDs: albumAssetIDs)
+                        }
+                        let checked = M("Data conferida") + (item.metadata.latitude != nil ? M(" · GPS conferido") : M(" · sem GPS informado")) + (item.live ? M(" · Live conferido") : "")
+                        if allVerified { uploadMetrics?.completedItems += 1 }
+                        resultsMessages[item.id] = (allVerified ? checked : M("Enviado/existente · conferência pendente ou divergente")) + (targetAlbumID != nil ? M(" · no álbum") : "")
+                    } catch {
+                        resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
+                        // A failed resource may already exist remotely; pause rather than replay blindly.
+                        stopRequested = true; pendingNetworkChange = true
+                    }
+                    try? FileManager.default.removeItem(at: folder)
+                    withAnimation { progress = Double(position + 1) / Double(batch.count) }
+                }
             }
             statusMessage = stopRequested ? M("Pausado entre itens. Selecione o lote e envie para retomar.") : M("Lote finalizado. Confira os resultados de cada foto.")
         } catch { statusMessage = PFMessage.error(error) }
@@ -735,7 +840,7 @@ struct ContentView: View {
                 Button(L("Voltar às fotos"), systemImage: "arrow.left") { navigation.settings = false }.controlSize(.large).disabled(model.busy)
             } else {
                 Button { navigation.settings = true } label: {
-                    Label(model.serverReady ? model.connectionLabel : L("Configurar conexão"), systemImage: model.serverReady ? "checkmark.icloud" : "network")
+                    Label(model.serverReady ? model.connectionIndicatorMessage.text : L("Configurar conexão"), systemImage: model.serverReady ? "checkmark.icloud" : "network")
                         .lineLimit(1)
                 }.disabled(model.busy).help(L("Abrir configurações de conexão"))
             }
@@ -826,6 +931,7 @@ struct ContentView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.busy { ProgressView(value: model.progress).tint(PFTheme.accent) }
+            if let message = model.uploadMetricsMessage { Text(message.text).font(.caption).foregroundStyle(.secondary) }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 20) { status; Spacer(minLength: 20); footerActions }
                 VStack(alignment: .leading, spacing: 12) { status; HStack { Spacer(); footerActions } }

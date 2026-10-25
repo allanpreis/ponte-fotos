@@ -13,6 +13,7 @@ enum TransferFileIO {
     static func copyOriginal(from source: URL, to destination: URL) async throws {
         let task = Task.detached(priority: .utility) {
             try Task.checkCancellation()
+            try PFUploadFileIO.checkCapacity(fileSizes: [try PFUploadFileIO.size(of: source)], availableBytes: PFUploadFileIO.availableCapacity(at: destination.deletingLastPathComponent()))
             let staging = destination.deletingLastPathComponent().appendingPathComponent(".ponte-copy-" + UUID().uuidString, isDirectory: true)
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
             defer { try? FileManager.default.removeItem(at: staging) }
