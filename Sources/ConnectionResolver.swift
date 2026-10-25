@@ -3,12 +3,12 @@ import Foundation
 struct ConnectionResolution {
     let candidate: ConnectionCandidate
     let identity: ConnectionIdentity
+    let reason: PFMessage
 }
 
 enum ConnectionResolver {
     static func resolve(
         profile: ConnectionProfile,
-        ssid: String?,
         key: String,
         expectedUserID: String?,
         probe: (String, String) async throws -> ConnectionIdentity = {
@@ -16,7 +16,7 @@ enum ConnectionResolver {
         }
     ) async throws -> ConnectionResolution {
         try profile.validate()
-        let candidates = profile.candidates(ssid: ssid)
+        let candidates = profile.candidates()
         guard !candidates.isEmpty else {
             throw BridgeError(message: M("Configure uma URL disponível para o modo escolhido."))
         }
@@ -29,7 +29,14 @@ enum ConnectionResolver {
                 if let expectedUserID, expectedUserID != identity.userID {
                     throw BridgeError(message: M("Este endereço respondeu com outra conta ou servidor. A troca foi bloqueada. Confira as URLs e a chave."))
                 }
-                return ConnectionResolution(candidate: candidate, identity: identity)
+                let reason: PFMessage
+                if profile.mode == .local { reason = M("Modo Local: somente a URL local.") }
+                else if profile.mode == .remote { reason = M("Modo Remoto: somente a URL remota.") }
+                else if let lastUnavailable {
+                    reason = M("URL local indisponível; URL remota validada. \(PFMessage.error(lastUnavailable))")
+                } else if candidate.kind == "Local" { reason = M("URL local disponível e identidade validada.") }
+                else { reason = M("URL local não configurada; URL remota validada.") }
+                return ConnectionResolution(candidate: candidate, identity: identity, reason: reason)
             } catch let error as ConnectionProbeError {
                 guard error.canFallback else {
                     throw BridgeError(message: PFMessage.error(error))

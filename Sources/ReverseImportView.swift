@@ -9,10 +9,8 @@ import AppKit
 struct PFReverseImportView: View {
     @ObservedObject private var localization = PFLocalization.shared
     @ObservedObject var model: PFReverseImportModel
-    let address: String
-    let key: String
-    let profileID: String
-    let connectionReady: Bool
+    @ObservedObject var connection: LibraryModel
+    private var connectionReady: Bool { connection.transferReady }
     var configure: () -> Void = {}
     @StateObject private var ui = PFReverseUIState()
 
@@ -52,16 +50,18 @@ struct PFReverseImportView: View {
         .alert(L("Importar para o Fotos da Apple?"), isPresented: $ui.confirmingImport) {
             Button(L("Cancelar"), role: .cancel) {}
             Button(eligibleSelection.count == 1 ? L("Importar 1 item") : L("Importar \(eligibleSelection.count) itens")) {
-                Task { await model.importSelected() }
+                Task { await model.importSelected(preflight: validateSource) }
             }
         } message: {
-            Text(L("Seleção: \(eligibleSelection.count) \(eligibleSelection.count == 1 ? L("item") : L("itens")). Destino: “\(model.destinationLabel)” no Fotos deste Mac. Itens já importados pelo app serão adicionados ao álbum sem criar novas cópias. O macOS poderá pedir permissão. O iCloud segue os ajustes do Fotos. Os originais continuam no Immich."))
+            Text(L("Origem: \(connection.transferAccountLabel) · \(connection.transferAddress).") + "\n\n" + L("Seleção: \(eligibleSelection.count) \(eligibleSelection.count == 1 ? L("item") : L("itens")). Destino: “\(model.destinationLabel)” no Fotos deste Mac. Itens já importados pelo app serão adicionados ao álbum sem criar novas cópias. O macOS poderá pedir permissão. O iCloud segue os ajustes do Fotos. Os originais continuam no Immich."))
         }
     }
 
     private var sourceControls: some View {
         PFCard {
             VStack(alignment: .leading, spacing: 14) {
+                Text(L("Origem: \(connection.transferAccountLabel) · \(connection.transferAddress)."))
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .bottom, spacing: 12) { albumPicker; sourceActions }
                     VStack(alignment: .leading, spacing: 12) { albumPicker; sourceActions }
@@ -127,9 +127,11 @@ struct PFReverseImportView: View {
 
     private var sourceActions: some View {
         HStack(spacing: 10) {
-            Button(L("Atualizar álbuns")) { Task { await model.load(address: address, key: key, profileID: profileID) } }
+            Button(L("Atualizar álbuns")) { Task {
+                await model.load(address: connection.transferAddress, key: connection.transferKey, profileID: connection.profile.id, expectedUserID: connection.transferAccountID, preflight: validateSource)
+            } }
                 .disabled(working || !connectionReady)
-            Button(L("Consultar itens")) { Task { await model.loadAlbum() } }
+            Button(L("Consultar itens")) { Task { await model.loadAlbum(preflight: validateSource) } }
                 .disabled(working || !connectionReady || model.albumID.isEmpty)
         }
     }
@@ -185,7 +187,7 @@ struct PFReverseImportView: View {
                         }
                     }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     if item.canRecheck {
-                        Button(L("Conferir novamente no Fotos")) { Task { await model.recheck(id: item.id) } }
+                        Button(L("Conferir novamente no Fotos")) { Task { await model.recheck(id: item.id, preflight: validateSource) } }
                             .disabled(working || !connectionReady)
                     }
                     if let verification = item.verification {
@@ -215,6 +217,13 @@ struct PFReverseImportView: View {
         }
     }
 
+    private func validateSource(_ expected: [String]) async throws {
+        try await connection.validateTransfer(requiredPermissions: ["asset.read", "asset.download", "album.read"])
+        guard expected == [connection.transferAddress, connection.transferKey, connection.profile.id] else {
+            throw BridgeError(message: M("A conta ou o endereço mudou. Atualize os álbuns e revise a seleção antes de importar."))
+        }
+    }
+
     private var footer: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !model.status.isEmpty {
@@ -237,7 +246,7 @@ struct PFReverseImportView: View {
                     ui.confirmingImport = true
                 } label: {
                     Label(L("Importar para o Fotos…"), systemImage: "square.and.arrow.down")
-                }.buttonStyle(.borderedProminent).controlSize(.large)
+                }.buttonStyle(PFPrimaryButtonStyle()).controlSize(.large)
                     .disabled(working || !connectionReady || eligibleSelection.isEmpty || !model.isDestinationValid)
             }
         }

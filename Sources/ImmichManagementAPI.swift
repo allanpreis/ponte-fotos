@@ -113,13 +113,13 @@ struct IMClient {
     init(address: String, credential: IMCredential, session: URLSession? = nil) {
         self.address = address; self.credential = credential; self.session = session ?? Self.standardSession
     }
-    func data(_ endpoint: String, method: String = "GET", query: [URLQueryItem] = [], body: [String: Any]? = nil) async throws -> Data {
+    func data(_ endpoint: String, method: String = "GET", query: [URLQueryItem] = [], body: [String: Any]? = nil, timeout: TimeInterval = 20) async throws -> Data {
         try Task.checkCancellation()
         let base = try ImmichClient(address: address, key: credential.key).base
         var parts = URLComponents(url: base.appendingPathComponent(endpoint), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { parts.queryItems = query }
         guard let url = parts.url else { throw BridgeError(message: M("Endereço da API inválido.")) }
-        var r = URLRequest(url: url); r.httpMethod = method; r.timeoutInterval = 20
+        var r = URLRequest(url: url); r.httpMethod = method; r.timeoutInterval = timeout
         r.setValue(credential.key, forHTTPHeaderField: "x-api-key"); r.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body { r.httpBody = try JSONSerialization.data(withJSONObject: body); r.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let data: Data; let response: URLResponse
@@ -219,9 +219,9 @@ struct IMClient {
     func add(_ ids: [String], to albumID: String) async throws { try await albumMutation(ids, albumID: albumID, method: "PUT") }
     func unlink(_ ids: [String], from albumID: String) async throws { try await albumMutation(ids, albumID: albumID, method: "DELETE") }
     func trash(_ ids: [String]) async throws { _ = try await data("assets", method: "DELETE", body: ["ids": ids, "force": false]) }
-    func permissions() async throws -> Set<String> {
+    func permissions(timeout: TimeInterval = 5) async throws -> Set<String> {
         struct Info: Decodable { let permissions: [String] }
-        return Set(try decode(Info.self, await data("api-keys/me")).permissions)
+        return Set(try decode(Info.self, await data("api-keys/me", timeout: timeout)).permissions)
     }
 }
 

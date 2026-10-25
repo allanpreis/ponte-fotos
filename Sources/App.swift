@@ -54,12 +54,9 @@ struct AlbumItem: Identifiable {
     }
     @Published var address = ""
     @Published var apiKey = "" {
-        didSet { if apiKey != oldValue { verifiedUserID = nil; resetConnection() } }
+        didSet { if apiKey != oldValue { verifiedUserID = nil; primaryAccountName = ""; resetConnection() } }
     }
     @Published var profile = ConnectionProfile()
-    @Published var wifiName: String?
-    var wifiStatus: String { get { wifiStatusMessage.text } set { wifiStatusMessage = .verbatim(newValue) } }
-    @Published var wifiStatusMessage = M("Identificação de Wi-Fi não autorizada")
     var connectionLabel: String { get { connectionLabelMessage.text } set { connectionLabelMessage = .verbatim(newValue) } }
     @Published var connectionLabelMessage = M("Conexão não testada")
     @Published var showConnectionSettings = false
@@ -89,16 +86,98 @@ struct AlbumItem: Identifiable {
     @Published var edits: [String: MetadataOverride] = [:]
     @Published var editing: PhotoItem?
     @Published var inspectingMedia: PhotoItem?
+    @Published var selectedTransferAccountID = ""
+    @Published private(set) var transferAccounts: [IMAccount] = []
+    @Published private(set) var transferConnection: PFTransferConnection?
+    @Published private(set) var transferStatusMessage = M("Valide a conta para transferir.")
+    @Published private(set) var networkRevision = 0
+    private var additionalCredentials: [IMCredential] = []
+    private let credentialLoader: (String) throws -> [IMCredential]
+    private let transferResolver: (ConnectionProfile, IMCredential, Set<String>) async throws -> PFTransferConnection
+    var transferAddress: String { transferConnection?.address ?? "" }
+    var transferKey: String { transferConnection?.credential.key ?? "" }
+    var transferReady: Bool { transferConnection != nil }
+    var transferAccountID: String? { transferConnection?.credential.account.id }
+    @Published private(set) var primaryAccountName = ""
+    var primaryAccountLabel: String { primaryAccountName.isEmpty ? L("Conta principal") : primaryAccountName }
+    var transferAccountLabel: String {
+        guard let credential = transferConnection?.credential else { return L("Conta não validada") }
+        return selectedTransferAccountID.isEmpty ? primaryAccountLabel : credential.account.displayName
+    }
+    private var selectedTransferCredential: IMCredential? {
+        if selectedTransferAccountID.isEmpty {
+            guard let id = verifiedUserID else { return nil }
+            return IMCredential(account: IMAccount(id: id, name: primaryAccountName), key: apiKey)
+        }
+        return additionalCredentials.first { $0.account.id == selectedTransferAccountID }
+    }
+    func reloadTransferAccounts() {
+        do {
+            additionalCredentials = try credentialLoader(profile.id)
+            transferAccounts = additionalCredentials.map(\.account).sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+            if !selectedTransferAccountID.isEmpty && !transferAccounts.contains(where: { $0.id == selectedTransferAccountID }) {
+                selectedTransferAccountID = ""; resetTransferConnection()
+            }
+            if let current = transferConnection, current.credential.key != selectedTransferCredential?.key { resetTransferConnection() }
+        } catch { resetTransferConnection(); transferStatusMessage = PFMessage.error(error) }
+    }
+    func resetTransferConnection() {
+        transferConnection = nil; remoteAlbums = []; remoteAlbumID = ""; albumStatusMessage = ""
+        transferStatusMessage = M("Valide a conta para transferir.")
+    }
+    func transferAccountChanged() {
+        guard !busy else { return }
+        resetTransferConnection()
+        Task { await testTransferConnection() }
+    }
+    func validateTransfer(requiredPermissions: Set<String>) async throws {
+        guard let credential = selectedTransferCredential else {
+            throw BridgeError(message: M("Teste a conexão principal ou selecione uma conta cadastrada."))
+        }
+        let selectionSnapshot = selectedTransferAccountID, profileSnapshot = profile, revision = networkRevision
+        let resolved: PFTransferConnection
+        do { resolved = try await transferResolver(profileSnapshot, credential, requiredPermissions) }
+        catch {
+            if selectionSnapshot == selectedTransferAccountID && profileSnapshot == profile {
+                transferConnection = nil; transferStatusMessage = PFMessage.error(error)
+            }
+            throw error
+        }
+        guard selectionSnapshot == selectedTransferAccountID, profileSnapshot == profile,
+              revision == networkRevision, selectedTransferCredential?.key == credential.key else {
+            throw BridgeError(message: M("A conta ou a rede mudou durante a validação. Valide novamente."))
+        }
+        // Album choices belong to an account, not to its currently reachable address.
+        if let previous = transferConnection, previous.credential.account.id != resolved.credential.account.id || previous.profileID != resolved.profileID {
+            remoteAlbums = []; remoteAlbumID = ""
+        }
+        transferConnection = resolved
+        transferStatusMessage = resolved.explanation
+    }
+    func testTransferConnection() async {
+        guard !busy else { return }
+        busy = true; defer { busy = false }
+        do {
+            reloadTransferAccounts()
+            try await validateTransfer(requiredPermissions: [])
+            await refreshAlbums(timeout: 5)
+        } catch { resetTransferConnection(); transferStatusMessage = PFMessage.error(error) }
+    }
     @Published var destination: UploadDestination = .timeline
     @Published var remoteAlbums: [ImmichAlbum] = []
     @Published var remoteAlbumID = ""
     @Published var newAlbumName = ""
     var albumStatus: String { get { albumStatusMessage.text } set { albumStatusMessage = .verbatim(newValue) } }
     @Published var albumStatusMessage: PFMessage = ""
-    init() {
+    init(loadSavedState: Bool = true, observeNetwork: Bool = true, initialCredential: IMCredential? = nil,
+         credentialLoader: @escaping (String) throws -> [IMCredential] = { try IMManagementStore.credentials(profileID: $0) },
+         transferResolver: @escaping (ConnectionProfile, IMCredential, Set<String>) async throws -> PFTransferConnection = {
+             try await PFTransferConnection.resolve(profile: $0, credential: $1, requiredPermissions: $2)
+         }) {
+        self.credentialLoader = credentialLoader; self.transferResolver = transferResolver
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos/reviews.json")
         do {
-            if let connection = try ConnectionStore.load() {
+            if loadSavedState, let connection = try ConnectionStore.load() {
                 address = connection.address; apiKey = connection.key
                 if let savedProfile = connection.profile { profile = savedProfile }
                 else if !profile.recognizes(address: connection.address) {
@@ -108,21 +187,18 @@ struct AlbumItem: Identifiable {
                 connectionSaved = true; statusMessage = M("Conexão salva carregada. Verificando a rede…")
             }
         } catch { statusMessage = PFMessage.error(error) }
-        edits = (try? JSONDecoder().decode([String: MetadataOverride].self, from: Data(contentsOf: url))) ?? [:]
-        network.onStatusChange = { [weak self] in
-            guard let self else { return }
-            self.wifiName = self.network.ssid; self.wifiStatusMessage = self.network.locationStatusMessage
-        }
+        if let initialCredential { apiKey = initialCredential.key; verifiedUserID = initialCredential.account.id; primaryAccountName = initialCredential.account.name }
+        if loadSavedState { edits = (try? JSONDecoder().decode([String: MetadataOverride].self, from: Data(contentsOf: url))) ?? [:] }
         network.onChange = { [weak self] in self?.networkChanged() }
-        network.start()
+        if observeNetwork { network.start() }
         showConnectionSettings = apiKey.isEmpty
-        if connectionSaved && profile.mode != .automatic { Task { await testConnection() } }
+        if connectionSaved { Task { await testConnection() } }
     }
     func saveConnection() {
         do {
             try profile.validate()
             try ConnectionStore.save(address: address, key: apiKey, profile: profile, userID: verifiedUserID)
-            connectionSaved = true; statusMessage = M("URLs, rede e chave salvas no Chaves do macOS.")
+            connectionSaved = true; statusMessage = M("URLs e chave salvas no Chaves do macOS.")
             Task { await testConnection() }
         }
         catch { statusMessage = PFMessage.error(error) }
@@ -149,6 +225,7 @@ struct AlbumItem: Identifiable {
         edits = updated; resultsMessages[id] = M("Revisão salva · pronta para enviar")
     }
     func resetConnection() {
+        resetTransferConnection()
         serverReady = false; verifiedConnection = ""; remoteAlbums = []; remoteAlbumID = ""; albumStatusMessage = ""; connectionLabelMessage = M("Conexão não testada")
     }
     var destinationLabel: String {
@@ -159,11 +236,12 @@ struct AlbumItem: Identifiable {
         }
     }
     var canSend: Bool {
-        !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && serverReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && transferReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     func refreshAlbums(timeout: TimeInterval = 15) async {
         do {
-            remoteAlbums = try await ImmichClient(address: address, key: apiKey).albums(timeout: timeout)
+            guard transferReady else { return }
+            remoteAlbums = try await ImmichClient(address: transferAddress, key: transferKey).albums(timeout: timeout)
             if !remoteAlbums.contains(where: { $0.id == remoteAlbumID }) { remoteAlbumID = remoteAlbums.first?.id ?? "" }
             albumStatusMessage = remoteAlbums.isEmpty ? M("Nenhum álbum disponível. Você pode criar um.") : M("\(remoteAlbums.count) álbuns disponíveis")
         } catch { remoteAlbums = []; remoteAlbumID = ""; albumStatusMessage = M("Não foi possível listar álbuns: \(PFMessage.error(error))") }
@@ -242,20 +320,20 @@ struct AlbumItem: Identifiable {
         guard prepareManagementSession() != nil else { return }
         showManagement = true
     }
-    func requestWifiPermission() { network.requestLocationPermission() }
     func connectionSettingsChanged(previous: ConnectionProfile) {
         guard !busy else { return }
         resetConnection()
         if previous.mode != profile.mode, !apiKey.isEmpty { Task { await testConnection() } }
     }
     private func networkChanged() {
-        wifiName = network.ssid; wifiStatusMessage = network.locationStatusMessage
-        guard profile.mode == .automatic, !apiKey.isEmpty else { return }
+        guard !apiKey.isEmpty || !selectedTransferAccountID.isEmpty else { return }
         if busy {
             pendingNetworkChange = true
+            networkRevision += 1
             if uploading { stopRequested = true; connectionLabelMessage = M("Rede mudou · pausa após este item") }
             return
         }
+        networkRevision += 1
         resetConnection()
         connectionLabelMessage = M("Rede mudou · verificando conexão…")
         networkTask?.cancel()
@@ -263,7 +341,8 @@ struct AlbumItem: Identifiable {
             do { try await Task.sleep(nanoseconds: 500_000_000) } catch { return }
             guard let self, !Task.isCancelled else { return }
             if self.busy { self.pendingNetworkChange = true; return }
-            await self.testConnection()
+            if !self.apiKey.isEmpty { await self.testConnection() }
+            if !self.selectedTransferAccountID.isEmpty && !self.transferReady { await self.testTransferConnection() }
         }
     }
     func testConnection() async {
@@ -271,17 +350,35 @@ struct AlbumItem: Identifiable {
         busy = true; resetConnection(); connectionLabelMessage = M("Verificando conexão…")
         defer { busy = false }
         do {
-            let resolution = try await ConnectionResolver.resolve(profile: profile, ssid: wifiName, key: apiKey, expectedUserID: verifiedUserID)
+            let resolution = try await ConnectionResolver.resolve(profile: profile, key: apiKey, expectedUserID: verifiedUserID)
             address = resolution.candidate.address
             verifiedUserID = resolution.identity.userID
             verifiedConnection = address + "\n" + apiKey
             serverReady = true
-            connectionLabelMessage = M("Conexão: \(MV(resolution.candidate.kind))")
+            connectionLabelMessage = resolution.reason
             statusMessage = M("Conexão com \(resolution.identity.serverVersion) OK.")
             if connectionSaved {
                 try ConnectionStore.save(address: address, key: apiKey, profile: profile, userID: resolution.identity.userID)
             }
-            await refreshAlbums(timeout: 5)
+            reloadTransferAccounts()
+            struct NamedUser: Decodable { let id: String; let name: String? }
+            let primary = IMCredential(account: IMAccount(id: resolution.identity.userID, name: ""), key: apiKey)
+            if let data = try? await IMClient(address: address, credential: primary).data("users/me", timeout: 5),
+               let user = try? JSONDecoder().decode(NamedUser.self, from: data),
+               user.id.lowercased() == resolution.identity.userID {
+                primaryAccountName = user.name ?? ""
+            }
+            do {
+                if selectedTransferAccountID.isEmpty {
+                    // Reuse the identity probe just completed for the primary connection.
+                    let credential = IMCredential(account: IMAccount(id: resolution.identity.userID, name: primaryAccountName), key: apiKey)
+                    transferConnection = PFTransferConnection(profile: profile, credential: credential, resolution: resolution)
+                    transferStatusMessage = resolution.reason
+                } else {
+                    try await validateTransfer(requiredPermissions: [])
+                }
+                await refreshAlbums(timeout: 5)
+            } catch { resetTransferConnection(); transferStatusMessage = PFMessage.error(error) }
         } catch {
             resetConnection(); connectionLabelMessage = M("Sem conexão verificada"); statusMessage = PFMessage.error(error)
         }
@@ -347,12 +444,16 @@ struct AlbumItem: Identifiable {
         NSWorkspace.shared.open(root)
     }
     func sendSelected() async {
-        guard canSend, verifiedConnection == address + "\n" + apiKey else { statusMessage = M("Teste a conexão antes de enviar."); return }
+        guard canSend, transferReady else { statusMessage = M("Teste a conexão antes de enviar."); return }
         busy = true; uploading = true; progress = 0; stopRequested = false
         defer { uploading = false; busy = false }
         do {
-            let client = try ImmichClient(address: address, key: apiKey)
-            guard let userID = verifiedUserID else { throw BridgeError(message: M("Teste a conexão antes de enviar.")) }
+            let permissions = PFTransferConnection.uploadPermissions(addingToAlbum: destination != .timeline, creatingAlbum: destination == .new, applyingReview: chosen.contains { edits[$0.id]?.hasChanges == true })
+            try await validateTransfer(requiredPermissions: permissions)
+            guard let resolved = transferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
+            // Freeze endpoint, account and key through every resource in this batch.
+            let client = try ImmichClient(address: resolved.address, key: resolved.credential.key)
+            let userID = resolved.userID
             let transferProfile = profile
             var targetAlbumID: String?
             if destination == .existing {
@@ -375,7 +476,7 @@ struct AlbumItem: Identifiable {
                 do {
                     let files = try await prepare(item, root: staging)
                     let recordURL = ConnectionHistory.recordURL(directory: history, profileID: transferProfile.id, userID: userID, itemID: item.id)
-                    let legacy = ConnectionHistory.legacyURLs(directory: history, addresses: [transferProfile.localAddress, transferProfile.remoteAddress, address], itemID: item.id)
+                    let legacy = ConnectionHistory.legacyURLs(directory: history, addresses: [transferProfile.localAddress, transferProfile.remoteAddress, resolved.address], itemID: item.id)
                     var records = ConnectionHistory.load([recordURL] + legacy)
                     var videoID: String?
                     var allVerified = true
@@ -417,7 +518,11 @@ struct AlbumItem: Identifiable {
                     }
                     let checked = M("Data conferida") + (item.metadata.latitude != nil ? M(" · GPS conferido") : M(" · sem GPS informado")) + (item.live ? M(" · Live conferido") : "")
                     resultsMessages[item.id] = (allVerified ? checked : M("Enviado/existente · conferência pendente ou divergente")) + (targetAlbumID != nil ? M(" · no álbum") : "")
-                } catch { resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))") }
+                } catch {
+                    resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
+                    // A failed resource may already exist remotely; pause rather than replay blindly.
+                    stopRequested = true; pendingNetworkChange = true
+                }
                 try? FileManager.default.removeItem(at: folder)
                 withAnimation { progress = Double(position + 1) / Double(batch.count) }
             }
@@ -488,7 +593,7 @@ struct ContentView: View {
                 if navigation.settings {
                     PFSettingsView(model: model, themeRaw: $themeRaw, glassEnabled: $glassEnabled)
                 } else if navigation.reverse {
-                    PFReverseImportView(model: reverseImport, address: model.address, key: model.apiKey, profileID: model.profile.id, connectionReady: model.serverReady, configure: { navigation.settings = true })
+                    PFReverseImportView(model: reverseImport, connection: model, configure: { navigation.settings = true })
                 } else {
                     HStack(alignment: .top, spacing: 16) { sourcePanel; destinationPanel }
                         .fixedSize(horizontal: false, vertical: true)
@@ -509,10 +614,12 @@ struct ContentView: View {
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
         .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
+        .onChange(of: model.selectedTransferAccountID) { _, _ in reverseImport.invalidate(); model.transferAccountChanged() }
+        .onChange(of: model.networkRevision) { _, _ in reverseImport.requestPauseAfterItem() }
         .onChange(of: model.apiKey) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
         .onChange(of: model.address) { _, _ in reverseImport.invalidate(); model.prepareManagementSession() }
         .onChange(of: model.serverReady) { _, ready in if !ready { reverseImport.invalidate() }; model.prepareManagementSession() }
-        .onChange(of: model.busy) { _, busy in if !busy { model.prepareManagementSession() } }
+        .onChange(of: model.busy) { _, busy in if !busy { model.prepareManagementSession(); model.reloadTransferAccounts() } }
         .onChange(of: reverseImport.busy || reverseImport.importing) { _, active in model.busy = active }
         .onChange(of: navigation.settings) { _, open in
             if open { navigation.reverse = false }
@@ -540,7 +647,7 @@ struct ContentView: View {
         .confirmationDialog(L("Enviar \(model.selection.count) itens para o Immich?"), isPresented: $model.showUpload, titleVisibility: .visible) {
             Button(L("Enviar com originais e XMP")) { Task { await model.sendSelected() } }
         } message: {
-            Text(L("Destino: \(model.address) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação."))
+            Text(L("Destino: \(model.transferAddress) · \(model.transferAccountLabel) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação."))
         }
     }
 
@@ -583,11 +690,12 @@ struct ContentView: View {
             }
             Spacer(minLength: 16)
             sidebarAction(L("Configurações"), icon: "gearshape", selected: navigation.settings) { navigation.settings = true }.disabled(model.busy)
+            PFTransferAccountPicker(model: model).padding(.top, 6)
             Divider().padding(.vertical, 12)
             VStack(alignment: .leading, spacing: 8) {
                 Label(L("Originais preservados"), systemImage: "checkmark.shield").font(.caption.weight(.medium))
                 Text(L("Live Photos, RAW e metadados\nacompanham suas memórias.")).font(.caption).foregroundStyle(.secondary)
-                Text("Ponte Fotos 0.9.6").font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
+                Text("Ponte Fotos " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.9.7")).font(.system(size: 10)).foregroundStyle(.secondary).padding(.top, 4)
             }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
         }.padding(18).frame(width: 220).frame(maxHeight: .infinity).modifier(PFNavigationSurface())
@@ -643,7 +751,7 @@ struct ContentView: View {
                             if model.remoteAlbums.isEmpty { Text(L("Nenhum álbum")).tag("") }
                             ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? L(" · compartilhado") : "")).tag($0.id) }
                         }.id(PFLocalization.languageCode).labelsHidden()
-                        Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help(L("Atualizar álbuns")).accessibilityLabel(L("Atualizar álbuns")).disabled(!model.serverReady)
+                        Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help(L("Atualizar álbuns")).accessibilityLabel(L("Atualizar álbuns")).disabled(!model.transferReady)
                     }
                     Text(model.albumStatus).font(.caption).foregroundStyle(.secondary)
                 }
@@ -725,7 +833,7 @@ struct ContentView: View {
                 Button(model.scanning ? L("Parar análise") : L("Pausar após este item")) { model.stopRequested = true; model.cancelScan() }
             } else {
                 Button(L("Exportar XMP…"), systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
-                Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.borderedProminent).disabled(!model.canSend)
+                Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(PFPrimaryButtonStyle()).disabled(!model.canSend)
             }
         }.controlSize(.large)
     }

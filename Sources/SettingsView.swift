@@ -45,19 +45,8 @@ struct PFSettingsView: View {
                         field(L("URL local"), placeholder: "http://immich.local:2283", value: $model.profile.localAddress)
                         field(L("URL remota"), placeholder: "https://photos.example.com", value: $model.profile.remoteAddress)
                     }
-                    Text(L("No modo Automático, o Wi-Fi de casa prioriza o endereço local. Fora dessa rede, o aplicativo usa o endereço remoto."))
+                    Text(L("No modo Automático, o app valida primeiro a URL local e tenta a remota somente se a local estiver indisponível. Local e Remoto usam exclusivamente o endereço escolhido."))
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            PFCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    PFSectionHeading(L("Rede de casa"), subtitle: L("O nome do Wi-Fi ajuda a escolher o endereço certo."), systemImage: "wifi")
-                    field(L("Nome do Wi-Fi"), placeholder: L("Nome exato da rede"), value: $model.profile.homeSSID)
-                    ViewThatFits(in: .horizontal) {
-                        HStack { wifiStatus; Spacer(); wifiPermission }
-                        VStack(alignment: .leading, spacing: 12) { wifiStatus; wifiPermission }
-                    }
-                    Text(L("A permissão de Localização é exigida pelo macOS para ler o nome da rede. O app não usa nem armazena sua posição.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             PFCard {
@@ -75,8 +64,6 @@ struct PFSettingsView: View {
             }
         }.disabled(model.busy)
     }
-    private var wifiStatus: some View { Text(model.wifiName.map { L("Wi-Fi atual: \($0)") } ?? model.wifiStatus).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-    private var wifiPermission: some View { Button(L("Permitir identificar Wi-Fi")) { model.requestWifiPermission() } }
     private var connectionActions: some View {
         Group {
             Button(L("Testar conexão")) { Task { await model.testConnection() } }.buttonStyle(.borderedProminent)

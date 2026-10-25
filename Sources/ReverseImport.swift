@@ -386,6 +386,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     private let photos: PFReversePhotos
     private var assets: [String: PFReverseAsset] = [:]
     private var cancellationRequested = false
+    private var pauseAfterItem = false
     private var generation = UUID()
     init(history: PFReverseHistory = PFReverseDiskHistory(), photos: PFReversePhotos? = nil,
          connect: @escaping (String, String, String) async throws -> PFReverseRemote = { address, key, profileID in
@@ -394,7 +395,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
          }) {
         self.history = history; self.photos = photos ?? PFReversePhotoLibrary(); self.connect = connect
     }
-    func load(address: String, key: String, profileID: String) async {
+    func load(address: String, key: String, profileID: String, expectedUserID: String? = nil, preflight: (([String]) async throws -> Void)? = nil) async {
         guard !importing && !busy else { return }
         busy = true; defer { busy = false }
         let context = [address, key, profileID]
@@ -403,7 +404,13 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         let token = generation
         do {
             guard UUID(uuidString: profileID) != nil else { throw BridgeError(message: M("Salve o perfil de conexão antes de importar.")) }
+            try await preflight?(context)
+            guard token == generation else { return }
             let value = try await connect(address, key, profileID)
+            if let expectedUserID, let http = value as? PFReverseHTTP,
+               http.client.credential.account.id != expectedUserID {
+                throw BridgeError(message: M("A conta ou o endereço mudou. Atualize os álbuns e revise a seleção antes de importar."))
+            }
             let rows = try await value.albums()
             guard token == generation else { return }
             remote = value; sourceContext = context
@@ -413,11 +420,13 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             statusMessage = M("Escolha um álbum para revisar os originais.")
         } catch { if token == generation { statusMessage = PFMessage.error(error) } }
     }
-    func loadAlbum() async {
+    func loadAlbum(preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing, let remote else { return }
         busy = true; defer { busy = false }; selection = []; items = []; assets = [:]
         let token = generation, album = albumID
         do {
+            try await validateSource(preflight)
+            guard generation == token else { return }
             let ids = try await remote.ids(album: album)
             var rows: [PFReverseItem] = [], loaded: [String: PFReverseAsset] = [:]
             let records = try history.load(scope: remote.scope)
@@ -444,12 +453,14 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     }
     // Explicit recovery reads an already-known PhotoKit identifier. It never
     // downloads originals, creates assets or changes album membership.
-    func recheck(id: String) async {
+    func recheck(id: String, preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing && !loadingDestinations, let remote,
               items.contains(where: { $0.id == id && $0.canRecheck }) else { return }
         busy = true; defer { busy = false }
         let token = generation
         do {
+            try await validateSource(preflight)
+            guard token == generation else { return }
             let records = try history.load(scope: remote.scope)
             guard let pending = records.last(where: { $0.assetID == id && $0.pending }),
                   let photosID = pending.photosID, !photosID.isEmpty else { return }
@@ -485,6 +496,17 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         guard let data = try? await remote.client.thumbnail(id), token == generation, !Task.isCancelled else { return nil }
         return NSImage(data: data)
     }
+    // A route change never replaces the endpoint of an in-flight media pair.
+    // Finish this item, then require a fresh source review before continuing.
+    func requestPauseAfterItem() {
+        if importing { pauseAfterItem = true }
+        else { invalidateConnection() }
+    }
+    private func validateSource(_ preflight: (([String]) async throws -> Void)?) async throws {
+        guard let preflight else { return }
+        guard let sourceContext else { throw BridgeError(message: M("Atualize os álbuns para validar a conta e o endereço de origem.")) }
+        try await preflight(sourceContext)
+    }
     func cancel() {
         cancellationRequested = true; showConfirmation = false
         if !importing { generation = UUID(); items = []; selection = []; assets = [:] }
@@ -499,19 +521,25 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func use(remote: PFReverseRemote, assets: [PFReverseAsset]) {
         guard !importing else { return }; self.remote = remote; self.assets = Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) }); items = assets.map(\.item)
     }
-    func importSelected() async {
+    func importSelected(preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing && !loadingDestinations, let remote else { return }
         let selected = items.filter { selection.contains($0.id) && $0.selectable }.compactMap { assets[$0.id] }
         guard !selected.isEmpty, var target = destination, target.isValid else { statusMessage = M("Selecione originais válidos e informe o álbum de destino."); return }
-        importing = true; cancellationRequested = false; showConfirmation = false; done = 0; total = selected.count
+        importing = true; cancellationRequested = false; pauseAfterItem = false; showConfirmation = false; done = 0; total = selected.count
         let token = generation
-        defer { importing = false; if token != generation { self.remote = nil; items = []; albums = []; assets = [:]; selection = [] } }
+        defer {
+            importing = false
+            if pauseAfterItem { invalidateConnection() }
+            if token != generation { self.remote = nil; items = []; albums = []; assets = [:]; selection = [] }
+        }
         do {
+            try await validateSource(preflight)
+            guard token == generation else { return }
             try await photos.authorize()
             try photos.prepareDestination(target)
             var records = try history.load(scope: remote.scope)
             for originalAsset in selected {
-                if cancellationRequested || generation != token { statusMessage = M("Importação interrompida entre itens. \(done) concluídos."); return }
+                if cancellationRequested || pauseAfterItem || generation != token { statusMessage = M("Importação interrompida entre itens. \(done) concluídos."); return }
                 let asset = try await remote.asset(originalAsset.id)
                 guard asset.item.selectable, asset.checksum == originalAsset.checksum, asset.livePhotoVideoId == originalAsset.livePhotoVideoId,
                       asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.")) }

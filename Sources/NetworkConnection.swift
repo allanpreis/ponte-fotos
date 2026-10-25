@@ -1,7 +1,5 @@
 import Foundation
 import Combine
-import CoreWLAN
-import CoreLocation
 import Network
 
 enum ConnectionMode: String, Codable, CaseIterable, Identifiable {
@@ -25,6 +23,7 @@ struct ConnectionProfile: Codable, Equatable {
     var id: String = UUID().uuidString
     var localAddress: String = ""
     var remoteAddress: String = ""
+    // Retained only to decode and round-trip profiles saved before availability routing.
     var homeSSID: String = ""
     var mode: ConnectionMode = .local
 
@@ -39,18 +38,20 @@ struct ConnectionProfile: Codable, Equatable {
         }
     }
 
-    func candidates(ssid: String?) -> [ConnectionCandidate] {
+    func candidates() -> [ConnectionCandidate] {
         let local = clean(localAddress), remote = clean(remoteAddress)
         switch mode {
         case .local: return local.isEmpty ? [] : [ConnectionCandidate(address: local, kind: "Local")]
         case .remote: return remote.isEmpty ? [] : [ConnectionCandidate(address: remote, kind: "Remota")]
         case .automatic:
             var result: [ConnectionCandidate] = []
-            let home = clean(homeSSID)
-            if !home.isEmpty, ssid == home, !local.isEmpty {
+            if !local.isEmpty {
                 result.append(ConnectionCandidate(address: local, kind: "Local"))
             }
-            if !remote.isEmpty, !result.contains(where: { $0.address == remote }) {
+            let remoteBase = try? ImmichClient(address: remote, key: "compare-address-only").base
+            if !remote.isEmpty, !result.contains(where: {
+                (try? ImmichClient(address: $0.address, key: "compare-address-only").base) == remoteBase
+            }) {
                 result.append(ConnectionCandidate(address: remote, kind: "Remota"))
             }
             return result
@@ -76,16 +77,19 @@ struct ConnectionProfile: Codable, Equatable {
             }
         }
         try address(localAddress, name: M("local"), required: mode == .local)
-        try address(remoteAddress, name: M("remota"), required: mode != .local)
+        try address(remoteAddress, name: M("remota"), required: mode == .remote)
+        if mode == .automatic, clean(localAddress).isEmpty, clean(remoteAddress).isEmpty {
+            throw BridgeError(message: M("Configure uma URL disponível para o modo escolhido."))
+        }
     }
 }
 
 /// Only changes that can affect routing should invalidate a verified connection.
-/// macOS can send several path/authorization notifications for the same network.
+/// Gateway changes also matter when Wi-Fi, Ethernet or VPN reuse an interface.
 struct NetworkRoutingSnapshot: Equatable {
     let status: NWPath.Status
     let interfaces: Set<String>
-    let ssid: String?
+    var gateways: Set<String> = []
 }
 
 struct NetworkRoutingChanges {
@@ -100,91 +104,28 @@ struct NetworkRoutingChanges {
 }
 
 @MainActor
-final class NetworkObserver: NSObject, ObservableObject, CLLocationManagerDelegate, CWEventDelegate {
-    @Published private(set) var ssid: String?
-    var locationStatus: String { locationStatusMessage.text }
-    @Published private(set) var locationStatusMessage = M("Permita Localização para identificar o Wi-Fi.")
+final class NetworkObserver: ObservableObject {
     var onChange: (() -> Void)?
-    var onStatusChange: (() -> Void)?
-    private let locationManager = CLLocationManager()
-    private let wifiClient = CWWiFiClient()
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "PonteFotos.network")
     private var started = false
-    private var path: NWPath?
     private var routingChanges = NetworkRoutingChanges()
-
-    override init() {
-        super.init()
-        locationManager.delegate = self
-        refreshSSID()
-    }
 
     func start() {
         guard !started else { return }
         started = true
         monitor.pathUpdateHandler = { [weak self] path in
+            let interfaces = Set(path.availableInterfaces.filter { path.usesInterfaceType($0.type) }
+                .map { "\($0.type):\($0.name)" })
+            let snapshot = NetworkRoutingSnapshot(status: path.status, interfaces: interfaces,
+                gateways: Set(path.gateways.map { String(describing: $0) }))
             Task { @MainActor [weak self] in
-                self?.path = path
-                self?.refreshSSID()
-                self?.notifyRoutingChange()
+                guard let self else { return }
+                if self.routingChanges.update(snapshot) { self.onChange?() }
             }
         }
-        wifiClient.delegate = self
-        try? wifiClient.startMonitoringEvent(with: .ssidDidChange)
         monitor.start(queue: queue)
-        refreshSSID()
     }
 
-    func requestLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
-        refreshSSID()
-        notifyRoutingChange()
-    }
-
-    private func notifyRoutingChange() {
-        guard started, let path else { return }
-        let interfaces = Set(path.availableInterfaces.filter { path.usesInterfaceType($0.type) }
-            .map { "\($0.type):\($0.name)" })
-        let snapshot = NetworkRoutingSnapshot(status: path.status, interfaces: interfaces, ssid: ssid)
-        if routingChanges.update(snapshot) { onChange?() }
-    }
-
-    func refreshSSID() {
-        defer { onStatusChange?() }
-        switch locationManager.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            ssid = wifiClient.interface()?.ssid()
-            locationStatusMessage = ssid == nil ? M("Wi-Fi indisponível; será usada a conexão remota no modo automático.") : M("Wi-Fi identificado neste Mac.")
-        case .denied, .restricted:
-            ssid = nil
-            locationStatusMessage = M("Localização não permitida; use a conexão remota ou escolha Local manualmente.")
-        case .notDetermined:
-            ssid = nil
-            locationStatusMessage = M("Permita Localização para identificar o Wi-Fi.")
-        @unknown default:
-            ssid = nil
-            locationStatusMessage = M("Não foi possível identificar o Wi-Fi.")
-        }
-    }
-
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        Task { @MainActor [weak self] in
-            self?.refreshSSID()
-            if let self, self.started { try? self.wifiClient.startMonitoringEvent(with: .ssidDidChange) }
-            self?.notifyRoutingChange()
-        }
-    }
-
-    nonisolated func ssidDidChangeForWiFiInterface(withName interfaceName: String) {
-        Task { @MainActor [weak self] in
-            self?.refreshSSID()
-            self?.notifyRoutingChange()
-        }
-    }
-
-    deinit {
-        monitor.cancel()
-        try? wifiClient.stopMonitoringAllEvents()
-    }
+    deinit { monitor.cancel() }
 }
