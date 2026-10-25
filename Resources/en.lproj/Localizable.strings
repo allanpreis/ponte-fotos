@@ -575,3 +575,29 @@
 "Selecione uma conta válida antes de transferir." = "Select a valid account before transferring.";
 "A conta selecionada não tem as permissões necessárias: %@." = "The selected account does not have the required permissions: %@.";
 "Destino: %@ · %@ → %@. Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação." = "Destination: %@ · %@ → %@. Live Photos include video; RAW includes the available original resources. Saved manual reviews will also apply to photos already in Immich. The preview displays times in this Mac’s time zone; the historical capture time zone still needs validation.";
+
+"Espaço livre insuficiente para preparar este arquivo. Libere espaço e tente novamente." = "Not enough free space to prepare this file. Free some space and try again.";
+
+"O tamanho dos arquivos excede o limite suportado." = "The file sizes exceed the supported limit.";
+
+"Checksum SHA-1 inválido." = "Invalid SHA-1 checksum.";
+
+"Não foi possível validar a consulta de duplicatas. Nenhum arquivo foi considerado existente." = "The duplicate lookup could not be validated. No file was considered existing.";
+
+"Consultando arquivos existentes por hash…" = "Checking existing files by hash…";
+
+"%@ itens conferidos · %@ recursos enviados · %@ reutilizados" = "%@ items verified · %@ resources uploaded · %@ reused";
+
+"O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar." = "The existing file is trashed or unavailable in Immich. Review it before continuing.";
+
+"1 item conferido" = "1 item verified";
+
+"%@ itens conferidos" = "%@ items verified";
+
+"1 recurso enviado" = "1 resource uploaded";
+
+"%@ recursos enviados" = "%@ resources uploaded";
+
+"1 reutilizado" = "1 reused";
+
+"%@ reutilizados" = "%@ reused";
