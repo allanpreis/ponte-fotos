@@ -690,3 +690,5 @@
 "Consulte as novidades. Itens concluídos neste acompanhamento ficam fora da fila; falhas e resultados pendentes continuam para revisão." = "Check for new items. Items completed in this link are omitted from the queue; failures and pending results remain for review.";
 
 "O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item." = "The Live Photo pair changed or was not recorded in the old history. Check Photos before reusing this item.";
+
+"O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente." = "macOS did not respond to the Photos access request. Check Privacy & Security → Photos and try again.";
