@@ -24,13 +24,11 @@ enum PFUploadFollowIdentity {
 }
 
 extension ImmichClient {
-    func uploadFollowAlbumAssetIDs(_ id: String) async throws -> Set<String> {
+    func uploadFollowAlbumAssetIDs(_ id: String, userID: String) async throws -> Set<String> {
         guard UUID(uuidString: id) != nil else { throw BridgeError(message: M("Atualize e selecione um álbum de destino.")) }
-        struct Album: Decodable { struct Asset: Decodable { let id: String }; let id: String; let assets: [Asset] }
-        var r = request("albums/\(id)"); r.timeoutInterval = 15
-        let (data, response) = try await transport.data(for: r); try check(response)
-        let album = try JSONDecoder().decode(Album.self, from: data)
-        guard album.id == id else { throw BridgeError(message: M("Atualize e selecione um álbum de destino.")) }
-        return Set(album.assets.map(\.id))
+        // Immich 3 album details do not embed the assets array. Reuse the
+        // timeline-bucket query already used by library management and import.
+        let credential = IMCredential(account: IMAccount(id: userID, name: ""), key: key)
+        return try await IMClient(address: base.absoluteString, credential: credential, session: transport).albumIDs(id)
     }
 }

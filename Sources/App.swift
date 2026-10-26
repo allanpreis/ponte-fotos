@@ -385,7 +385,7 @@ struct AlbumItem: Identifiable {
                 throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
             }
             let client = try uploadClientFactory(connection.address, connection.credential.key)
-            let albumIDs = try await client.uploadFollowAlbumAssetIDs(context.destinationID)
+            let albumIDs = try await client.uploadFollowAlbumAssetIDs(context.destinationID, userID: connection.userID)
             let source = try readUploadFollowItems(context.albumID)
             var queue: [PhotoItem] = [], fingerprints: [String: String] = [:]
             for (index, item) in source.enumerated() {
