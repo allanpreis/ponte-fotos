@@ -118,9 +118,9 @@
 "Concluir" = "Done";
 "Concluída" = "Completed";
 "Conecte a conta proprietária de todas as cópias selecionadas antes de continuar." = "Connect the owner accounts for all selected copies before continuing.";
-"Conecte as contas em Contas e API para comparar suas cópias." = "Connect accounts in Accounts & API to compare your copies.";
+"Conecte as contas em Configurações → Contas e API para comparar suas cópias." = "Connect accounts in Settings → Accounts & API to compare their copies.";
 "Conecte as contas proprietárias e escolha a cópia para manter. Consulte novamente." = "Connect the owner accounts and choose the copy to keep. Run the analysis again.";
-"Conecte em Contas e API: " = "Connect in Accounts & API: ";
+"Conecte em Configurações → Contas e API: " = "Connect in Settings → Accounts & API: ";
 "Conecte o Immich para escolher um álbum." = "Connect to Immich to choose an album.";
 "Conecte seu servidor" = "Connect your server";
 "Conecte sua biblioteca para começar." = "Connect your library to get started.";
@@ -620,7 +620,7 @@
 
 "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer." = "The analysis compares up to ten neighbors per item. Very repetitive sets may contain other pairs that are not shown.";
 
-"Conecte a conta proprietária em Contas e API para carregar a prévia." = "Connect the owner account in Accounts and API to load the preview.";
+"Conecte a conta proprietária em Configurações → Contas e API para carregar a prévia." = "Connect the owner account in Settings → Accounts & API to load the preview.";
 
 "Faça uma nova consulta antes de revisar as sugestões." = "Run a new scan before reviewing suggestions.";
 
