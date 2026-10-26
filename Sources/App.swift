@@ -136,10 +136,19 @@ struct AlbumItem: Identifiable {
     private var additionalCredentials: [IMCredential] = []
     private let credentialLoader: (String) throws -> [IMCredential]
     private let transferResolver: (ConnectionProfile, IMCredential, Set<String>) async throws -> PFTransferConnection
-    var transferAddress: String { transferConnection?.address ?? "" }
-    var transferKey: String { transferConnection?.credential.key ?? "" }
-    var transferReady: Bool { transferConnection != nil }
-    var transferAccountID: String? { transferConnection?.credential.account.id }
+    // Published account selection may change before SwiftUI runs its onChange hook.
+    // Never expose the previous account's validated client during that interval.
+    private var currentTransferConnection: PFTransferConnection? {
+        guard let value = transferConnection, let credential = selectedTransferCredential,
+              value.profile == profile, value.credential.key == credential.key,
+              let actualID = UUID(uuidString: value.userID),
+              let selectedID = UUID(uuidString: credential.account.id), actualID == selectedID else { return nil }
+        return value
+    }
+    var transferAddress: String { currentTransferConnection?.address ?? "" }
+    var transferKey: String { currentTransferConnection?.credential.key ?? "" }
+    var transferReady: Bool { currentTransferConnection != nil }
+    var transferAccountID: String? { currentTransferConnection?.credential.account.id }
     @Published private(set) var primaryAccountName = ""
     var primaryAccountLabel: String { primaryAccountName.isEmpty ? L("Conta principal") : primaryAccountName }
     // The primary API key and a saved management key can identify the same person.
@@ -156,7 +165,7 @@ struct AlbumItem: Identifiable {
         return selectedTransferAccountID
     }
     var transferAccountLabel: String {
-        guard let credential = transferConnection?.credential else { return L("Conta não validada") }
+        guard let credential = currentTransferConnection?.credential else { return L("Conta não validada") }
         return selectedTransferAccountID.isEmpty ? primaryAccountLabel : credential.account.displayName
     }
     private var selectedTransferCredential: IMCredential? {

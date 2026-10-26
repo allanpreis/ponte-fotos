@@ -516,10 +516,16 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         if !importing { generation = UUID(); items = []; selection = []; assets = [:] }
     }
     func invalidate() { invalidateConnection() }
-    func invalidateConnection() {
+    func invalidateConnection(preservingProgress: Bool = false) {
         sourceContext = nil
         generation = UUID(); cancellationRequested = true; showConfirmation = false
-        if !importing { remote = nil; albums = []; items = []; selection = []; assets = [:] }
+        if !importing {
+            remote = nil; albums = []; albumID = ""; items = []; selection = []; assets = [:]
+            if !preservingProgress {
+                done = 0; total = 0
+                statusMessage = M("Atualize a lista de álbuns, escolha uma origem e consulte os itens para revisar a importação.")
+            }
+        }
     }
     // Dependency injection keeps tests entirely outside the user's Photos library and network.
     func use(remote: PFReverseRemote, assets: [PFReverseAsset]) {
@@ -533,7 +539,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         let token = generation
         defer {
             importing = false
-            if pauseAfterItem { invalidateConnection() }
+            if pauseAfterItem { invalidateConnection(preservingProgress: true) }
             if token != generation { self.remote = nil; items = []; albums = []; assets = [:]; selection = [] }
         }
         do {
