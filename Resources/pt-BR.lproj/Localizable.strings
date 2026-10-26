@@ -692,3 +692,20 @@
 "O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item." = "O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item.";
 
 "O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente." = "O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente.";
+
+"Destino e acompanhamento" = "Destino e acompanhamento";
+
+"Destino: %@" = "Destino: %@";
+
+/* Photos to Immich tracking */
+"Consulte as novidades do álbum acompanhado antes de enviar." = "Consulte as novidades do álbum acompanhado antes de enviar.";
+"Acompanhamento de envio salvo. Consulte as novidades para revisar antes de enviar." = "Acompanhamento de envio salvo. Consulte as novidades para revisar antes de enviar.";
+"Acompanhamento de envio removido. Fotos e histórico foram preservados." = "Acompanhamento de envio removido. Fotos e histórico foram preservados.";
+"O álbum de origem do Fotos está indisponível. Confira o acesso e consulte novamente." = "O álbum de origem do Fotos está indisponível. Confira o acesso e consulte novamente.";
+"O acompanhamento de envio mudou. Consulte novamente antes de enviar." = "O acompanhamento de envio mudou. Consulte novamente antes de enviar.";
+"Consultando novidades: %@ de %@…" = "Consultando novidades: %@ de %@…";
+"%@ itens para revisar antes do envio. Nada foi enviado automaticamente." = "%@ itens para revisar antes do envio. Nada foi enviado automaticamente.";
+"O álbum do Fotos mudou. Consulte as novidades novamente antes de enviar." = "O álbum do Fotos mudou. Consulte as novidades novamente antes de enviar.";
+"Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar." = "Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar.";
+"A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente." = "A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente.";
+"Fotos → Immich" = "Fotos → Immich";
