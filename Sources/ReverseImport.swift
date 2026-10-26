@@ -227,10 +227,39 @@ extension PFReversePhotos {
     // Unknown membership must stay in the review queue.
     func contains(id: String, albumID: String) -> Bool { false }
 }
+// TCC can leave a request unanswered after a local-signature update. Never
+// keep the import screen locked indefinitely; a late callback is ignored.
+private final class PFPhotosAuthorizationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<PHAuthorizationStatus, Error>?
+    init(_ continuation: CheckedContinuation<PHAuthorizationStatus, Error>) { self.continuation = continuation }
+    func finish(_ result: Result<PHAuthorizationStatus, Error>) {
+        lock.lock(); let pending = continuation; continuation = nil; lock.unlock()
+        pending?.resume(with: result)
+    }
+}
+enum PFPhotosAuthorization {
+    static func request(timeout: TimeInterval = 30, using request: (@escaping @Sendable (PHAuthorizationStatus) -> Void) -> Void) async throws -> PHAuthorizationStatus {
+        try await withCheckedThrowingContinuation { continuation in
+            let gate = PFPhotosAuthorizationGate(continuation)
+            request { gate.finish(.success($0)) }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
+                gate.finish(.failure(BridgeError(message: M("O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente."))))
+            }
+        }
+    }
+}
 @MainActor final class PFReversePhotoLibrary: PFReversePhotos {
     var canRead: Bool { PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized }
     func authorize() async throws {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if current == .authorized { return }
+        let status: PHAuthorizationStatus
+        if current == .notDetermined {
+            status = try await PFPhotosAuthorization.request { completion in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite, handler: completion)
+            }
+        } else { status = current }
         guard status == .authorized else { throw BridgeError(message: M("Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.")) }
     }
     func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
