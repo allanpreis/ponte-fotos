@@ -675,3 +675,18 @@
 "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento." = "Both copies are Live Photos. Removal of this pair is blocked to preserve motion.";
 
 "O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente." = "Moving copies to trash was blocked because Immich did not confirm enabled trash with a positive retention period. Check the server settings and run the query again.";
+
+/* Assisted album tracking */
+"Acompanhamento salvo. Consulte as novidades para revisar antes de importar." = "Album link saved. Check for new items to review before importing.";
+"Acompanhamento removido. Fotos e histórico de importação foram preservados." = "Album link removed. Photos and import history were preserved.";
+"O acompanhamento mudou. Consulte as novidades novamente." = "The album link changed. Check for new items again.";
+"%@ itens para revisar no acompanhamento. Nenhuma importação foi iniciada." = "%@ items to review in the linked album. No import has started.";
+"Acompanhamento assistido" = "Assisted album tracking";
+"Última consulta: %@" = "Last checked: %@";
+"Parar acompanhamento" = "Stop tracking";
+"Acompanhar este álbum" = "Track this album";
+"Consultar novidades" = "Check for new items";
+"Vincule um álbum existente do Fotos. A consulta é manual; todos os itens ainda não concluídos entram na revisão, inclusive os já existentes na primeira consulta. Nada é importado automaticamente." = "Link an existing Photos album. Checks are manual; all unfinished items enter review, including existing items on the first check. Nothing is imported automatically.";
+"Consulte as novidades. Itens concluídos neste acompanhamento ficam fora da fila; falhas e resultados pendentes continuam para revisão." = "Check for new items. Items completed in this link are omitted from the queue; failures and pending results remain for review.";
+
+"O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item." = "The Live Photo pair changed or was not recorded in the old history. Check Photos before reusing this item.";
