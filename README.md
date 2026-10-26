@@ -13,13 +13,15 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 0.9.9 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 0.9.10 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-Version 0.9.7 adds transfer account selection and connection by URL availability. It retains the media diagnostics and post-import verification introduced in 0.9.6, including an explicit recheck action for pending results. The app reports format and preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.9).
+Version 0.9.7 adds transfer account selection and connection by URL availability. It retains the media diagnostics and post-import verification introduced in 0.9.6, including an explicit recheck action for pending results. The app reports format and preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.10).
+
+Version 0.9.10 keeps temporary read buffers bounded while hashing and packaging large originals, reducing memory peaks.
 
 ## Large transfers — bounded concurrency
 
@@ -27,7 +29,7 @@ Version 0.9.8 prepares small windows of up to eight complete media items with a 
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-Version 0.9.9 processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.9).
+Version 0.9.9 processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.10).
 
 ## Transfer accounts and connection availability
 
@@ -79,9 +81,9 @@ The library screenshot shows the 0.9.9 sidebar account menu and primary transfer
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 0.9.9 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.9/Ponte-Fotos-0.9.9-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 0.9.10 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.10/Ponte-Fotos-0.9.10-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.9) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.10) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
