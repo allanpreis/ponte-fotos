@@ -13,15 +13,15 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.11 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 0.9.12 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.11).
+A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
 
-A versão 0.9.11 limita os buffers temporários durante o cálculo de hash e a preparação de originais grandes, reduzindo picos de memória.
+A versão 0.9.12 limita os buffers temporários durante o cálculo de hash e a preparação de originais grandes, reduzindo picos de memória.
 
 ## Operações grandes — concorrência limitada
 
@@ -29,7 +29,7 @@ A versão 0.9.8 prepara janelas de até oito mídias completas, com alvo flexív
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-A versão 0.9.9 processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.11).
+A versão 0.9.9 processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -82,9 +82,9 @@ A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.9 com
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.11 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.11/Ponte-Fotos-0.9.11-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 0.9.12 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.12/Ponte-Fotos-0.9.12-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.11) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -239,6 +239,8 @@ Toda alteração da gestão passa por uma tela de revisão e uma confirmação e
 - Criação/destinos extras de álbuns no fluxo de duplicatas e decisões em lote da comparação ainda não estão disponíveis.
 - Operações grandes podem ser lentas devido às revalidações de segurança.
 
+As sugestões por metadados complementam a comparação exata por hash, com escolha manual da cópia para manter, prévias ampliadas do servidor e revisão antes de enviar uma cópia estática à lixeira. Os pares exigem dimensões iguais e captura com até um segundo de diferença, além de mesmo nome ou fabricante/modelo de câmera coincidentes. Live Photos, escolhas conflitantes e mudanças no conteúdo, nos metadados ou nos vínculos revisados são protegidos. Essa análise limitada pode deixar variantes de fora e não garante uma biblioteca sem duplicatas.
+
 ## Privacidade e armazenamento local
 
 | Local | Conteúdo |
@@ -294,5 +296,3 @@ Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distr
 Criado e mantido por [Allan Reis](https://github.com/allanpreis). Veja os [contribuidores](https://github.com/allanpreis/ponte-fotos/graphs/contributors). Contribuições de código, documentação, tradução, acessibilidade e testes são bem-vindas.
 
 [Como contribuir](CONTRIBUTING.md) · [Código de conduta](CODE_OF_CONDUCT.md) · [Segurança](SECURITY.md) · [Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
-
-Sugestões por metadados complementam a consulta de duplicatas exatas: pares com mesmo nome e dimensões, capturados com até um segundo de diferença, aparecem para revisão visual. As sugestões nunca entram no fluxo de lixeira das cópias exatas. A análise conservadora pode deixar de encontrar variantes com nomes, dimensões ou datas diferentes; ela não garante uma biblioteca sem duplicatas.
