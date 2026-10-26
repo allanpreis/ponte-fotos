@@ -4,6 +4,7 @@ import AppKit
 /// Downloads are read-only; creating Photos assets always requires a separate confirmation.
 @MainActor private final class PFReverseUIState: ObservableObject {
     @Published var confirmingImport = false
+    @Published var configuring = false
 }
 
 struct PFReverseImportView: View {
@@ -43,7 +44,7 @@ struct PFReverseImportView: View {
                         ForEach(model.items) { item in itemRow(item) }
                     }
                 }.padding(.bottom, 8)
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }.frame(minHeight: 220, maxHeight: .infinity)
             footer
         }
         .padding(.horizontal, 24).padding(.bottom, 16)
@@ -59,19 +60,45 @@ struct PFReverseImportView: View {
 
     private var sourceControls: some View {
         PFCard {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L("Origem: \(connection.transferAccountLabel) · \(connection.transferAddress)."))
-                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 10) {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .bottom, spacing: 12) { albumPicker; sourceActions }
-                    VStack(alignment: .leading, spacing: 12) { albumPicker; sourceActions }
+                    VStack(alignment: .leading, spacing: 8) { albumPicker; sourceActions }
                 }
-                destinationControls
-                followControls
-                Text(L("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados."))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Image(systemName: model.activeFollow == nil ? "photo.on.rectangle" : "arrow.triangle.2.circlepath")
+                        .foregroundStyle(.secondary)
+                    Text(L("Destino: \(model.activeFollow?.destinationTitle ?? model.destinationLabel)"))
+                        .font(.callout).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 0)
+                }
+                Button(L("Destino e acompanhamento"), systemImage: "slider.horizontal.3") { ui.configuring = true }
+                    .disabled(working)
+                    .popover(isPresented: $ui.configuring, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text(L("Destino e acompanhamento")).font(.headline)
+                                Spacer()
+                                Button(L("Concluir")) { ui.configuring = false }
+                            }
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Text(L("Origem: \(connection.transferAccountLabel) · \(connection.transferAddress)."))
+                                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                                    destinationControls
+                                    followControls
+                                    Text(L("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados."))
+                                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                                    Text(L("O histórico evita repetir importações feitas pelo Ponte Fotos. Ele não compara toda a biblioteca existente do Fotos. Pessoas reconhecidas e histórico de edições não são transferidos."))
+                                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }.padding(20).frame(width: 540, height: 480)
+                            .environment(\.locale, PFLocalization.locale)
+                    }
             }
         }
+        .onChange(of: model.items.count) { _, count in if count > 0 { ui.configuring = false } }
     }
 
     private var followControls: some View {
@@ -254,8 +281,6 @@ struct PFReverseImportView: View {
             if model.importing && model.total > 0 {
                 ProgressView(L("\(model.done) de \(model.total) itens concluídos"), value: Double(model.done), total: Double(model.total))
             }
-            Text(L("O histórico evita repetir importações feitas pelo Ponte Fotos. Ele não compara toda a biblioteca existente do Fotos. Pessoas reconhecidas e histórico de edições não são transferidos."))
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 if working {
                     Button(L("Cancelar operação")) { model.cancel() }

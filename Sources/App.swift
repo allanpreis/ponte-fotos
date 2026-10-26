@@ -58,7 +58,9 @@ struct AlbumItem: Identifiable {
 @MainActor final class LibraryModel: ObservableObject {
     @Published var items: [PhotoItem] = []
     @Published var albums: [AlbumItem] = []
-    @Published var album = "all"
+    @Published var album = "all" {
+        didSet { if album != oldValue { invalidateUploadFollowReview(); restoreUploadFollowDestination() } }
+    }
     @Published var selection = Set<String>()
     var status: String { get { statusMessage.text } set { statusMessage = .verbatim(newValue) } }
     @Published var statusMessage = M("Conecte sua biblioteca para começar.")
@@ -103,7 +105,9 @@ struct AlbumItem: Identifiable {
     @Published var stopRequested = false
     @Published var scanning = false
     private var scanTask: Task<ExternalScanResult, Never>?
-    @Published var sourceName: String?
+    @Published var sourceName: String? {
+        didSet { if sourceName != oldValue { invalidateUploadFollowReview() } }
+    }
     private var externalItems: [PhotoItem] = []
     private var scopedFolder: URL?
     private var folderScoped = false
@@ -128,7 +132,9 @@ struct AlbumItem: Identifiable {
     @Published var edits: [String: MetadataOverride] = [:]
     @Published var editing: PhotoItem?
     @Published var inspectingMedia: PhotoItem?
-    @Published var selectedTransferAccountID = ""
+    @Published var selectedTransferAccountID = "" {
+        didSet { if selectedTransferAccountID != oldValue { invalidateUploadFollowReview() } }
+    }
     @Published private(set) var transferAccounts: [IMAccount] = []
     @Published private(set) var transferConnection: PFTransferConnection?
     @Published private(set) var transferStatusMessage = M("Valide a conta para transferir.")
@@ -186,6 +192,7 @@ struct AlbumItem: Identifiable {
         } catch { resetTransferConnection(); transferStatusMessage = PFMessage.error(error) }
     }
     func resetTransferConnection() {
+        invalidateUploadFollowReview()
         transferConnection = nil; remoteAlbums = []; remoteAlbumID = ""; albumStatusMessage = ""
         transferStatusMessage = M("Valide a conta para transferir.")
     }
@@ -216,6 +223,7 @@ struct AlbumItem: Identifiable {
             remoteAlbums = []; remoteAlbumID = ""
         }
         transferConnection = resolved
+        reloadUploadFollows()
         transferStatusMessage = resolved.explanation
     }
     func testTransferConnection() async {
@@ -238,7 +246,11 @@ struct AlbumItem: Identifiable {
          transferResolver: @escaping (ConnectionProfile, IMCredential, Set<String>) async throws -> PFTransferConnection = {
              try await PFTransferConnection.resolve(profile: $0, credential: $1, requiredPermissions: $2)
          }, workspaceOverride: URL? = nil, uploadConcurrency: Int = 2,
+         uploadFollowStore: PFAlbumFollowStore? = nil,
+         uploadFollowSource: ((String) throws -> [PhotoItem])? = nil,
          uploadClientFactory: @escaping (String, String) throws -> ImmichClient = { try ImmichClient(address: $0, key: $1) }) {
+        self.uploadFollowSource = uploadFollowSource
+        self.uploadFollowStore = uploadFollowStore ?? PFAlbumFollowDiskStore(root: (workspaceOverride ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PonteFotos", isDirectory: true)).appendingPathComponent("upload-album-follow", isDirectory: true))
         self.workspaceOverride = workspaceOverride; self.uploadClientFactory = uploadClientFactory
         self.uploadConcurrency = max(1, min(2, uploadConcurrency))
         self.credentialLoader = credentialLoader; self.transferResolver = transferResolver
@@ -274,6 +286,166 @@ struct AlbumItem: Identifiable {
         do { try ConnectionStore.remove(); connectionSaved = false; verifiedUserID = nil; profile.id = UUID().uuidString; resetConnection(); statusMessage = M("Conexão salva removida do Chaves. Os campos atuais permanecem até fechar.") }
         catch { statusMessage = PFMessage.error(error) }
     }
+    @Published private(set) var uploadFollowLinks: [PFAlbumFollowLink] = []
+    private let uploadFollowStore: PFAlbumFollowStore
+    private let uploadFollowSource: ((String) throws -> [PhotoItem])?
+    private var uploadFollowScope: String?
+    private var uploadFollowReadFailed = false
+    private var uploadFollowReview: PFUploadFollowContext?
+    private var uploadFollowFingerprints: [String: String] = [:]
+    var activeUploadFollow: PFAlbumFollowLink? {
+        guard sourceName == nil, let scope = currentUploadFollowScope, scope == uploadFollowScope else { return nil }
+        return uploadFollowLinks.first { $0.albumID == album }
+    }
+    private var currentUploadFollowScope: String? {
+        guard let connection = currentTransferConnection else { return nil }
+        return PFUploadFollowIdentity.scope(profileID: connection.profileID, userID: connection.userID)
+    }
+    private var currentUploadFollowContext: PFUploadFollowContext? {
+        guard let scope = currentUploadFollowScope, let link = activeUploadFollow else { return nil }
+        return PFUploadFollowContext(scope: scope, albumID: link.albumID, destinationID: link.destinationID, networkRevision: networkRevision)
+    }
+    var canStartUploadFollow: Bool {
+        !busy && connected && sourceName == nil && album != "all" && albums.contains { $0.id == album }
+            && transferReady && destination == .existing && remoteAlbums.contains { $0.id == remoteAlbumID }
+            && activeUploadFollow == nil && !uploadFollowReadFailed
+    }
+    private var uploadFollowSelectionReady: Bool {
+        guard let context = currentUploadFollowContext else { return true }
+        guard uploadFollowReview == context, destination == .existing, remoteAlbumID == context.destinationID else { return false }
+        return chosen.allSatisfy { uploadFollowFingerprints[$0.id] == uploadFollowFingerprint($0) }
+    }
+    private func uploadFollowFingerprint(_ item: PhotoItem) -> String {
+        PFUploadFollowIdentity.fingerprint(id: item.id, modified: item.asset?.modificationDate, metadata: metadata(for: item), live: item.live,
+            resources: item.resources.map { "\($0.type.rawValue):\($0.originalFilename):\($0.uniformTypeIdentifier)" })
+    }
+    private func invalidateUploadFollowReview() {
+        if uploadFollowReview != nil { items = []; selection = []; fetched = nil; offset = 0 }
+        uploadFollowReview = nil; uploadFollowFingerprints = [:]
+    }
+    private func reloadUploadFollows() {
+        guard let scope = currentUploadFollowScope else { return }
+        do {
+            let links = try uploadFollowStore.load(scope: scope)
+            if scope != uploadFollowScope { invalidateUploadFollowReview() }
+            uploadFollowLinks = links; uploadFollowScope = scope; uploadFollowReadFailed = false
+            restoreUploadFollowDestination()
+        } catch {
+            invalidateUploadFollowReview(); uploadFollowLinks = []; uploadFollowScope = scope; uploadFollowReadFailed = true
+            statusMessage = PFMessage.error(error)
+        }
+    }
+    private func restoreUploadFollowDestination() {
+        guard let link = activeUploadFollow else { return }
+        destination = .existing; remoteAlbumID = link.destinationID
+    }
+    func startUploadFollowing() {
+        guard canStartUploadFollow, let scope = currentUploadFollowScope,
+              let target = remoteAlbums.first(where: { $0.id == remoteAlbumID }) else { return }
+        do {
+            var links = uploadFollowLinks
+            links.append(PFAlbumFollowLink(albumID: album, destinationID: target.id, destinationTitle: target.albumName, completed: [:], lastChecked: nil))
+            try uploadFollowStore.save(links, scope: scope)
+            uploadFollowLinks = links; uploadFollowScope = scope
+            items = []; selection = []; fetched = nil; offset = 0; invalidateUploadFollowReview()
+            statusMessage = M("Acompanhamento de envio salvo. Consulte as novidades para revisar antes de enviar.")
+        } catch { statusMessage = PFMessage.error(error) }
+    }
+    func stopUploadFollowing() {
+        guard !busy, activeUploadFollow != nil, let scope = currentUploadFollowScope else { return }
+        do {
+            let links = uploadFollowLinks.filter { $0.albumID != album }
+            try uploadFollowStore.save(links, scope: scope)
+            uploadFollowLinks = links; invalidateUploadFollowReview(); loadAlbum()
+            statusMessage = M("Acompanhamento de envio removido. Fotos e histórico foram preservados.")
+        } catch { statusMessage = PFMessage.error(error) }
+    }
+    private func readUploadFollowItems(_ id: String) throws -> [PhotoItem] {
+        if let uploadFollowSource { return try uploadFollowSource(id) }
+        guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized,
+              let collection = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject else {
+            throw BridgeError(message: M("O álbum de origem do Fotos está indisponível. Confira o acesso e consulte novamente."))
+        }
+        let options = PHFetchOptions(); options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let result = PHAsset.fetchAssets(in: collection, options: options)
+        var rows: [PhotoItem] = []
+        result.enumerateObjects { asset, _, _ in
+            rows.append(PhotoItem(asset: asset, resources: PHAssetResource.assetResources(for: asset).filter { [.photo, .video, .pairedVideo, .alternatePhoto].contains($0.type) },
+                metadata: CaptureMetadata(date: asset.creationDate, latitude: asset.location?.coordinate.latitude, longitude: asset.location?.coordinate.longitude, favorite: asset.isFavorite)))
+        }
+        return rows
+    }
+    func checkUploadFollow() async {
+        guard !busy, connected, let context = currentUploadFollowContext, let link = activeUploadFollow else { return }
+        busy = true; stopRequested = false; invalidateUploadFollowReview(); items = []; selection = []; fetched = nil; offset = 0
+        defer { busy = false }
+        do {
+            try await validateTransfer(requiredPermissions: ["asset.read", "album.read"])
+            guard currentUploadFollowContext == context, let connection = currentTransferConnection else {
+                throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
+            }
+            let client = try uploadClientFactory(connection.address, connection.credential.key)
+            let albumIDs = try await client.uploadFollowAlbumAssetIDs(context.destinationID)
+            let source = try readUploadFollowItems(context.albumID)
+            var queue: [PhotoItem] = [], fingerprints: [String: String] = [:]
+            for (index, item) in source.enumerated() {
+                try Task.checkCancellation()
+                guard !stopRequested, currentUploadFollowContext == context else {
+                    throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
+                }
+                let fingerprint = uploadFollowFingerprint(item)
+                var completed = false
+                if link.completed[item.id] == fingerprint {
+                    let file = ConnectionHistory.recordURL(directory: workspace.appendingPathComponent("history"), profileID: profile.id, userID: connection.userID, itemID: item.id)
+                    let records = ConnectionHistory.load([file])
+                    let expectedCount = item.external == nil ? item.resources.count : 1
+                    if expectedCount > 0 && records.count == expectedCount && Set(records.map(\.resourceIndex)) == Set(0..<expectedCount) {
+                        completed = true
+                        let paired = records.first { record in item.resources.indices.contains(record.resourceIndex) && item.resources[record.resourceIndex].type == .pairedVideo }?.result.id
+                        for record in records {
+                            let isPair = item.resources.indices.contains(record.resourceIndex) && item.resources[record.resourceIndex].type == .pairedVideo
+                            if !isPair && !albumIDs.contains(record.result.id) { completed = false; break }
+                            guard try await client.matchesHistory(assetID: record.result.id, checksum: record.checksum, userID: connection.userID) else { completed = false; break }
+                            let remote = try await client.info(record.result.id)
+                            if !metadata(for: item).verify(remote, liveVideoID: item.resources.indices.contains(record.resourceIndex) && item.resources[record.resourceIndex].type == .photo ? paired : nil) { completed = false; break }
+                        }
+                    }
+                }
+                if !completed { queue.append(item); fingerprints[item.id] = fingerprint }
+                statusMessage = M("Consultando novidades: \(index + 1) de \(source.count)…")
+                await Task.yield()
+            }
+            guard !stopRequested, currentUploadFollowContext == context,
+                  let index = uploadFollowLinks.firstIndex(where: { $0.albumID == context.albumID && $0.destinationID == context.destinationID }) else {
+                throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
+            }
+            var links = uploadFollowLinks; links[index].lastChecked = Date()
+            try uploadFollowStore.save(links, scope: context.scope)
+            uploadFollowLinks = links; items = queue; uploadFollowFingerprints = fingerprints; uploadFollowReview = context
+            statusMessage = M("\(queue.count) itens para revisar antes do envio. Nada foi enviado automaticamente.")
+        } catch { invalidateUploadFollowReview(); items = []; selection = []; statusMessage = PFMessage.error(error) }
+    }
+    private func validateUploadFollowBeforeSend(_ context: PFUploadFollowContext?) throws {
+        guard let context else { return }
+        guard currentUploadFollowContext == context, destination == .existing, remoteAlbumID == context.destinationID else {
+            throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
+        }
+        let latest = Dictionary(uniqueKeysWithValues: try readUploadFollowItems(context.albumID).map { ($0.id, uploadFollowFingerprint($0)) })
+        guard chosen.allSatisfy({ latest[$0.id] == uploadFollowFingerprints[$0.id] }) else {
+            throw BridgeError(message: M("O álbum do Fotos mudou. Consulte as novidades novamente antes de enviar."))
+        }
+    }
+    private func completeUploadFollow(_ item: PhotoItem, context: PFUploadFollowContext?, targetAlbumID: String?) throws {
+        guard let context else { return }
+        guard currentUploadFollowContext == context, targetAlbumID == context.destinationID,
+              let expected = uploadFollowFingerprints[item.id], expected == uploadFollowFingerprint(item),
+              let index = uploadFollowLinks.firstIndex(where: { $0.albumID == context.albumID && $0.destinationID == context.destinationID }) else {
+            throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
+        }
+        var links = uploadFollowLinks; links[index].completed[item.id] = expected
+        try uploadFollowStore.save(links, scope: context.scope)
+        uploadFollowLinks = links; selection.remove(item.id)
+    }
     func reviewSelection() {
         guard let item = items.first(where: { selection.contains($0.id) }) else { statusMessage = M("Selecione uma foto para revisar."); return }
         editing = item
@@ -303,13 +475,14 @@ struct AlbumItem: Identifiable {
         }
     }
     var canSend: Bool {
-        !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && transferReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        uploadFollowSelectionReady && !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && transferReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     func refreshAlbums(timeout: TimeInterval = 15) async {
         do {
             guard transferReady else { return }
             remoteAlbums = try await ImmichClient(address: transferAddress, key: transferKey).albums(timeout: timeout)
-            if !remoteAlbums.contains(where: { $0.id == remoteAlbumID }) { remoteAlbumID = remoteAlbums.first?.id ?? "" }
+            if let link = activeUploadFollow { destination = .existing; remoteAlbumID = link.destinationID }
+            else if !remoteAlbums.contains(where: { $0.id == remoteAlbumID }) { remoteAlbumID = remoteAlbums.first?.id ?? "" }
             albumStatusMessage = remoteAlbums.isEmpty ? M("Nenhum álbum disponível. Você pode criar um.") : M("\(remoteAlbums.count) álbuns disponíveis")
         } catch { remoteAlbums = []; remoteAlbumID = ""; albumStatusMessage = M("Não foi possível listar álbuns: \(PFMessage.error(error))") }
     }
@@ -336,7 +509,15 @@ struct AlbumItem: Identifiable {
     }
     func connectLibrary() async {
         busy = true; statusMessage = M("Abrindo biblioteca do Fotos…"); defer { busy = false }
-        let authorization = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        let authorization: PHAuthorizationStatus
+        do {
+            let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if current == .notDetermined {
+                authorization = try await PFPhotosAuthorization.request { completion in
+                    PHPhotoLibrary.requestAuthorization(for: .readWrite, handler: completion)
+                }
+            } else { authorization = current }
+        } catch { statusMessage = PFMessage.error(error); return }
         guard authorization == .authorized || authorization == .limited else {
             statusMessage = M("Acesso ao Fotos não autorizado. Libere Ponte Fotos em Ajustes do Sistema → Privacidade e Segurança → Fotos."); return
         }
@@ -357,7 +538,11 @@ struct AlbumItem: Identifiable {
         if let collection = albums.first(where: { $0.id == album })?.collection {
             fetched = PHAsset.fetchAssets(in: collection, options: options)
         } else { fetched = PHAsset.fetchAssets(with: options) }
-        loadMore()
+        restoreUploadFollowDestination()
+        if activeUploadFollow != nil {
+            fetched = nil
+            statusMessage = M("Consulte as novidades do álbum acompanhado antes de enviar.")
+        } else { loadMore() }
     }
     func loadMore() {
         if sourceName != nil {
@@ -513,6 +698,7 @@ struct AlbumItem: Identifiable {
     }
     func sendSelected() async {
         guard canSend, transferReady else { statusMessage = M("Teste a conexão antes de enviar."); return }
+        let followContext = uploadFollowReview
         busy = true; uploading = true; progress = 0; stopRequested = false
         uploadMetrics = PFUploadMetrics()
         defer { uploading = false; busy = false }
@@ -520,6 +706,7 @@ struct AlbumItem: Identifiable {
             let permissions = PFTransferConnection.uploadPermissions(addingToAlbum: destination != .timeline, creatingAlbum: destination == .new, applyingReview: chosen.contains { edits[$0.id]?.hasChanges == true })
             try await validateTransfer(requiredPermissions: permissions)
             guard let resolved = transferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
+            try validateUploadFollowBeforeSend(followContext)
             // Freeze endpoint, account and key through every resource in this batch.
             let client = try uploadClientFactory(resolved.address, resolved.credential.key)
             let userID = resolved.userID
@@ -597,7 +784,7 @@ struct AlbumItem: Identifiable {
                     }, shouldPause: { self.stopRequested }, operation: { prepared in
                         await self.uploadPreparedItem(prepared, client: client, userID: userID,
                             transferProfile: transferProfile, resolvedAddress: resolved.address,
-                            history: history, targetAlbumID: targetAlbumID, duplicates: duplicates)
+                            history: history, targetAlbumID: targetAlbumID, duplicates: duplicates, followContext: followContext)
                     }, onComplete: { _ in
                         self.uploadMetrics?.processedItems += 1
                         withAnimation { self.progress = Double(self.uploadMetrics?.processedItems ?? 0) / Double(batch.count) }
@@ -608,7 +795,7 @@ struct AlbumItem: Identifiable {
     }
     private func uploadPreparedItem(_ prepared: PFPreparedUploadItem, client: ImmichClient,
         userID: String, transferProfile: ConnectionProfile, resolvedAddress: String,
-        history: URL, targetAlbumID: String?, duplicates: [String: PFUploadCheckCandidate]?) async {
+        history: URL, targetAlbumID: String?, duplicates: [String: PFUploadCheckCandidate]?, followContext: PFUploadFollowContext?) async {
         let item = prepared.item, folder = prepared.folder
         do {
             let recordURL = ConnectionHistory.recordURL(directory: history, profileID: transferProfile.id, userID: userID, itemID: item.id)
@@ -674,7 +861,10 @@ struct AlbumItem: Identifiable {
                 try await client.addToAlbum(targetAlbumID, assetIDs: albumAssetIDs)
             }
             let checked = M("Data conferida") + (item.metadata.latitude != nil ? M(" · GPS conferido") : M(" · sem GPS informado")) + (item.live ? M(" · Live conferido") : "")
-            if allVerified { uploadMetrics?.completedItems += 1 }
+            if allVerified {
+                try completeUploadFollow(item, context: followContext, targetAlbumID: targetAlbumID)
+                uploadMetrics?.completedItems += 1
+            }
             resultsMessages[item.id] = (allVerified ? checked : M("Enviado/existente · conferência pendente ou divergente")) + (targetAlbumID != nil ? M(" · no álbum") : "")
         } catch {
             resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
@@ -728,6 +918,7 @@ extension Notification.Name { static let pfOpenSettings = Notification.Name("Pon
 @MainActor final class PFNavigationState: ObservableObject {
     @Published var settings = false
     @Published var reverse = false
+    @Published var showingUploadFollow = false
 }
 
 struct ContentView: View {
@@ -892,20 +1083,62 @@ struct ContentView: View {
                     Picker(L("Álbum do Fotos"), selection: $model.album) { ForEach(model.albums) { Text($0.displayTitle).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
                 }
                 Toggle(L("Baixar originais do iCloud"), isOn: $model.allowCloud).font(.caption).disabled(model.sourceName != nil)
+                if model.sourceName == nil {
+                    HStack(spacing: 8) {
+                        if model.activeUploadFollow != nil {
+                            Button(L("Consultar novidades")) { Task { await model.checkUploadFollow() } }
+                                .disabled(!model.transferReady)
+                            Button { navigation.showingUploadFollow = true } label: { Image(systemName: "arrow.triangle.2.circlepath") }
+                                .help(L("Acompanhamento assistido"))
+                                .accessibilityLabel(L("Acompanhamento assistido"))
+                        } else {
+                            Button(L("Acompanhar este álbum")) { navigation.showingUploadFollow = true }
+                                .disabled(!model.canStartUploadFollow)
+                                .help(L("Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar."))
+                        }
+                    }
+                    .popover(isPresented: $navigation.showingUploadFollow, arrowEdge: .bottom) { uploadFollowSettings }
+                }
             }
         }.disabled(model.busy).onChange(of: model.album) { model.loadAlbum() }
     }
+    private var uploadFollowSettings: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label(L("Acompanhamento assistido"), systemImage: "arrow.triangle.2.circlepath").font(.headline)
+                Spacer()
+                Button(L("Concluir")) { navigation.showingUploadFollow = false }
+            }
+            Text(L("Fotos → Immich")).font(.callout.weight(.semibold))
+            Text(L("Destino: \(model.activeUploadFollow?.destinationTitle ?? model.destinationLabel)"))
+                .font(.callout).textSelection(.enabled)
+            Text(L("A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente."))
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let follow = model.activeUploadFollow {
+                if let date = follow.lastChecked {
+                    Text(L("Última consulta: \(PFLocalization.formatDate(date, date: .abbreviated, time: .shortened))"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Button(L("Parar acompanhamento")) { model.stopUploadFollowing(); navigation.showingUploadFollow = false }
+                    .disabled(model.busy)
+            } else {
+                Button(L("Acompanhar este álbum")) { model.startUploadFollowing(); navigation.showingUploadFollow = false }
+                    .disabled(model.busy || !model.canStartUploadFollow)
+            }
+        }.padding(20).frame(width: 440).environment(\.locale, PFLocalization.locale)
+    }
+
     private var destinationPanel: some View {
         PFCard {
             VStack(alignment: .leading, spacing: 12) {
                 PFSectionHeading(L("Destino"), systemImage: "externaldrive.badge.icloud")
-                Picker(L("Destino no Immich"), selection: $model.destination) { ForEach(UploadDestination.allCases) { Text($0.label).tag($0) } }.id(PFLocalization.languageCode).labelsHidden().controlSize(.large)
+                Picker(L("Destino no Immich"), selection: $model.destination) { ForEach(UploadDestination.allCases) { Text($0.label).tag($0) } }.id(PFLocalization.languageCode).labelsHidden().controlSize(.large).disabled(model.activeUploadFollow != nil)
                 if model.destination == .existing {
                     HStack {
                         Picker(L("Álbum de destino"), selection: $model.remoteAlbumID) {
                             if model.remoteAlbums.isEmpty { Text(L("Nenhum álbum")).tag("") }
                             ForEach(model.remoteAlbums) { Text($0.albumName + ($0.shared == true ? L(" · compartilhado") : "")).tag($0.id) }
-                        }.id(PFLocalization.languageCode).labelsHidden()
+                        }.id(PFLocalization.languageCode).labelsHidden().disabled(model.activeUploadFollow != nil)
                         Button { Task { await model.refreshAlbums() } } label: { Image(systemName: "arrow.clockwise") }.help(L("Atualizar álbuns")).accessibilityLabel(L("Atualizar álbuns")).disabled(!model.transferReady)
                     }
                     Text(model.albumStatus).font(.caption).foregroundStyle(.secondary)
@@ -934,7 +1167,7 @@ struct ContentView: View {
                     }
                 }.frame(minHeight: 180).disabled(model.busy)
             HStack(spacing: 14) {
-                Button(L("Carregar mais")) { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy)
+                Button(L("Carregar mais")) { model.loadMore() }.disabled((!model.connected && model.sourceName == nil) || model.busy || model.activeUploadFollow != nil)
                 Button(L("Selecionar visíveis")) { model.selection = Set(model.items.map(\.id)) }.disabled(model.busy)
                 Spacer()
                 Text(L("\(model.items.count) itens carregados")).font(.caption).foregroundStyle(.secondary)
