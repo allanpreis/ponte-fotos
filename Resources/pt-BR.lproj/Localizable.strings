@@ -118,9 +118,9 @@
 "Concluir" = "Concluir";
 "Concluída" = "Concluída";
 "Conecte a conta proprietária de todas as cópias selecionadas antes de continuar." = "Conecte a conta proprietária de todas as cópias selecionadas antes de continuar.";
-"Conecte as contas em Contas e API para comparar suas cópias." = "Conecte as contas em Contas e API para comparar suas cópias.";
+"Conecte as contas em Configurações → Contas e API para comparar suas cópias." = "Conecte as contas em Configurações → Contas e API para comparar suas cópias.";
 "Conecte as contas proprietárias e escolha a cópia para manter. Consulte novamente." = "Conecte as contas proprietárias e escolha a cópia para manter. Consulte novamente.";
-"Conecte em Contas e API: " = "Conecte em Contas e API: ";
+"Conecte em Configurações → Contas e API: " = "Conecte em Configurações → Contas e API: ";
 "Conecte o Immich para escolher um álbum." = "Conecte o Immich para escolher um álbum.";
 "Conecte seu servidor" = "Conecte seu servidor";
 "Conecte sua biblioteca para começar." = "Conecte sua biblioteca para começar.";
@@ -620,7 +620,7 @@
 
 "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer." = "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer.";
 
-"Conecte a conta proprietária em Contas e API para carregar a prévia." = "Conecte a conta proprietária em Contas e API para carregar a prévia.";
+"Conecte a conta proprietária em Configurações → Contas e API para carregar a prévia." = "Conecte a conta proprietária em Configurações → Contas e API para carregar a prévia.";
 
 "Faça uma nova consulta antes de revisar as sugestões." = "Faça uma nova consulta antes de revisar as sugestões.";
 
