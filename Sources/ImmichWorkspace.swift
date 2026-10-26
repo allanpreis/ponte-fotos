@@ -281,7 +281,7 @@ struct ImmichWorkspaceView: View {
         VStack(alignment: .leading, spacing: 20) {
             header
             Picker(L("Área"), selection: $ui.tab) {
-                ForEach(["Álbuns", "Comparar álbuns", "Pessoa e idade", "Contas e API", "Histórico"], id: \.self) { Text(LV($0)).tag($0) }
+                ForEach(["Álbuns", "Comparar álbuns", "Pessoa e idade", "Histórico"], id: \.self) { Text(LV($0)).tag($0) }
             }.id(PFLocalization.languageCode).pickerStyle(.segmented).controlSize(.large).disabled(model.busy)
             if model.busy { HStack { ProgressView().controlSize(.small); Text(model.progress).font(.callout); Spacer(); if model.canCancel { Button(L("Cancelar consulta")) { model.cancelQuery() } } } }
             if let error = model.error {
@@ -290,7 +290,6 @@ struct ImmichWorkspaceView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     switch ui.tab {
-                    case "Contas e API": accountsView
                     case "Histórico": historyView
                     case "Pessoa e idade": ageView
                     default: albumSelector; if ui.tab == "Álbuns" { duplicatesView } else { comparisonView }
@@ -334,7 +333,7 @@ struct ImmichWorkspaceView: View {
                     VStack(alignment: .leading, spacing: 12) { albumSearch; HStack { ownerPicker; Spacer(); refreshAlbums } }
                 }
                 if model.credentials.isEmpty {
-                    Label(L("Conecte as contas em Contas e API para comparar suas cópias."), systemImage: "person.crop.circle.badge.plus").font(.callout).foregroundStyle(.secondary)
+                    Label(L("Conecte as contas em Configurações → Contas e API para comparar suas cópias."), systemImage: "person.crop.circle.badge.plus").font(.callout).foregroundStyle(.secondary)
                 }
                 if !filteredAlbums.isEmpty {
                     ScrollView {
@@ -451,7 +450,7 @@ struct ImmichWorkspaceView: View {
                     Button(L("Comparar ampliado")) { ui.enlargedSuggestion = suggestion }
                     if model.suggestionChoices[suggestion.id] != nil { Button(L("Desmarcar par")) { model.suggestionChoices.removeValue(forKey: suggestion.id) } }
                 }
-                if ownerMissing { Text(L("Conecte a conta proprietária em Contas e API para carregar a prévia.")).font(.caption).foregroundStyle(.orange) }
+                if ownerMissing { Text(L("Conecte a conta proprietária em Configurações → Contas e API para carregar a prévia.")).font(.caption).foregroundStyle(.orange) }
                 if suggestion.assets.filter(\.isLive).count > 1 { Text(L("As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento.")).foregroundStyle(.orange) }
                 else if suggestion.assets.contains(where: \.isLive) { Text(L("Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar.")).foregroundStyle(.secondary) }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
@@ -485,7 +484,7 @@ struct ImmichWorkspaceView: View {
         PFCard {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle(L("Revisar grupo · \(group.assets.count) cópias"), isOn: Binding(get: { model.duplicateChoices[group.id] != nil }, set: { model.duplicateChoices[group.id] = $0 ? group.keepID : nil })).font(.headline).disabled(!group.unavailableOwnerIDs.isEmpty)
-                if !group.unavailableOwnerIDs.isEmpty { Text(L("Conecte em Contas e API: ") + group.unavailableOwnerIDs.map { model.name($0) }.joined(separator: ", ") + L(". Depois, refaça a consulta para alterar este grupo.")).font(.caption).foregroundStyle(.orange) }
+                if !group.unavailableOwnerIDs.isEmpty { Text(L("Conecte em Configurações → Contas e API: ") + group.unavailableOwnerIDs.map { model.name($0) }.joined(separator: ", ") + L(". Depois, refaça a consulta para alterar este grupo.")).font(.caption).foregroundStyle(.orange) }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
                     ForEach(group.assets) { asset in
                         VStack(alignment: .leading, spacing: 10) {
@@ -551,7 +550,6 @@ struct ImmichWorkspaceView: View {
             }
         }
     }
-    private var accountsView: some View { IMAccountSettingsView(model: model) }
     private var historyView: some View {
         VStack(alignment: .leading, spacing: 14) {
             PFSectionHeading(L("Histórico de organização"), subtitle: L("Acompanhe as últimas 20 operações deste perfil."), systemImage: "clock.arrow.circlepath")
