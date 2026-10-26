@@ -56,6 +56,7 @@ struct PFReverseAsset: Decodable {
     let type: String
     let fileCreatedAt: String?
     let livePhotoVideoId: String?
+    var pairedChecksum: String? = nil // Filled from the paired resource, never trusted from the image response.
     let isOffline: Bool?
     let isTrashed: Bool?
     struct Exif: Decodable { let dateTimeOriginal: String?; let latitude: Double?; let longitude: Double? }
@@ -147,6 +148,7 @@ struct PFReverseRecord: Codable, Equatable {
     let checksum: String
     var photosID: String?
     var pending: Bool
+    var pairSignature: String? = nil
 }
 protocol PFReverseHistory {
     func load(scope: String) throws -> [PFReverseRecord]
@@ -213,12 +215,17 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     var canRead: Bool { get }
     func authorize() async throws
     func exists(_ id: String) -> Bool
+    func contains(id: String, albumID: String) -> Bool
     func verify(id: String, asset: PFReverseAsset) async throws -> PFImportVerification
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws
     func listAlbums() async throws -> [PFPhotosAlbum]
     func prepareDestination(_ destination: PFPhotosDestination) throws
     func addExisting(id: String, destination: PFPhotosDestination) async throws -> String
     func create(asset: PFReverseAsset, original: URL, paired: URL?, destination: PFPhotosDestination) async throws -> PFPhotosImportResult
+}
+extension PFReversePhotos {
+    // Unknown membership must stay in the review queue.
+    func contains(id: String, albumID: String) -> Bool { false }
 }
 @MainActor final class PFReversePhotoLibrary: PFReversePhotos {
     var canRead: Bool { PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized }
@@ -227,6 +234,15 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         guard status == .authorized else { throw BridgeError(message: M("Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.")) }
     }
     func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
+    func contains(id: String, albumID: String) -> Bool {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return false }
+        let collections = PHAssetCollection.fetchAssetCollectionsContaining(asset, with: .album, options: nil)
+        var found = false
+        collections.enumerateObjects { collection, _, stop in
+            if collection.localIdentifier == albumID { found = true; stop.pointee = true }
+        }
+        return found
+    }
     func verify(id: String, asset: PFReverseAsset) async throws -> PFImportVerification {
         // PhotoKit can briefly lag the completed changes transaction. Only missing
         // visibility is retried, for at most one second; metadata mismatches are final.
@@ -339,7 +355,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     @Published var selection = Set<String>()
     @Published var albumID = "" {
         didSet {
-            if albumID != oldValue && !importing { generation = UUID(); items = []; selection = []; assets = [:] }
+            if albumID != oldValue && !importing { generation = UUID(); items = []; selection = []; assets = [:]; reviewFollowID = nil; restoreFollowDestination() }
         }
     }
     @Published var destinationMode: PFPhotosDestinationMode = .new
@@ -373,6 +389,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             let rows = try await photos.listAlbums()
             photosAlbums = rows
             if !rows.contains(where: { $0.id == destinationAlbumID }) { destinationAlbumID = "" }
+            restoreFollowDestination()
             statusMessage = rows.isEmpty ? M("Nenhum álbum editável encontrado. Você pode criar um novo álbum ao importar.") : M("\(rows.count) álbuns do Fotos disponíveis.")
         } catch { photosAlbums = []; destinationAlbumID = ""; statusMessage = PFMessage.error(error) }
     }
@@ -386,18 +403,62 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     private var sourceContext: [String]?
     private let connect: (String, String, String) async throws -> PFReverseRemote
     private var remote: PFReverseRemote?
+    @Published private(set) var followedAlbums: [PFAlbumFollowLink] = []
+    private let followStore: PFAlbumFollowStore
+    private var reviewFollowID: String?
+    var activeFollow: PFAlbumFollowLink? { followedAlbums.first { $0.albumID == albumID } }
+    private func restoreFollowDestination() {
+        guard let link = activeFollow else { return }
+        destinationMode = .existing; destinationAlbumID = link.destinationID
+    }
+    func startFollowing() {
+        guard !busy && !importing, let remote, !albumID.isEmpty,
+              case .existing(let id, let title)? = destination, activeFollow == nil else { return }
+        do {
+            var links = followedAlbums
+            links.append(PFAlbumFollowLink(albumID: albumID, destinationID: id, destinationTitle: title, completed: [:], lastChecked: nil))
+            try followStore.save(links, scope: remote.scope)
+            followedAlbums = links; items = []; selection = []; assets = [:]; reviewFollowID = nil
+            statusMessage = M("Acompanhamento salvo. Consulte as novidades para revisar antes de importar.")
+        } catch { statusMessage = PFMessage.error(error) }
+    }
+    func stopFollowing() {
+        guard !busy && !importing, let remote, activeFollow != nil else { return }
+        do {
+            let links = followedAlbums.filter { $0.albumID != albumID }
+            try followStore.save(links, scope: remote.scope)
+            followedAlbums = links; items = []; selection = []; assets = [:]; reviewFollowID = nil
+            statusMessage = M("Acompanhamento removido. Fotos e histórico de importação foram preservados.")
+        } catch { statusMessage = PFMessage.error(error) }
+    }
+    private func followFingerprint(_ asset: PFReverseAsset) -> String {
+        let values = [asset.checksum, asset.livePhotoVideoId ?? "", asset.pairedChecksum ?? "", asset.type,
+                      asset.item.captureDate.map { String($0.timeIntervalSince1970) } ?? "",
+                      asset.item.latitude.map { String($0) } ?? "", asset.item.longitude.map { String($0) } ?? ""]
+        return SHA256.hash(data: Data(values.joined(separator: "|").utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    private func completeFollow(_ asset: PFReverseAsset, scope: String, destinationID: String) throws {
+        guard let followedID = reviewFollowID else { return }
+        guard let index = followedAlbums.firstIndex(where: { $0.albumID == followedID && $0.destinationID == destinationID }) else {
+            throw BridgeError(message: M("O acompanhamento mudou. Consulte as novidades novamente."))
+        }
+        var links = followedAlbums
+        links[index].completed[asset.id] = followFingerprint(asset)
+        try followStore.save(links, scope: scope)
+        followedAlbums = links
+    }
     private let history: PFReverseHistory
     private let photos: PFReversePhotos
     private var assets: [String: PFReverseAsset] = [:]
     private var cancellationRequested = false
     private var pauseAfterItem = false
     private var generation = UUID()
-    init(history: PFReverseHistory = PFReverseDiskHistory(), photos: PFReversePhotos? = nil,
+    init(history: PFReverseHistory = PFReverseDiskHistory(), followStore: PFAlbumFollowStore = PFAlbumFollowDiskStore(), photos: PFReversePhotos? = nil,
          connect: @escaping (String, String, String) async throws -> PFReverseRemote = { address, key, profileID in
              let credential = try await IMManagementStore.verify(address: address, key: key)
              return PFReverseHTTP(client: IMClient(address: address, credential: credential), profileID: profileID)
          }) {
-        self.history = history; self.photos = photos ?? PFReversePhotoLibrary(); self.connect = connect
+        self.history = history; self.followStore = followStore; self.photos = photos ?? PFReversePhotoLibrary(); self.connect = connect
     }
     func load(address: String, key: String, profileID: String, expectedUserID: String? = nil, preflight: (([String]) async throws -> Void)? = nil) async {
         guard !importing && !busy else { return }
@@ -417,17 +478,20 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             }
             let rows = try await value.albums()
             guard token == generation else { return }
-            remote = value; sourceContext = context
+            let links = try followStore.load(scope: value.scope)
+            remote = value; sourceContext = context; followedAlbums = links
             albums = rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             // An explicit refresh must not silently switch the user's source album.
             albumID = previousAlbum.isEmpty ? (albums.first?.id ?? "") : (albums.contains { $0.id == previousAlbum } ? previousAlbum : "")
+            restoreFollowDestination()
             statusMessage = M("Escolha um álbum para revisar os originais.")
         } catch { if token == generation { statusMessage = PFMessage.error(error) } }
     }
     func loadAlbum(preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing, let remote else { return }
         busy = true; defer { busy = false }; selection = []; items = []; assets = [:]
-        let token = generation, album = albumID
+        let token = generation, album = albumID, follow = activeFollow
+        reviewFollowID = nil
         do {
             try await validateSource(preflight)
             guard generation == token else { return }
@@ -436,7 +500,14 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             let records = try history.load(scope: remote.scope)
             for id in ids {
                 try Task.checkCancellation(); guard generation == token else { return }
-                let asset = try await remote.asset(id)
+                var asset = try await remote.asset(id)
+                if let videoID = asset.livePhotoVideoId {
+                    let video = try await remote.asset(videoID)
+                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
+                        throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
+                    }
+                    asset.pairedChecksum = video.checksum
+                } else { asset.pairedChecksum = nil }
                 var item = asset.item
                 if let pending = records.last(where: { $0.assetID == id && $0.pending }) {
                     item.setIssue(M("Importação anterior sem confirmação final. Confira o Fotos antes de tentar novamente."))
@@ -452,7 +523,23 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
             guard generation == token, albumID == album else { return }
             let pairedIDs = Set(loaded.values.compactMap(\.livePhotoVideoId))
             rows = rows.filter { !pairedIDs.contains($0.id) }
-            assets = loaded; items = rows; statusMessage = M("\(rows.count) originais encontrados. Selecione os itens para importar.")
+            if let follow {
+                rows = rows.filter { item in
+                    guard !records.contains(where: { $0.assetID == item.id && $0.pending }),
+                          let asset = loaded[item.id], follow.completed[item.id] == followFingerprint(asset),
+                          photos.canRead, let record = records.last(where: { $0.assetID == item.id && $0.checksum == asset.checksum }),
+                          !record.pending, let id = record.photosID, photos.exists(id), photos.contains(id: id, albumID: follow.destinationID) else { return true }
+                    return false
+                }
+                var links = followedAlbums
+                guard let index = links.firstIndex(where: { $0.albumID == album && $0.destinationID == follow.destinationID }) else {
+                    throw BridgeError(message: M("O acompanhamento mudou. Consulte as novidades novamente."))
+                }
+                links[index].lastChecked = Date()
+                try followStore.save(links, scope: remote.scope)
+                followedAlbums = links; reviewFollowID = album
+            }
+            assets = loaded; items = rows; statusMessage = follow == nil ? M("\(rows.count) originais encontrados. Selecione os itens para importar.") : M("\(rows.count) itens para revisar no acompanhamento. Nenhuma importação foi iniciada.")
         } catch { if generation == token { statusMessage = PFMessage.error(error) } }
     }
     // Explicit recovery reads an already-known PhotoKit identifier. It never
@@ -520,7 +607,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         sourceContext = nil
         generation = UUID(); cancellationRequested = true; showConfirmation = false
         if !importing {
-            remote = nil; albums = []; albumID = ""; items = []; selection = []; assets = [:]
+            remote = nil; followedAlbums = []; reviewFollowID = nil; albums = []; albumID = ""; items = []; selection = []; assets = [:]
             if !preservingProgress {
                 done = 0; total = 0
                 statusMessage = M("Atualize a lista de álbuns, escolha uma origem e consulte os itens para revisar a importação.")
@@ -535,6 +622,11 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         guard !busy && !importing && !loadingDestinations, let remote else { return }
         let selected = items.filter { selection.contains($0.id) && $0.selectable }.compactMap { assets[$0.id] }
         guard !selected.isEmpty, var target = destination, target.isValid else { statusMessage = M("Selecione originais válidos e informe o álbum de destino."); return }
+        if reviewFollowID != nil {
+            guard case .existing(let id, _) = target, activeFollow?.destinationID == id else {
+                statusMessage = M("O acompanhamento mudou. Consulte as novidades novamente."); return
+            }
+        }
         importing = true; cancellationRequested = false; pauseAfterItem = false; showConfirmation = false; done = 0; total = selected.count
         let token = generation
         defer {
@@ -545,16 +637,37 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
         do {
             try await validateSource(preflight)
             guard token == generation else { return }
+            if let followedID = reviewFollowID {
+                let currentIDs = Set(try await remote.ids(album: followedID))
+                guard token == generation, selected.allSatisfy({ currentIDs.contains($0.id) }) else {
+                    throw BridgeError(message: M("O acompanhamento mudou. Consulte as novidades novamente."))
+                }
+            }
             try await photos.authorize()
             try photos.prepareDestination(target)
             var records = try history.load(scope: remote.scope)
             for originalAsset in selected {
                 if cancellationRequested || pauseAfterItem || generation != token { statusMessage = M("Importação interrompida entre itens. \(done) concluídos."); return }
-                let asset = try await remote.asset(originalAsset.id)
+                var asset = try await remote.asset(originalAsset.id)
+                if let videoID = asset.livePhotoVideoId {
+                    let video = try await remote.asset(videoID)
+                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
+                        throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
+                    }
+                    asset.pairedChecksum = video.checksum
+                    if let expectedPair = originalAsset.pairedChecksum, expectedPair != video.checksum {
+                        throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar."))
+                    }
+                } else { asset.pairedChecksum = nil }
                 guard asset.item.selectable, asset.checksum == originalAsset.checksum, asset.livePhotoVideoId == originalAsset.livePhotoVideoId,
                       asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.")) }
                 if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: M("Há um resultado pendente para este item. Confira o Fotos antes de repetir.")) }
                 if let previous = records.last(where: { $0.assetID == asset.id && $0.checksum == asset.checksum }), let id = previous.photosID, photos.exists(id) {
+                    if asset.livePhotoVideoId != nil || previous.pairSignature != nil {
+                        guard previous.pairSignature == followFingerprint(asset) else {
+                            throw BridgeError(message: M("O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item."))
+                        }
+                    }
                     if cancellationRequested || generation != token { return }
                     let verification: PFImportVerification
                     do { verification = try await photos.verify(id: id, asset: asset) }
@@ -577,6 +690,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                     let albumID = try await photos.addExisting(id: id, destination: target)
                     rememberResolvedAlbum(id: albumID, destination: target)
                     target = .existing(id: albumID, title: target.title)
+                    try completeFollow(asset, scope: remote.scope, destinationID: albumID)
                     markImported(asset.id); done += 1; continue
                 }
                 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ponte-reverse-" + UUID().uuidString, isDirectory: true)
@@ -588,7 +702,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 if let videoID = asset.livePhotoVideoId {
                     guard asset.type == "IMAGE" else { throw BridgeError(message: M("Par Live Photo inválido.")) }
                     let video = try await remote.asset(videoID)
-                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true else { throw BridgeError(message: M("Vídeo da Live Photo indisponível.")) }
+                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, video.checksum == asset.pairedChecksum else { throw BridgeError(message: M("Vídeo da Live Photo indisponível.")) }
                     paired = try await remote.download(video, directory: dir)
                 }
                 if cancellationRequested || generation != token { statusMessage = M("Importação interrompida antes de gravar no Fotos."); return }
@@ -596,7 +710,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 if cancellationRequested || generation != token { statusMessage = M("Importação interrompida antes de gravar no Fotos."); return }
                 // Persist intent BEFORE PhotoKit. Crashes/ambiguous errors must never trigger blind retries.
                 records.removeAll { $0.assetID == asset.id }
-                records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true))
+                records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true, pairSignature: asset.livePhotoVideoId == nil ? nil : followFingerprint(asset)))
                 try history.save(records, scope: remote.scope)
                 let result = try await photos.create(asset: asset, original: file, paired: paired, destination: target)
                 rememberResolvedAlbum(id: result.albumID, destination: target)
@@ -616,6 +730,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
                 records[records.count - 1].pending = false
                 try history.save(records, scope: remote.scope)
                 setCanRecheck(false, id: asset.id)
+                try completeFollow(asset, scope: remote.scope, destinationID: result.albumID)
                 markImported(asset.id); done += 1
             }
             statusMessage = M("\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados.")

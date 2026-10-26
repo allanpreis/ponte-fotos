@@ -37,7 +37,7 @@ struct PFReverseImportView: View {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     if model.items.isEmpty {
                         PFEmptyState(working ? L("Consultando o Immich…") : L("Escolha suas memórias"),
-                                     detail: L("Atualize a lista de álbuns, escolha uma origem e consulte os itens para revisar a importação."),
+                                     detail: model.activeFollow == nil ? L("Atualize a lista de álbuns, escolha uma origem e consulte os itens para revisar a importação.") : L("Consulte as novidades. Itens concluídos neste acompanhamento ficam fora da fila; falhas e resultados pendentes continuam para revisão."),
                                      systemImage: "photo.on.rectangle.angled")
                     } else {
                         ForEach(model.items) { item in itemRow(item) }
@@ -67,9 +67,28 @@ struct PFReverseImportView: View {
                     VStack(alignment: .leading, spacing: 12) { albumPicker; sourceActions }
                 }
                 destinationControls
+                followControls
                 Text(L("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var followControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let link = model.activeFollow {
+                Label(L("Acompanhamento assistido"), systemImage: "arrow.triangle.2.circlepath").font(.headline)
+                Text(link.destinationTitle).font(.callout)
+                if let date = link.lastChecked {
+                    Text(L("Última consulta: \(PFLocalization.formatDate(date, date: .abbreviated, time: .shortened))")).font(.caption).foregroundStyle(.secondary)
+                }
+                Button(L("Parar acompanhamento")) { model.stopFollowing() }.disabled(working)
+            } else {
+                Button(L("Acompanhar este álbum")) { model.startFollowing() }
+                    .disabled(working || !connectionReady || model.albumID.isEmpty || model.destinationMode != .existing || !model.isDestinationValid)
+            }
+            Text(L("Vincule um álbum existente do Fotos. A consulta é manual; todos os itens ainda não concluídos entram na revisão, inclusive os já existentes na primeira consulta. Nada é importado automaticamente."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -79,7 +98,7 @@ struct PFReverseImportView: View {
             Picker(L("Tipo de destino no Fotos"), selection: $model.destinationMode) {
                 Text(L("Álbum existente")).tag(PFPhotosDestinationMode.existing)
                 Text(L("Criar novo álbum")).tag(PFPhotosDestinationMode.new)
-            }.id(PFLocalization.languageCode).pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).disabled(working)
+            }.id(PFLocalization.languageCode).pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).disabled(working || model.activeFollow != nil)
             if model.destinationMode == .existing {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { photosAlbumPicker; refreshPhotosAlbums }
@@ -91,7 +110,7 @@ struct PFReverseImportView: View {
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 TextField(L("Nome do novo álbum"), text: $model.destinationAlbumName)
-                    .textFieldStyle(.roundedBorder).frame(maxWidth: 420).disabled(working)
+                    .textFieldStyle(.roundedBorder).frame(maxWidth: 420).disabled(working || model.activeFollow != nil)
                     .accessibilityLabel(L("Nome do novo álbum no Fotos"))
                 Text(L("Um novo álbum será criado somente ao confirmar a importação, mesmo se já existir outro com o mesmo nome."))
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -104,7 +123,7 @@ struct PFReverseImportView: View {
             Text(L("Selecione um álbum do Fotos")).tag("")
             ForEach(model.photosAlbums) { album in Text(album.displayLabel).tag(album.id) }
         }.id(PFLocalization.languageCode).labelsHidden().frame(minWidth: 200, maxWidth: .infinity)
-            .disabled(working || model.photosAlbums.isEmpty)
+            .disabled(working || model.photosAlbums.isEmpty || model.activeFollow != nil)
     }
 
     private var refreshPhotosAlbums: some View {
@@ -131,7 +150,7 @@ struct PFReverseImportView: View {
                 await model.load(address: connection.transferAddress, key: connection.transferKey, profileID: connection.profile.id, expectedUserID: connection.transferAccountID, preflight: validateSource)
             } }
                 .disabled(working || !connectionReady)
-            Button(L("Consultar itens")) { Task { await model.loadAlbum(preflight: validateSource) } }
+            Button(model.activeFollow == nil ? L("Consultar itens") : L("Consultar novidades")) { Task { await model.loadAlbum(preflight: validateSource) } }
                 .disabled(working || !connectionReady || model.albumID.isEmpty)
         }
     }
