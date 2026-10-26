@@ -692,3 +692,20 @@
 "O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item." = "The Live Photo pair changed or was not recorded in the old history. Check Photos before reusing this item.";
 
 "O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente." = "macOS did not respond to the Photos access request. Check Privacy & Security → Photos and try again.";
+
+"Destino e acompanhamento" = "Destination and tracking";
+
+"Destino: %@" = "Destination: %@";
+
+/* Photos to Immich tracking */
+"Consulte as novidades do álbum acompanhado antes de enviar." = "Check the tracked album for new items before uploading.";
+"Acompanhamento de envio salvo. Consulte as novidades para revisar antes de enviar." = "Upload tracking saved. Check for new items to review before uploading.";
+"Acompanhamento de envio removido. Fotos e histórico foram preservados." = "Upload tracking removed. Photos and history were preserved.";
+"O álbum de origem do Fotos está indisponível. Confira o acesso e consulte novamente." = "The source Photos album is unavailable. Check access and try again.";
+"O acompanhamento de envio mudou. Consulte novamente antes de enviar." = "Upload tracking changed. Check again before uploading.";
+"Consultando novidades: %@ de %@…" = "Checking for new items: %@ of %@…";
+"%@ itens para revisar antes do envio. Nada foi enviado automaticamente." = "%@ items to review before uploading. Nothing was uploaded automatically.";
+"O álbum do Fotos mudou. Consulte as novidades novamente antes de enviar." = "The Photos album changed. Check for new items again before uploading.";
+"Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar." = "Choose a Photos album and an existing Immich album to track.";
+"A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente." = "The check reviews the entire Photos album and creates a manual queue. Select items and confirm the upload. Nothing is uploaded automatically.";
+"Fotos → Immich" = "Photos → Immich";
