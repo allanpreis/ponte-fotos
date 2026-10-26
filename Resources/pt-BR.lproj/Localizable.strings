@@ -673,3 +673,5 @@
 "Conferindo álbuns das sugestões" = "Conferindo álbuns das sugestões";
 
 "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento." = "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento.";
+
+"O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente." = "O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente.";
