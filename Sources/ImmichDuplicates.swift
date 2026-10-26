@@ -7,7 +7,7 @@ struct IMDuplicateGroup: Codable, Identifiable {
     var unavailableOwnerIDs: [String] = []
 }
 
-/// Metadata candidates are deliberately separate from exact groups and are never accepted by the trash plan.
+/// Metadata candidates remain separate from exact groups and require their own explicitly reviewed action.
 struct IMDuplicateSuggestion: Codable, Identifiable {
     var id: String
     var keepID: String
@@ -43,7 +43,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
     /// Pair suggestions avoid joining a burst transitively; at most ten nearby records per item are compared.
     static func suggestions(_ assets: [IMAsset]) -> [IMDuplicateSuggestion] {
         struct Candidate { let asset: IMAsset; let date: Date }
-        struct Key: Hashable { let name: String; let width: Int; let height: Int }
+        struct Key: Hashable { let name: String; let width: Int; let height: Int; let make: String; let model: String }
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let whole = ISO8601DateFormatter()
@@ -66,11 +66,17 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                   let width = asset.width, let height = asset.height, width > 0, height > 0,
                   let captured = date(asset.captureDateTime) ?? date(asset.fileCreatedAt) else { continue }
             let name = normalized(asset.originalFileName)
-            guard !name.isEmpty else { continue }
-            buckets[Key(name: name, width: width, height: height), default: []].append(Candidate(asset: asset, date: captured))
+            let candidate = Candidate(asset: asset, date: captured)
+            if !name.isEmpty {
+                buckets[Key(name: name, width: width, height: height, make: "", model: ""), default: []].append(candidate)
+            }
+            let make = normalized(asset.cameraMake ?? ""), model = normalized(asset.cameraModel ?? "")
+            if !make.isEmpty && !model.isEmpty {
+                buckets[Key(name: "", width: width, height: height, make: make, model: model), default: []].append(candidate)
+            }
         }
-        let keys = buckets.keys.sorted { ($0.name, $0.width, $0.height) < ($1.name, $1.width, $1.height) }
-        var result: [IMDuplicateSuggestion] = []
+        let keys = buckets.keys.sorted { ($0.name, $0.width, $0.height, $0.make, $0.model) < ($1.name, $1.width, $1.height, $1.make, $1.model) }
+        var result: [IMDuplicateSuggestion] = [], emitted = Set<String>()
         for key in keys {
             let values = buckets[key]!.sorted { ($0.date, $0.asset.id) < ($1.date, $1.asset.id) }
             for index in values.indices {
@@ -83,9 +89,12 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                           compatible(first.asset.cameraModel, second.asset.cameraModel) else { continue }
                     let pair = [first.asset, second.asset]
                     let ids = pair.map(\.id).sorted()
-                    result.append(IMDuplicateSuggestion(id: "metadata:" + ids.joined(separator: ":"),
+                    let id = "metadata:" + ids.joined(separator: ":")
+                    guard emitted.insert(id).inserted else { continue }
+                    let sameName = !normalized(pair[0].originalFileName).isEmpty && normalized(pair[0].originalFileName) == normalized(pair[1].originalFileName)
+                    result.append(IMDuplicateSuggestion(id: id,
                         keepID: (pair.first(where: \.isLive) ?? pair[0]).id, assets: pair,
-                        evidence: ["Mesmo nome de arquivo e dimensões", "Capturas com diferença de até 1 segundo", "Arquivos com hashes diferentes"]))
+                        evidence: [sameName ? "Mesmo nome de arquivo e dimensões" : "Mesma câmera e dimensões, mesmo com nomes diferentes", "Capturas com diferença de até 1 segundo", "Arquivos com hashes diferentes"]))
                     if result.count == 500 { return result }
                 }
             }
@@ -122,6 +131,55 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             }
         }
         return result
+    }
+
+    /// User choices for metadata candidates never enter the exact-checksum selection path.
+    static func suggestionPairs(analysis: IMDuplicateAnalysis, selections: [String:String]) throws -> [Pair] {
+        let candidates = analysis.suggestions ?? []
+        guard !selections.isEmpty, selections.keys.allSatisfy({ id in candidates.filter { $0.id == id }.count == 1 }) else {
+            throw BridgeError(message: M("Selecione pelo menos uma sugestão válida."))
+        }
+        var result: [Pair] = [], used = Set<String>()
+        for suggestion in candidates where selections[suggestion.id] != nil {
+            guard suggestion.assets.count == 2,
+                  let keep = suggestion.assets.first(where: { $0.id == selections[suggestion.id] }),
+                  let drop = suggestion.assets.first(where: { $0.id != keep.id }),
+                  suggestions(suggestion.assets).contains(where: { $0.id == suggestion.id }),
+                  !drop.isLive, drop.livePhotoVideoId == nil else {
+                throw BridgeError(message: M("Sugestão inválida ou Live Photo protegida. Escolha manter a versão com movimento e consulte novamente."))
+            }
+            guard used.insert(keep.id).inserted, used.insert(drop.id).inserted else {
+                throw BridgeError(message: M("Uma foto aparece em mais de um par selecionado. Revise um par por foto para evitar escolhas conflitantes."))
+            }
+            result.append(Pair(keep: keep, drop: drop))
+        }
+        return result
+    }
+
+    static func unchangedSuggestion(_ old: IMAsset, _ fresh: IMAsset) throws {
+        try unchanged(old, fresh)
+        guard old.originalFileName == fresh.originalFileName, old.width == fresh.width, old.height == fresh.height,
+              old.captureDateTime == fresh.captureDateTime, old.fileCreatedAt == fresh.fileCreatedAt,
+              old.cameraMake == fresh.cameraMake, old.cameraModel == fresh.cameraModel else {
+            throw BridgeError(message: M("Os metadados de uma sugestão mudaram. Consulte novamente antes de alterar as fotos."))
+        }
+    }
+
+    private static func currentPair(_ pair: Pair, session: IMSession, metadata: Bool) async throws -> Pair {
+        let current = Pair(keep: try await fresh(pair.keep, session: session), drop: try await fresh(pair.drop, session: session))
+        if metadata {
+            try unchangedSuggestion(pair.keep, current.keep)
+            try unchangedSuggestion(pair.drop, current.drop)
+            guard Set(pair.keep.albums.map(\.id)) == Set(current.keep.albums.map(\.id)),
+                  Set(pair.drop.albums.map(\.id)) == Set(current.drop.albums.map(\.id)) else {
+                throw BridgeError(message: M("Os álbuns de uma sugestão mudaram. Consulte novamente antes de alterar as fotos."))
+            }
+            guard !current.drop.isLive, current.drop.livePhotoVideoId == nil,
+                  suggestions([current.keep, current.drop]).count == 1 else {
+                throw BridgeError(message: M("A sugestão não é mais válida. Consulte novamente."))
+            }
+        }
+        return current
     }
 
     static func unchanged(_ old: IMAsset, _ fresh: IMAsset) throws {
@@ -185,8 +243,29 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             }
             progress(M("Conferindo álbuns das cópias"), groupIndex + 1, found.count)
         }
+        var suggested = suggestions(assets), refreshedSuggestions: [String:IMAsset] = [:]
+        for suggestionIndex in suggested.indices {
+            for assetIndex in suggested[suggestionIndex].assets.indices {
+                try Task.checkCancellation()
+                let old = suggested[suggestionIndex].assets[assetIndex]
+                let key = old.ownerId + ":" + old.id
+                if let refreshed = refreshedSuggestions[key] {
+                    suggested[suggestionIndex].assets[assetIndex] = refreshed
+                } else if let owner = try? session.owner(old.ownerId) {
+                    var refreshed = try await owner.asset(old.id)
+                    try unchangedSuggestion(old, refreshed)
+                    refreshed.albums = try await session.memberships(old.id)
+                    guard Set(old.albums.map(\.id)).isSubset(of: Set(refreshed.albums.map(\.id))) else {
+                        throw BridgeError(message: M("Uma cópia saiu do álbum durante a análise. Consulte novamente."))
+                    }
+                    refreshedSuggestions[key] = refreshed
+                    suggested[suggestionIndex].assets[assetIndex] = refreshed
+                }
+            }
+            progress(M("Conferindo álbuns das sugestões"), suggestionIndex + 1, suggested.count)
+        }
         return IMDuplicateAnalysis(id: UUID().uuidString, profileID: session.profileID, albums: albums,
-            createdAt: Date(), groups: found, total: readers.count, skipped: skipped, suggestions: suggestions(assets))
+            createdAt: Date(), groups: found, total: readers.count, skipped: skipped, suggestions: suggested)
     }
 
     static func fresh(_ old: IMAsset, session: IMSession) async throws -> IMAsset {
@@ -204,10 +283,9 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         return asset
     }
 
-    static func coverage(_ pair: Pair, session: IMSession) async throws {
-        let keep = try await fresh(pair.keep, session: session)
-        let drop = try await fresh(pair.drop, session: session)
-        guard Set(drop.albums.map(\.id)).isSubset(of: Set(keep.albums.map(\.id))) else {
+    static func coverage(_ pair: Pair, session: IMSession, metadata: Bool = false) async throws {
+        let current = try await currentPair(pair, session: session, metadata: metadata)
+        guard Set(current.drop.albums.map(\.id)).isSubset(of: Set(current.keep.albums.map(\.id))) else {
             throw BridgeError(message: M("Há um álbum sem a cópia mantida. A exclusão foi bloqueada; consulte novamente."))
         }
     }
@@ -215,6 +293,16 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
     static func trash(session: IMSession, analysis: IMDuplicateAnalysis, selections: [String:String], progress: @escaping IMProgress, report: @escaping IMReport) async throws {
         try validateAnalysis(analysis, profileID: session.profileID)
         let plan = try pairs(analysis: analysis, selections: selections)
+        try await executePlan(plan, session: session, metadata: false, progress: progress, report: report)
+    }
+
+    static func trashSuggestions(session: IMSession, analysis: IMDuplicateAnalysis, selections: [String:String], progress: @escaping IMProgress, report: @escaping IMReport) async throws {
+        try validateAnalysis(analysis, profileID: session.profileID)
+        let plan = try suggestionPairs(analysis: analysis, selections: selections)
+        try await executePlan(plan, session: session, metadata: true, progress: progress, report: report)
+    }
+
+    private static func executePlan(_ plan: [Pair], session: IMSession, metadata: Bool, progress: @escaping IMProgress, report: @escaping IMReport) async throws {
         var permissions: [String:Set<String>] = [:]
         for client in session.clients {
             permissions[client.credential.account.id] = try await client.permissions()
@@ -230,7 +318,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         var validated: [Pair] = []
         for (index, pair) in plan.enumerated() {
             try Task.checkCancellation()
-            let current = Pair(keep: try await fresh(pair.keep, session: session), drop: try await fresh(pair.drop, session: session))
+            let current = try await currentPair(pair, session: session, metadata: metadata)
             validated.append(current)
             let keepAlbums = Set(current.keep.albums.map(\.id))
             for album in current.drop.albums where !keepAlbums.contains(album.id) {
@@ -260,7 +348,12 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
         }
         for (index, addition) in additions.enumerated() {
             try Task.checkCancellation()
-            try unchanged(addition.keep, await addition.writer.asset(addition.keep.id))
+            if metadata {
+                for pair in validated where pair.keep.id == addition.keep.id { _ = try await currentPair(pair, session: session, metadata: true) }
+            }
+            let currentKeep = try await addition.writer.asset(addition.keep.id)
+            if metadata { try unchangedSuggestion(addition.keep, currentKeep) }
+            else { try unchanged(addition.keep, currentKeep) }
             var record = IMActionRecord(action: "add", asset: addition.keep, album: addition.album, status: "preparing")
             try report(record)
             do {
@@ -270,13 +363,21 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                 }
             } catch { record.status = "uncertain"; record.setMessage(M("Adição sem confirmação; confira o Immich antes de repetir.")); try report(record); throw error }
             record.status = "confirmed"; try report(record)
+            if metadata {
+                // Only the reviewed preservation additions may extend the keeper's album set.
+                for pairIndex in validated.indices where validated[pairIndex].keep.id == addition.keep.id {
+                    if !validated[pairIndex].keep.albums.contains(where: { $0.id == addition.album.id }) {
+                        validated[pairIndex].keep.albums.append(addition.album)
+                    }
+                }
+            }
             progress(M("Preservando álbuns das cópias"), index + 1, additions.count)
         }
         // All additions, including their read-back, finish before the first trash request.
-        for pair in validated { try Task.checkCancellation(); try await coverage(pair, session: session) }
+        for pair in validated { try Task.checkCancellation(); try await coverage(pair, session: session, metadata: metadata) }
         for (index, pair) in validated.enumerated() {
             try Task.checkCancellation()
-            try await coverage(pair, session: session)
+            try await coverage(pair, session: session, metadata: metadata)
             let owner = try session.owner(pair.drop.ownerId)
             var record = IMActionRecord(action: "trash", asset: pair.drop, keepID: pair.keep.id, status: "preparing")
             try report(record)

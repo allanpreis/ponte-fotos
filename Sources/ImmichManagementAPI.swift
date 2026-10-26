@@ -155,7 +155,7 @@ struct IMClient {
         catch { throw BridgeError(message: M("Resposta do Immich incompatível. Atualize a análise antes de continuar.")) }
     }
     func asset(_ id: String) async throws -> IMAsset { try decode(IMRawAsset.self, await data("assets/" + id)).asset }
-    func thumbnail(_ id: String) async throws -> Data { try await data("assets/" + id + "/thumbnail", query: [URLQueryItem(name: "size", value: "thumbnail")]) }
+    func thumbnail(_ id: String, preview: Bool = false) async throws -> Data { try await data("assets/" + id + "/thumbnail", query: [URLQueryItem(name: "size", value: preview ? "preview" : "thumbnail")]) }
     func albums(assetID: String? = nil) async throws -> [IMAlbum] {
         let query = assetID.map { [URLQueryItem(name: "assetId", value: $0)] } ?? []
         let all = try decode([IMRawAlbum].self, await data("albums", query: query))

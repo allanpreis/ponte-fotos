@@ -19,6 +19,7 @@ final class IMWorkspaceModel: ObservableObject {
     @Published var comparison: IMComparisonAnalysis?
     @Published var age: IMAgeAnalysis?
     @Published var duplicateChoices: [String: String] = [:]
+    @Published var suggestionChoices: [String: String] = [:]
     @Published var comparisonChoices: [String: String] = [:]
     @Published var ageChoices: Set<String> = []
     @Published var address: String
@@ -39,7 +40,8 @@ final class IMWorkspaceModel: ObservableObject {
         if self.address != address {
             self.address = address
             albums = []; people = []; duplicates = nil; comparison = nil; age = nil
-            duplicateChoices = [:]; comparisonChoices = [:]; ageChoices = []; cache.removeAll()
+            duplicateChoices = [:]; suggestionChoices = [:]; comparisonChoices = [:]; ageChoices = []; cache.removeAll()
+            ui.reviewKind = nil; ui.reviewAccepted = false; ui.enlargedSuggestion = nil
             errorMessage = M("O endereço de conexão mudou. Atualize os álbuns e faça uma nova consulta.")
         }
         connectionReady = ready
@@ -47,8 +49,8 @@ final class IMWorkspaceModel: ObservableObject {
     func endReview() {
         guard !busy else { return }
         duplicates = nil; comparison = nil; age = nil
-        duplicateChoices = [:]; comparisonChoices = [:]; ageChoices = []
-        ui.reviewKind = nil; ui.reviewAccepted = false; error = nil
+        duplicateChoices = [:]; suggestionChoices = [:]; comparisonChoices = [:]; ageChoices = []
+        ui.reviewKind = nil; ui.reviewAccepted = false; ui.enlargedSuggestion = nil; error = nil
     }
     var session: IMSession { IMSession(address: address, profileID: profileID, credentials: credentials) }
     func name(_ id: String) -> String {
@@ -65,6 +67,7 @@ final class IMWorkspaceModel: ObservableObject {
     }
     func load() {
         guard !loaded else { return }; loaded = true
+        suggestionChoices = [:]
         do {
             credentials = try IMManagementStore.credentials(profileID: profileID)
             history = try IMManagementStore.history(profileID: profileID)
@@ -98,6 +101,7 @@ final class IMWorkspaceModel: ObservableObject {
             if persist { try IMManagementStore.saveCredential(credential, profileID: self.profileID) }
             self.credentials.removeAll { $0.account.id == credential.account.id }
             self.credentials.append(credential); self.scopes[credential.account.id] = permissions
+            self.suggestionChoices = [:]
         }
     }
     func disconnect(_ id: String) {
@@ -106,6 +110,7 @@ final class IMWorkspaceModel: ObservableObject {
             try IMManagementStore.removeCredential(accountID: id, profileID: profileID)
             credentials.removeAll { $0.account.id == id }; scopes.removeValue(forKey: id); cache.removeAll()
             albums = []; people = []; duplicates = nil; comparison = nil; age = nil
+            suggestionChoices = [:]; duplicateChoices = [:]
         } catch { self.errorMessage = .error(error) }
     }
     func refresh() {
@@ -116,10 +121,13 @@ final class IMWorkspaceModel: ObservableObject {
         }
     }
     func scanDuplicates(_ selected: Set<String>) {
+        suggestionChoices = [:]; ui.enlargedSuggestion = nil
         let chosen = albums.filter { selected.contains($0.id) }
         run(M("Procurando cópias idênticas…")) {
             let result = try await IMDuplicates.scan(session: self.session, albums: chosen, progress: self.updateProgress)
             self.duplicates = result
+            self.suggestionChoices = [:]
+            self.ui.duplicateResultMode = result.groups.isEmpty && !(result.suggestions ?? []).isEmpty ? "suggestions" : "exact"
             self.duplicateChoices = Dictionary(uniqueKeysWithValues: result.groups.filter { $0.unavailableOwnerIDs.isEmpty }.map { ($0.id, $0.keepID) })
         }
     }
@@ -145,6 +153,20 @@ final class IMWorkspaceModel: ObservableObject {
             return group.assets.contains { $0.id != keeper && $0.isLive }
         }
     }
+    var suggestionSelectionError: String? {
+        guard !suggestionChoices.isEmpty else { return nil }
+        guard let duplicates else { return L("Faça uma nova consulta antes de revisar as sugestões.") }
+        let selected = (duplicates.suggestions ?? []).filter { suggestionChoices[$0.id] != nil }
+        guard selected.flatMap(\.assets).allSatisfy({ asset in credentials.contains { $0.account.id == asset.ownerId } }) else {
+            return L("Conecte todas as contas proprietárias antes de revisar estas sugestões.")
+        }
+        do {
+            try IMDuplicates.validateAnalysis(duplicates, profileID: profileID)
+            _ = try IMDuplicates.suggestionPairs(analysis: duplicates, selections: suggestionChoices)
+            return nil
+        }
+        catch { return PFMessage.error(error).text }
+    }
     func persistHistory() throws {
         try IMManagementStore.saveHistory(Array(history.prefix(20)), profileID: profileID)
     }
@@ -157,11 +179,17 @@ final class IMWorkspaceModel: ObservableObject {
     func execute(_ kind: String) {
         guard !busy else { return }
         let snapshot = session
+        let selectedSuggestions = suggestionChoices
         let assets: [IMAsset]
         let title: String
         if kind == "duplicates", let duplicates {
             guard !unsafeLiveRemoval else { errorMessage = M("Uma Live Photo seria enviada à lixeira. Escolha manter a Live Photo ou desmarque o grupo."); return }
             assets = duplicates.groups.filter { duplicateChoices[$0.id] != nil }.flatMap(\.assets); title = "Revisão de duplicatas"
+        } else if kind == "suggestions", let duplicates {
+            guard !selectedSuggestions.isEmpty else { return }
+            if let message = suggestionSelectionError { errorMessage = .verbatim(message); return }
+            assets = (duplicates.suggestions ?? []).filter { selectedSuggestions[$0.id] != nil }.flatMap(\.assets)
+            title = "Revisão de possíveis duplicatas"
         } else if kind == "comparison", let comparison {
             assets = comparison.groups.filter { comparisonChoices[$0.id] != nil }.flatMap(\.assets); title = "Organização de álbuns"
         } else if kind == "age", let age {
@@ -175,7 +203,10 @@ final class IMWorkspaceModel: ObservableObject {
                 let report: IMReport = { try self.record($0, entryID: entry.id) }
                 if kind == "duplicates", let analysis = self.duplicates {
                     try await IMDuplicates.trash(session: snapshot, analysis: analysis, selections: self.duplicateChoices, progress: self.updateProgress, report: report)
-                    self.duplicates = nil; self.duplicateChoices = [:]
+                    self.duplicates = nil; self.duplicateChoices = [:]; self.suggestionChoices = [:]
+                } else if kind == "suggestions", let analysis = self.duplicates {
+                    try await IMDuplicates.trashSuggestions(session: snapshot, analysis: analysis, selections: selectedSuggestions, progress: self.updateProgress, report: report)
+                    self.duplicates = nil; self.duplicateChoices = [:]; self.suggestionChoices = [:]
                 } else if kind == "comparison", let analysis = self.comparison {
                     try await IMOrganization.organize(session: snapshot, analysis: analysis, selections: self.comparisonChoices, progress: self.updateProgress, report: report)
                     self.comparison = nil; self.comparisonChoices = [:]
@@ -192,10 +223,15 @@ final class IMWorkspaceModel: ObservableObject {
             }
         }
     }
-    func thumbnail(_ asset: IMAsset) async -> NSImage? {
-        if let image = cache[asset.id] { return image }
-        guard let client = try? session.owner(asset.ownerId), let data = try? await client.thumbnail(asset.id), let image = NSImage(data: data) else { return nil }
-        if cache.count >= 120 { cache.removeAll() }; cache[asset.id] = image; return image
+    func thumbnail(_ asset: IMAsset, preview: Bool = false) async -> NSImage? {
+        let cacheKey = asset.id + (preview ? ":preview" : ":thumbnail")
+        if !preview, let image = cache[cacheKey] { return image }
+        guard let client = try? session.owner(asset.ownerId), let data = try? await client.thumbnail(asset.id, preview: preview), let image = NSImage(data: data) else { return nil }
+        if !preview {
+            if cache.count >= 120 { cache.removeAll() }
+            cache[cacheKey] = image
+        }
+        return image
     }
 }
 
@@ -220,6 +256,8 @@ fileprivate final class IMWorkspaceUIState: ObservableObject {
     @Published var reviewAccepted = false
     @Published var reviewPage = 0
     @Published var suggestionPage = 0
+    @Published var duplicateResultMode = "exact"
+    @Published var enlargedSuggestion: IMDuplicateSuggestion?
 }
 
 struct ImmichWorkspaceView: View {
@@ -267,6 +305,7 @@ struct ImmichWorkspaceView: View {
         .onChange(of: currentReady) { _, value in model.updateConnection(address: currentAddress, ready: value) }
         .interactiveDismissDisabled(model.busy)
         .sheet(isPresented: Binding(get: { ui.reviewKind != nil }, set: { if !$0 { ui.reviewKind = nil } })) { reviewView.environment(\.locale, PFLocalization.locale) }
+        .sheet(item: $ui.enlargedSuggestion) { suggestion in enlargedComparison(suggestion).environment(\.locale, PFLocalization.locale) }
     }
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -322,7 +361,7 @@ struct ImmichWorkspaceView: View {
                     HStack(spacing: 12) { albumSelectionButtons; Spacer(minLength: 12); scanAlbumsButton }
                     VStack(alignment: .leading, spacing: 12) { albumSelectionButtons; scanAlbumsButton }
                 }
-                Text(ui.tab == "Álbuns" ? L("Arquivos idênticos por checksum, entre todas as contas conectadas. Live Photos são identificadas e protegidas.") : L("Selecione exatamente dois álbuns. A organização altera apenas os vínculos com os álbuns; os arquivos permanecem na biblioteca.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(ui.tab == "Álbuns" ? L("Compare cópias exatas por hash e possíveis duplicatas por metadados. Live Photos são identificadas e protegidas.") : L("Selecione exatamente dois álbuns. A organização altera apenas os vínculos com os álbuns; os arquivos permanecem na biblioteca.")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -356,49 +395,91 @@ struct ImmichWorkspaceView: View {
     private var duplicatesView: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let result = model.duplicates {
-                Text(L("Cópias exatas por hash")).font(.title3.bold())
-                Text(L("\(result.groups.count) grupos · \(result.skipped) itens fora da análise")).font(.headline)
-                Text(L("A Live Photo é sugerida para manter. Cada cópia mostra sua conta, formato e álbuns atuais.")).foregroundStyle(.secondary)
-                HStack {
-                    Button(L("Selecionar todos")) { model.duplicateChoices = Dictionary(uniqueKeysWithValues: result.groups.filter { $0.unavailableOwnerIDs.isEmpty }.map { ($0.id, $0.keepID) }) }
-                    Button(L("Desmarcar todos")) { model.duplicateChoices = [:] }
-                    Spacer()
-                    Button(L("Revisar envio à lixeira")) { openReview("duplicates") }.disabled(!model.connectionReady || model.duplicateChoices.isEmpty || model.unsafeLiveRemoval)
+                let suggestions = result.suggestions ?? []
+                Text(L("Exatas: \(result.groups.count) · Possíveis: \(suggestions.count)")).font(.headline)
+                Picker(L("Resultado da consulta"), selection: $ui.duplicateResultMode) {
+                    Text(L("Cópias exatas por hash")).tag("exact")
+                    Text(L("Possíveis duplicatas")).tag("suggestions")
+                }.pickerStyle(.segmented)
+                if ui.duplicateResultMode == "suggestions" { suggestionResults(suggestions) }
+                else {
+                    Text(L("\(result.groups.count) grupos · \(result.skipped) itens fora da análise")).font(.headline)
+                    Text(L("A Live Photo é sugerida para manter. Cada cópia mostra sua conta, formato e álbuns atuais.")).foregroundStyle(.secondary)
+                    if result.groups.isEmpty { Text(L("Nenhuma cópia idêntica encontrada. Confira também a aba Possíveis duplicatas.")).foregroundStyle(.secondary) }
+                    else {
+                        HStack {
+                            Button(L("Selecionar todos")) { model.duplicateChoices = Dictionary(uniqueKeysWithValues: result.groups.filter { $0.unavailableOwnerIDs.isEmpty }.map { ($0.id, $0.keepID) }) }
+                            Button(L("Desmarcar todos")) { model.duplicateChoices = [:] }
+                            Spacer()
+                            Button(L("Revisar envio à lixeira")) { openReview("duplicates") }.disabled(!model.connectionReady || model.duplicateChoices.isEmpty || model.unsafeLiveRemoval)
+                        }
+                        if model.unsafeLiveRemoval { Text(L("Uma escolha removeria uma Live Photo. Mantenha a versão com movimento ou desmarque esse grupo.")).foregroundStyle(.orange) }
+                        ForEach(page(result.groups, ui.duplicatePage)) { group in duplicateGroup(group) }
+                        pager(count: result.groups.count, index: $ui.duplicatePage)
+                    }
                 }
-                if model.unsafeLiveRemoval { Text(L("Uma escolha removeria uma Live Photo. Mantenha a versão com movimento ou desmarque esse grupo.")).foregroundStyle(.orange) }
-                ForEach(page(result.groups, ui.duplicatePage)) { group in duplicateGroup(group) }
-                pager(count: result.groups.count, index: $ui.duplicatePage)
-                if result.groups.isEmpty { empty(L("Nenhuma cópia idêntica encontrada.")) }
-                Divider()
-                suggestionResults(result.suggestions ?? [])
             } else { empty(L("Selecione os álbuns e consulte as duplicatas para começar.")) }
         }
     }
     private func suggestionResults(_ suggestions: [IMDuplicateSuggestion]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("Possíveis duplicatas · \(suggestions.count)")).font(.headline)
-            Text(L("Complemento por metadados: mesmo nome, dimensões e captura com até 1 segundo de diferença. Os arquivos têm hashes diferentes; compare as imagens antes de decidir. As sugestões não entram no envio à lixeira.")).foregroundStyle(.secondary)
+            Text(L("Metadados semelhantes sugerem variantes, não arquivos idênticos. Compare as imagens ampliadas e escolha uma cópia para manter apenas nos pares que reconhecer como duplicatas. Nenhum par começa selecionado.")).foregroundStyle(.secondary)
             Text(L("A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer.")).font(.caption).foregroundStyle(.secondary)
             if suggestions.count == 500 { Text(L("Limite de 500 sugestões atingido. Analise menos álbuns para conferir os demais pares.")).foregroundStyle(.orange) }
+            HStack {
+                Button(L("Desmarcar todos")) { model.suggestionChoices = [:] }
+                Spacer()
+                Button(L("Revisar possíveis duplicatas")) { openReview("suggestions") }
+                    .disabled(!model.connectionReady || model.suggestionChoices.isEmpty || model.suggestionSelectionError != nil)
+            }
+            if let message = model.suggestionSelectionError { Text(message).foregroundStyle(.orange) }
             ForEach(page(suggestions, ui.suggestionPage)) { suggestion in
-                PFCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label(L("Revisão visual necessária"), systemImage: "photo.on.rectangle.angled").font(.headline)
-                        if suggestion.assets.contains(where: { asset in !model.credentials.contains(where: { $0.account.id == asset.ownerId }) }) {
-                            Text(L("Conecte a conta proprietária em Contas e API para carregar a prévia.")).font(.caption).foregroundStyle(.orange)
-                        }
-                        if suggestion.assets.contains(where: \.isLive) {
-                            Text(L("Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar.")).foregroundStyle(.secondary)
-                        }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
-                            ForEach(suggestion.assets) { asset in assetCard(asset) }
-                        }
+                suggestionCard(suggestion)
+            }
+            if !suggestions.isEmpty { pager(count: suggestions.count, index: $ui.suggestionPage) }
+            if suggestions.isEmpty { Text(L("Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes.")).foregroundStyle(.secondary) }
+        }
+    }
+    private func suggestionCard(_ suggestion: IMDuplicateSuggestion) -> some View {
+        let ownerMissing = suggestion.assets.contains { asset in !model.credentials.contains { $0.account.id == asset.ownerId } }
+        return PFCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label(L("Revisão visual necessária"), systemImage: "photo.on.rectangle.angled").font(.headline)
+                    Spacer()
+                    Button(L("Comparar ampliado")) { ui.enlargedSuggestion = suggestion }
+                    if model.suggestionChoices[suggestion.id] != nil { Button(L("Desmarcar par")) { model.suggestionChoices.removeValue(forKey: suggestion.id) } }
+                }
+                if ownerMissing { Text(L("Conecte a conta proprietária em Contas e API para carregar a prévia.")).font(.caption).foregroundStyle(.orange) }
+                if suggestion.assets.filter(\.isLive).count > 1 { Text(L("As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento.")).foregroundStyle(.orange) }
+                else if suggestion.assets.contains(where: \.isLive) { Text(L("Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar.")).foregroundStyle(.secondary) }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
+                    ForEach(suggestion.assets) { asset in
+                        VStack(alignment: .leading, spacing: 10) {
+                            assetCard(asset)
+                            Button {
+                                model.suggestionChoices[suggestion.id] = asset.id
+                            } label: { Label(model.suggestionChoices[suggestion.id] == asset.id ? L("Manter esta cópia") : L("Escolher para manter"), systemImage: model.suggestionChoices[suggestion.id] == asset.id ? "largecircle.fill.circle" : "circle") }
+                                .disabled(ownerMissing || suggestion.assets.contains { $0.id != asset.id && $0.isLive })
+                        }.padding(10)
+                            .background(model.suggestionChoices[suggestion.id] == asset.id ? PFTheme.accent.opacity(0.05) : PFTheme.background, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(model.suggestionChoices[suggestion.id] == asset.id ? PFTheme.accent : PFTheme.separator, lineWidth: model.suggestionChoices[suggestion.id] == asset.id ? 2 : 1))
                     }
                 }
             }
-            pager(count: suggestions.count, index: $ui.suggestionPage)
-            if suggestions.isEmpty { Text(L("Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes.")).foregroundStyle(.secondary) }
         }
+    }
+    private func enlargedComparison(_ suggestion: IMDuplicateSuggestion) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack { Text(L("Comparar possíveis duplicatas")).font(.title2.bold()); Spacer(); Button(L("Concluir")) { ui.enlargedSuggestion = nil } }
+            Text(L("Prévia gerada pelo Immich, não o original. Os arquivos têm hashes diferentes; confira conteúdo e enquadramento antes de escolher uma cópia. Esta imagem não comprova a qualidade ou o movimento do original.")).foregroundStyle(.secondary)
+            ScrollView {
+                HStack(alignment: .top, spacing: 20) {
+                    ForEach(suggestion.assets) { asset in assetCard(asset, previewHeight: 420) }
+                }
+            }
+        }.padding(24).frame(minWidth: 860, idealWidth: 1080, minHeight: 650, idealHeight: 800).background(PFTheme.background)
     }
     private func duplicateGroup(_ group: IMDuplicateGroup) -> some View {
         PFCard {
@@ -510,6 +591,12 @@ struct ImmichWorkspaceView: View {
                 return ReviewItem(id: group.id, title: L("Manter a cópia de \(model.name(group.assets.first { $0.id == keep }?.ownerId ?? ""))"), note: L("As demais cópias vão para a lixeira. Os vínculos de álbuns serão preservados na cópia mantida."), assets: group.assets, keepID: keep)
             }
         }
+        if ui.reviewKind == "suggestions", let analysis = model.duplicates {
+            return (analysis.suggestions ?? []).compactMap { suggestion in
+                guard let keep = model.suggestionChoices[suggestion.id] else { return nil }
+                return ReviewItem(id: suggestion.id, title: L("Manter a cópia de \(model.name(suggestion.assets.first { $0.id == keep }?.ownerId ?? ""))"), note: L("Estes arquivos têm hashes diferentes e podem conter conteúdo ou qualidade distintos. Ao confirmar, você reconhece o par como duplicata e envia a outra cópia à lixeira. Os vínculos de álbuns serão preservados; Live Photos não serão descartadas."), assets: suggestion.assets, keepID: keep)
+            }
+        }
         if ui.reviewKind == "comparison", let analysis = model.comparison {
             return analysis.groups.compactMap { group in
                 guard let choice = model.comparisonChoices[group.id] else { return nil }
@@ -526,6 +613,7 @@ struct ImmichWorkspaceView: View {
         VStack(alignment: .leading, spacing: 16) {
             PFSectionHeading(L("Revisar alterações"), subtitle: L("Confira cada cópia e destino antes de continuar."), systemImage: "checklist")
             Text(L("\(reviewItems.count) grupos ou fotos selecionados. Revise todas as páginas antes de confirmar.")).foregroundStyle(.secondary)
+            if ui.reviewKind == "suggestions" { Text(L("Confirme somente os pares que você comparou visualmente. Metadados semelhantes não provam que duas fotos são iguais.")).foregroundStyle(.orange) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(page(reviewItems, ui.reviewPage)) { item in
@@ -543,12 +631,12 @@ struct ImmichWorkspaceView: View {
             pager(count: reviewItems.count, index: $ui.reviewPage)
             Divider()
             Toggle(L("Conferi as cópias, os destinos e os álbuns envolvidos e autorizo estas alterações."), isOn: $ui.reviewAccepted).toggleStyle(.checkbox).fixedSize(horizontal: false, vertical: true)
-            HStack { Button(L("Cancelar")) { ui.reviewKind = nil }; Spacer(); Button(L("Confirmar alterações")) { guard let kind = ui.reviewKind else { return }; ui.reviewKind = nil; model.execute(kind) }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!ui.reviewAccepted || reviewItems.isEmpty || (ui.reviewKind == "duplicates" && model.unsafeLiveRemoval)) }
+            HStack { Button(L("Cancelar")) { ui.reviewKind = nil }; Spacer(); Button(L("Confirmar alterações")) { guard let kind = ui.reviewKind else { return }; ui.reviewKind = nil; model.execute(kind) }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!ui.reviewAccepted || reviewItems.isEmpty || (ui.reviewKind == "duplicates" && model.unsafeLiveRemoval) || (ui.reviewKind == "suggestions" && model.suggestionSelectionError != nil)) }
         }.padding(24).frame(minWidth: 760, idealWidth: 940, minHeight: 620, idealHeight: 780).background(PFTheme.background).tint(PFTheme.accent)
     }
-    private func assetCard(_ asset: IMAsset) -> some View {
+    private func assetCard(_ asset: IMAsset, previewHeight: CGFloat = 180) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            IMAssetThumbnail(asset: asset, model: model).frame(height: 180).frame(maxWidth: .infinity).background(PFTheme.background, in: RoundedRectangle(cornerRadius: 10)).clipShape(RoundedRectangle(cornerRadius: 10))
+            IMAssetThumbnail(asset: asset, model: model, preview: previewHeight > 180).frame(height: previewHeight).frame(maxWidth: .infinity).background(PFTheme.background, in: RoundedRectangle(cornerRadius: 10)).clipShape(RoundedRectangle(cornerRadius: 10))
             Text(model.name(asset.ownerId)).font(.headline)
             Text(asset.originalFileName).font(.callout).textSelection(.enabled).lineLimit(2)
             PFBadge(mediaLabel(asset), systemImage: asset.isLive ? "livephoto" : asset.type.uppercased() == "VIDEO" ? "video" : "photo", color: asset.isLive ? PFTheme.accent : .secondary).fixedSize(horizontal: false, vertical: true)
@@ -578,12 +666,13 @@ private struct IMAssetThumbnail: View {
     @ObservedObject private var localization = PFLocalization.shared
     let asset: IMAsset
     @ObservedObject var model: IMWorkspaceModel
+    var preview = false
     @StateObject private var thumbnail = IMWorkspaceThumbnailState()
     var body: some View {
         Group {
             if let image = thumbnail.image { Image(nsImage: image).resizable().scaledToFit() }
             else { Image(systemName: "photo").font(.largeTitle).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity) }
-        }.task(id: asset.id) { thumbnail.image = await model.thumbnail(asset) }
+        }.task(id: asset.id + (preview ? ":preview" : ":thumbnail")) { thumbnail.image = await model.thumbnail(asset, preview: preview) }
     }
 }
 
