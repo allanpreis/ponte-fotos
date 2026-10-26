@@ -621,3 +621,55 @@
 "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer." = "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer.";
 
 "Conecte a conta proprietária em Contas e API para carregar a prévia." = "Conecte a conta proprietária em Contas e API para carregar a prévia.";
+
+"Faça uma nova consulta antes de revisar as sugestões." = "Faça uma nova consulta antes de revisar as sugestões.";
+
+"Conecte todas as contas proprietárias antes de revisar estas sugestões." = "Conecte todas as contas proprietárias antes de revisar estas sugestões.";
+
+"Revisão de possíveis duplicatas" = "Revisão de possíveis duplicatas";
+
+"Compare cópias exatas por hash e possíveis duplicatas por metadados. Live Photos são identificadas e protegidas." = "Compare cópias exatas por hash e possíveis duplicatas por metadados. Live Photos são identificadas e protegidas.";
+
+"Exatas: %@ · Possíveis: %@" = "Exatas: %@ · Possíveis: %@";
+
+"Resultado da consulta" = "Resultado da consulta";
+
+"Possíveis duplicatas" = "Possíveis duplicatas";
+
+"Nenhuma cópia idêntica encontrada. Confira também a aba Possíveis duplicatas." = "Nenhuma cópia idêntica encontrada. Confira também a aba Possíveis duplicatas.";
+
+"Metadados semelhantes sugerem variantes, não arquivos idênticos. Compare as imagens ampliadas e escolha uma cópia para manter apenas nos pares que reconhecer como duplicatas. Nenhum par começa selecionado." = "Metadados semelhantes sugerem variantes, não arquivos idênticos. Compare as imagens ampliadas e escolha uma cópia para manter apenas nos pares que reconhecer como duplicatas. Nenhum par começa selecionado.";
+
+"Revisar possíveis duplicatas" = "Revisar possíveis duplicatas";
+
+"Comparar ampliado" = "Comparar ampliado";
+
+"Desmarcar par" = "Desmarcar par";
+
+"Comparar possíveis duplicatas" = "Comparar possíveis duplicatas";
+
+"As prévias servem para revisão visual; os arquivos têm hashes diferentes. Confira movimento, enquadramento e qualidade antes de escolher uma cópia." = "As prévias servem para revisão visual; os arquivos têm hashes diferentes. Confira movimento, enquadramento e qualidade antes de escolher uma cópia.";
+
+"Estes arquivos têm hashes diferentes e podem conter conteúdo ou qualidade distintos. Ao confirmar, você reconhece o par como duplicata e envia a outra cópia à lixeira. Os vínculos de álbuns serão preservados; Live Photos não serão descartadas." = "Estes arquivos têm hashes diferentes e podem conter conteúdo ou qualidade distintos. Ao confirmar, você reconhece o par como duplicata e envia a outra cópia à lixeira. Os vínculos de álbuns serão preservados; Live Photos não serão descartadas.";
+
+"Confirme somente os pares que você comparou visualmente. Metadados semelhantes não provam que duas fotos são iguais." = "Confirme somente os pares que você comparou visualmente. Metadados semelhantes não provam que duas fotos são iguais.";
+
+"Selecione pelo menos uma sugestão válida." = "Selecione pelo menos uma sugestão válida.";
+
+"Sugestão inválida ou Live Photo protegida. Escolha manter a versão com movimento e consulte novamente." = "Sugestão inválida ou Live Photo protegida. Escolha manter a versão com movimento e consulte novamente.";
+
+"Uma foto aparece em mais de um par selecionado. Revise um par por foto para evitar escolhas conflitantes." = "Uma foto aparece em mais de um par selecionado. Revise um par por foto para evitar escolhas conflitantes.";
+
+"Os metadados de uma sugestão mudaram. Consulte novamente antes de alterar as fotos." = "Os metadados de uma sugestão mudaram. Consulte novamente antes de alterar as fotos.";
+
+"A sugestão não é mais válida. Consulte novamente." = "A sugestão não é mais válida. Consulte novamente.";
+
+"Mesma câmera e dimensões, mesmo com nomes diferentes" = "Mesma câmera e dimensões, mesmo com nomes diferentes";
+
+"Prévia gerada pelo Immich, não o original. Os arquivos têm hashes diferentes; confira conteúdo e enquadramento antes de escolher uma cópia. Esta imagem não comprova a qualidade ou o movimento do original." = "Prévia gerada pelo Immich, não o original. Os arquivos têm hashes diferentes; confira conteúdo e enquadramento antes de escolher uma cópia. Esta imagem não comprova a qualidade ou o movimento do original.";
+
+"Os álbuns de uma sugestão mudaram. Consulte novamente antes de alterar as fotos." = "Os álbuns de uma sugestão mudaram. Consulte novamente antes de alterar as fotos.";
+
+"Conferindo álbuns das sugestões" = "Conferindo álbuns das sugestões";
+
+"As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento." = "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento.";
