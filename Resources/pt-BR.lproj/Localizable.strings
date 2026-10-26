@@ -603,3 +603,21 @@
 "%@ reutilizados" = "%@ reutilizados";
 
 "Pausar após itens em andamento" = "Pausar após itens em andamento";
+
+"Possíveis duplicatas · %@" = "Possíveis duplicatas · %@";
+
+"Complemento por metadados: mesmo nome, dimensões e captura com até 1 segundo de diferença. Os arquivos têm hashes diferentes; compare as imagens antes de decidir. As sugestões não entram no envio à lixeira." = "Complemento por metadados: mesmo nome, dimensões e captura com até 1 segundo de diferença. Os arquivos têm hashes diferentes; compare as imagens antes de decidir. As sugestões não entram no envio à lixeira.";
+
+"Limite de 500 sugestões atingido. Analise menos álbuns para conferir os demais pares." = "Limite de 500 sugestões atingido. Analise menos álbuns para conferir os demais pares.";
+
+"Revisão visual necessária" = "Revisão visual necessária";
+
+"Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar." = "Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar.";
+
+"Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes." = "Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes.";
+
+"Cópias exatas por hash" = "Cópias exatas por hash";
+
+"A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer." = "A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer.";
+
+"Conecte a conta proprietária em Contas e API para carregar a prévia." = "Conecte a conta proprietária em Contas e API para carregar a prévia.";
