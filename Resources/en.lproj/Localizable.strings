@@ -603,3 +603,21 @@
 "%@ reutilizados" = "%@ reused";
 
 "Pausar após itens em andamento" = "Pause after active items";
+
+"Possíveis duplicatas · %@" = "Possible duplicates · %@";
+
+"Complemento por metadados: mesmo nome, dimensões e captura com até 1 segundo de diferença. Os arquivos têm hashes diferentes; compare as imagens antes de decidir. As sugestões não entram no envio à lixeira." = "Additional metadata check: same filename, dimensions and capture within 1 second. The files have different hashes; compare the images before deciding. Suggestions are not included in trash actions.";
+
+"Limite de 500 sugestões atingido. Analise menos álbuns para conferir os demais pares." = "The 500-suggestion limit was reached. Scan fewer albums to review other pairs.";
+
+"Revisão visual necessária" = "Visual review required";
+
+"Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar." = "This pair includes a Live Photo. Preserve the version with motion when reviewing.";
+
+"Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes." = "No metadata suggestions found. This does not guarantee there are no similar photos.";
+
+"Cópias exatas por hash" = "Exact copies by hash";
+
+"A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer." = "The analysis compares up to ten neighbors per item. Very repetitive sets may contain other pairs that are not shown.";
+
+"Conecte a conta proprietária em Contas e API para carregar a prévia." = "Connect the owner account in Accounts and API to load the preview.";
