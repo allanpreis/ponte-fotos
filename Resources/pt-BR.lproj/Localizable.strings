@@ -675,3 +675,18 @@
 "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento." = "As duas cópias são Live Photos. A remoção deste par fica bloqueada para preservar o movimento.";
 
 "O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente." = "O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente.";
+
+/* Assisted album tracking */
+"Acompanhamento salvo. Consulte as novidades para revisar antes de importar." = "Acompanhamento salvo. Consulte as novidades para revisar antes de importar.";
+"Acompanhamento removido. Fotos e histórico de importação foram preservados." = "Acompanhamento removido. Fotos e histórico de importação foram preservados.";
+"O acompanhamento mudou. Consulte as novidades novamente." = "O acompanhamento mudou. Consulte as novidades novamente.";
+"%@ itens para revisar no acompanhamento. Nenhuma importação foi iniciada." = "%@ itens para revisar no acompanhamento. Nenhuma importação foi iniciada.";
+"Acompanhamento assistido" = "Acompanhamento assistido";
+"Última consulta: %@" = "Última consulta: %@";
+"Parar acompanhamento" = "Parar acompanhamento";
+"Acompanhar este álbum" = "Acompanhar este álbum";
+"Consultar novidades" = "Consultar novidades";
+"Vincule um álbum existente do Fotos. A consulta é manual; todos os itens ainda não concluídos entram na revisão, inclusive os já existentes na primeira consulta. Nada é importado automaticamente." = "Vincule um álbum existente do Fotos. A consulta é manual; todos os itens ainda não concluídos entram na revisão, inclusive os já existentes na primeira consulta. Nada é importado automaticamente.";
+"Consulte as novidades. Itens concluídos neste acompanhamento ficam fora da fila; falhas e resultados pendentes continuam para revisão." = "Consulte as novidades. Itens concluídos neste acompanhamento ficam fora da fila; falhas e resultados pendentes continuam para revisão.";
+
+"O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item." = "O par Live Photo mudou ou não foi registrado no histórico antigo. Confira o Fotos antes de reutilizar este item.";
