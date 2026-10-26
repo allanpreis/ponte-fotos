@@ -22,6 +22,7 @@ struct IMAlbum: Codable, Identifiable, Hashable {
 struct IMAsset: Codable, Identifiable {
     var id: String; var ownerId: String; var originalFileName: String; var checksum: String; var type: String
     var ownerName: String?
+    var captureDateTime: String?; var cameraMake: String?; var cameraModel: String?
     var createdAt = ""; var fileCreatedAt = ""; var localDateTime: String?
     var livePhotoVideoId: String?; var isEdited = false; var isOffline = false; var isTrashed = false
     var stacked = false; var isFavorite = false; var width: Int?; var height: Int?; var fileSize: Int64?
@@ -80,12 +81,16 @@ private struct IMRawAsset: Decodable {
     let createdAt: String?; let fileCreatedAt: String?; let localDateTime: String?; let livePhotoVideoId: String?
     let isEdited: Bool?; let isOffline: Bool?; let isTrashed: Bool?; let isFavorite: Bool?; let width: Int?; let height: Int?
     struct Stack: Decodable { let id: String? }
-    struct Exif: Decodable { let exifImageWidth: Int?; let exifImageHeight: Int?; let fileSizeInByte: Int64? }
+    struct Exif: Decodable {
+        let exifImageWidth: Int?; let exifImageHeight: Int?; let fileSizeInByte: Int64?
+        let dateTimeOriginal: String?; let make: String?; let model: String?
+    }
     struct Person: Decodable { let id: String }
     let stack: Stack?; let exifInfo: Exif?; let people: [Person]?
     var asset: IMAsset {
         var value = IMAsset(id: id, ownerId: ownerId, originalFileName: originalFileName, checksum: checksum ?? "", type: type)
         value.ownerName = owner?.name
+        value.captureDateTime = exifInfo?.dateTimeOriginal; value.cameraMake = exifInfo?.make; value.cameraModel = exifInfo?.model
         value.createdAt = createdAt ?? ""; value.fileCreatedAt = fileCreatedAt ?? ""; value.localDateTime = localDateTime
         value.livePhotoVideoId = livePhotoVideoId; value.isEdited = isEdited ?? false; value.isOffline = isOffline ?? false
         value.isTrashed = isTrashed ?? false; value.stacked = stack != nil; value.isFavorite = isFavorite ?? false

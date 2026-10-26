@@ -57,6 +57,7 @@ final class IMWorkspaceModel: ObservableObject {
             assets.first(where: { $0.ownerId == id && !($0.ownerName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.ownerName
         }
         for group in duplicates?.groups ?? [] { if let name = knownName(group.assets) { return name } }
+        for suggestion in duplicates?.suggestions ?? [] { if let name = knownName(suggestion.assets) { return name } }
         for group in comparison?.groups ?? [] { if let name = knownName(group.assets) { return name } }
         if let name = knownName(age?.assets ?? []) { return name }
         for entry in history { if let name = knownName(entry.assets) { return name } }
@@ -218,6 +219,7 @@ fileprivate final class IMWorkspaceUIState: ObservableObject {
     @Published var reviewKind: String?
     @Published var reviewAccepted = false
     @Published var reviewPage = 0
+    @Published var suggestionPage = 0
 }
 
 struct ImmichWorkspaceView: View {
@@ -345,7 +347,7 @@ struct ImmichWorkspaceView: View {
     }
     private var scanAlbumsButton: some View {
         Button {
-            ui.duplicatePage = 0; ui.comparisonPage = 0
+            ui.duplicatePage = 0; ui.comparisonPage = 0; ui.suggestionPage = 0
             if ui.tab == "Álbuns" { model.scanDuplicates(ui.selectedAlbums) } else { model.scanComparison(ui.selectedAlbums) }
         } label: {
             Label(ui.tab == "Álbuns" ? L("Consultar duplicatas · \(ui.selectedAlbums.count) álbuns") : L("Comparar seleção"), systemImage: ui.tab == "Álbuns" ? "square.on.square" : "rectangle.on.rectangle")
@@ -354,6 +356,7 @@ struct ImmichWorkspaceView: View {
     private var duplicatesView: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let result = model.duplicates {
+                Text(L("Cópias exatas por hash")).font(.title3.bold())
                 Text(L("\(result.groups.count) grupos · \(result.skipped) itens fora da análise")).font(.headline)
                 Text(L("A Live Photo é sugerida para manter. Cada cópia mostra sua conta, formato e álbuns atuais.")).foregroundStyle(.secondary)
                 HStack {
@@ -366,7 +369,35 @@ struct ImmichWorkspaceView: View {
                 ForEach(page(result.groups, ui.duplicatePage)) { group in duplicateGroup(group) }
                 pager(count: result.groups.count, index: $ui.duplicatePage)
                 if result.groups.isEmpty { empty(L("Nenhuma cópia idêntica encontrada.")) }
+                Divider()
+                suggestionResults(result.suggestions ?? [])
             } else { empty(L("Selecione os álbuns e consulte as duplicatas para começar.")) }
+        }
+    }
+    private func suggestionResults(_ suggestions: [IMDuplicateSuggestion]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L("Possíveis duplicatas · \(suggestions.count)")).font(.headline)
+            Text(L("Complemento por metadados: mesmo nome, dimensões e captura com até 1 segundo de diferença. Os arquivos têm hashes diferentes; compare as imagens antes de decidir. As sugestões não entram no envio à lixeira.")).foregroundStyle(.secondary)
+            Text(L("A análise compara até dez vizinhos por item. Em conjuntos muito repetitivos, outros pares podem não aparecer.")).font(.caption).foregroundStyle(.secondary)
+            if suggestions.count == 500 { Text(L("Limite de 500 sugestões atingido. Analise menos álbuns para conferir os demais pares.")).foregroundStyle(.orange) }
+            ForEach(page(suggestions, ui.suggestionPage)) { suggestion in
+                PFCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(L("Revisão visual necessária"), systemImage: "photo.on.rectangle.angled").font(.headline)
+                        if suggestion.assets.contains(where: { asset in !model.credentials.contains(where: { $0.account.id == asset.ownerId }) }) {
+                            Text(L("Conecte a conta proprietária em Contas e API para carregar a prévia.")).font(.caption).foregroundStyle(.orange)
+                        }
+                        if suggestion.assets.contains(where: \.isLive) {
+                            Text(L("Este par inclui uma Live Photo. Preserve a versão com movimento ao revisar.")).foregroundStyle(.secondary)
+                        }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), alignment: .top)], alignment: .leading, spacing: 12) {
+                            ForEach(suggestion.assets) { asset in assetCard(asset) }
+                        }
+                    }
+                }
+            }
+            pager(count: suggestions.count, index: $ui.suggestionPage)
+            if suggestions.isEmpty { Text(L("Nenhuma sugestão por metadados encontrada. Isso não garante ausência de fotos semelhantes.")).foregroundStyle(.secondary) }
         }
     }
     private func duplicateGroup(_ group: IMDuplicateGroup) -> some View {

@@ -7,6 +7,14 @@ struct IMDuplicateGroup: Codable, Identifiable {
     var unavailableOwnerIDs: [String] = []
 }
 
+/// Metadata candidates are deliberately separate from exact groups and are never accepted by the trash plan.
+struct IMDuplicateSuggestion: Codable, Identifiable {
+    var id: String
+    var keepID: String
+    var assets: [IMAsset]
+    var evidence: [String]
+}
+
 struct IMDuplicateAnalysis: Codable, Identifiable {
     var id: String
     var profileID: String
@@ -15,6 +23,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
     var groups: [IMDuplicateGroup]
     var total: Int
     var skipped: Int
+    var suggestions: [IMDuplicateSuggestion]? = nil
 }
 
 @MainActor enum IMDuplicates {
@@ -28,6 +37,60 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
                 return IMDuplicateGroup(id: UUID().uuidString, keepID: (sorted.first(where: \.isLive) ?? sorted[0]).id,
                     assets: sorted, unavailableOwnerIDs: Set(sorted.map(\.ownerId)).subtracting(availableOwners).sorted())
             }.sorted { ($0.assets[0].createdAt, $0.assets[0].id) < ($1.assets[0].createdAt, $1.assets[0].id) }
+    }
+
+    /// A bounded, conservative complement to the byte-identical checksum scan.
+    /// Pair suggestions avoid joining a burst transitively; at most ten nearby records per item are compared.
+    static func suggestions(_ assets: [IMAsset]) -> [IMDuplicateSuggestion] {
+        struct Candidate { let asset: IMAsset; let date: Date }
+        struct Key: Hashable { let name: String; let width: Int; let height: Int }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let whole = ISO8601DateFormatter()
+        whole.formatOptions = [.withInternetDateTime]
+        func date(_ text: String?) -> Date? {
+            guard let text else { return nil }
+            return fractional.date(from: text) ?? whole.date(from: text)
+        }
+        func normalized(_ text: String) -> String {
+            text.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping.lowercased()
+        }
+        func compatible(_ first: String?, _ second: String?) -> Bool {
+            guard let first, let second, !normalized(first).isEmpty, !normalized(second).isEmpty else { return true }
+            return normalized(first) == normalized(second)
+        }
+        var buckets: [Key: [Candidate]] = [:]
+        var seen = Set<String>()
+        for asset in assets.sorted(by: { $0.id < $1.id }) {
+            guard seen.insert(asset.id).inserted, asset.type == "IMAGE", asset.eligible(allowLive: true),
+                  let width = asset.width, let height = asset.height, width > 0, height > 0,
+                  let captured = date(asset.captureDateTime) ?? date(asset.fileCreatedAt) else { continue }
+            let name = normalized(asset.originalFileName)
+            guard !name.isEmpty else { continue }
+            buckets[Key(name: name, width: width, height: height), default: []].append(Candidate(asset: asset, date: captured))
+        }
+        let keys = buckets.keys.sorted { ($0.name, $0.width, $0.height) < ($1.name, $1.width, $1.height) }
+        var result: [IMDuplicateSuggestion] = []
+        for key in keys {
+            let values = buckets[key]!.sorted { ($0.date, $0.asset.id) < ($1.date, $1.asset.id) }
+            for index in values.indices {
+                let first = values[index]
+                for next in (index + 1)..<min(values.count, index + 11) {
+                    let second = values[next]
+                    guard second.date.timeIntervalSince(first.date) <= 1 else { break }
+                    guard first.asset.checksum != second.asset.checksum,
+                          compatible(first.asset.cameraMake, second.asset.cameraMake),
+                          compatible(first.asset.cameraModel, second.asset.cameraModel) else { continue }
+                    let pair = [first.asset, second.asset]
+                    let ids = pair.map(\.id).sorted()
+                    result.append(IMDuplicateSuggestion(id: "metadata:" + ids.joined(separator: ":"),
+                        keepID: (pair.first(where: \.isLive) ?? pair[0]).id, assets: pair,
+                        evidence: ["Mesmo nome de arquivo e dimensões", "Capturas com diferença de até 1 segundo", "Arquivos com hashes diferentes"]))
+                    if result.count == 500 { return result }
+                }
+            }
+        }
+        return result
     }
 
     static func validateAnalysis(_ analysis: IMDuplicateAnalysis, profileID: String, now: Date = Date()) throws {
@@ -123,7 +186,7 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             progress(M("Conferindo álbuns das cópias"), groupIndex + 1, found.count)
         }
         return IMDuplicateAnalysis(id: UUID().uuidString, profileID: session.profileID, albums: albums,
-            createdAt: Date(), groups: found, total: readers.count, skipped: skipped)
+            createdAt: Date(), groups: found, total: readers.count, skipped: skipped, suggestions: suggestions(assets))
     }
 
     static func fresh(_ old: IMAsset, session: IMSession) async throws -> IMAsset {
