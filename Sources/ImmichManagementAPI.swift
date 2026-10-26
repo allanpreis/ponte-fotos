@@ -223,7 +223,26 @@ struct IMClient {
     }
     func add(_ ids: [String], to albumID: String) async throws { try await albumMutation(ids, albumID: albumID, method: "PUT") }
     func unlink(_ ids: [String], from albumID: String) async throws { try await albumMutation(ids, albumID: albumID, method: "DELETE") }
-    func trash(_ ids: [String]) async throws { _ = try await data("assets", method: "DELETE", body: ["ids": ids, "force": false]) }
+    /// The server can disable retention even when DELETE uses force=false.
+    /// Do not cache this setting: a later change must block the next removal.
+    func requireRecoverableTrash() async throws {
+        struct Features: Decodable { let trash: Bool }
+        struct Config: Decodable { let trashDays: Int }
+        do {
+            let features = try decode(Features.self, await data("server/features", timeout: 5))
+            let config = try decode(Config.self, await data("server/config", timeout: 5))
+            guard features.trash, config.trashDays > 0 else {
+                throw BridgeError(message: M("O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente."))
+            }
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            throw BridgeError(message: M("O envio à lixeira foi bloqueado porque o Immich não confirmou uma lixeira ativa com prazo de retenção positivo. Confira a configuração do servidor e consulte novamente."))
+        }
+    }
+    func trash(_ ids: [String]) async throws {
+        try await requireRecoverableTrash()
+        _ = try await data("assets", method: "DELETE", body: ["ids": ids, "force": false])
+    }
     func permissions(timeout: TimeInterval = 5) async throws -> Set<String> {
         struct Info: Decodable { let permissions: [String] }
         return Set(try decode(Info.self, await data("api-keys/me", timeout: timeout)).permissions)

@@ -313,6 +313,9 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             _ = try session.owner(pair.keep.ownerId)
             try require(["asset.delete"], client: session.owner(pair.drop.ownerId), permissions: permissions)
         }
+        // All clients share this session's validated server. Confirm retention before
+        // preserving any album links, then trash() rechecks immediately before DELETE.
+        if let client = session.clients.first { try await client.requireRecoverableTrash() }
         let catalog = try await session.albums()
         var additions: [Addition] = [], additionIDs = Set<String>()
         var validated: [Pair] = []
@@ -323,23 +326,10 @@ struct IMDuplicateAnalysis: Codable, Identifiable {
             let keepAlbums = Set(current.keep.albums.map(\.id))
             for album in current.drop.albums where !keepAlbums.contains(album.id) {
                 guard let target = catalog.first(where: { $0.id == album.id }) else { throw BridgeError(message: M("Um álbum de destino não está disponível.")) }
-                let candidates = session.clients.filter {
-                    $0.credential.account.id == target.ownerID || target.writerIDs.contains($0.credential.account.id)
-                }.sorted { ($0.credential.account.id == target.ownerID ? 0 : 1) < ($1.credential.account.id == target.ownerID ? 0 : 1) }
-                var selectedWriter: IMClient?
-                for candidate in candidates {
-                    do {
-                        try Task.checkCancellation()
-                        try require(["asset.read", "album.read", "albumAsset.create"], client: candidate, permissions: permissions)
-                        try unchanged(current.keep, await candidate.asset(current.keep.id))
-                        selectedWriter = candidate
-                        break
-                    } catch is CancellationError { throw CancellationError() }
-                    catch { continue } // Read-only probes: an editor may have visibility the owner lacks.
-                }
-                guard let writer = selectedWriter else {
-                    throw BridgeError(message: M("Nenhuma conta editora pode ler a cópia mantida e adicionar ao álbum \(target.name). Confira albumAsset.create e os acessos."))
-                }
+                // Only access denials or missing scopes may try another editor.
+                // Network failures, incompatible responses and changed content must stop the plan.
+                let writer = try await session.writer(target, requiring: ["asset.read", "album.read", "albumAsset.create"], adding: [current.keep])
+                try unchanged(current.keep, await writer.asset(current.keep.id))
                 if additionIDs.insert(target.id + ":" + current.keep.id).inserted {
                     additions.append(Addition(keep: current.keep, album: target, writer: writer))
                 }

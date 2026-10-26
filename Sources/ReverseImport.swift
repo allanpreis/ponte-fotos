@@ -92,11 +92,15 @@ struct PFReverseAsset: Decodable {
     }
     static func validChecksum(_ value: String) -> Bool { Data(base64Encoded: value)?.count == 20 || (value.count == 40 && value.allSatisfy { $0.isHexDigit }) }
     static func verify(_ file: URL, checksum: String) throws {
-        let handle = try FileHandle(forReadingFrom: file); defer { try? handle.close() }
-        var digest = Insecure.SHA1()
-        while let bytes = try handle.read(upToCount: 1024 * 1024), !bytes.isEmpty { digest.update(data: bytes) }
-        let actual = Data(digest.finalize())
-        guard validChecksum(checksum), actual.base64EncodedString() == checksum || actual.map({ String(format: "%02x", $0) }).joined() == checksum.lowercased() else { throw BridgeError(message: M("O original baixado não corresponde ao checksum do Immich. Nada foi importado.")) }
+        guard validChecksum(checksum) else {
+            throw BridgeError(message: M("O original baixado não corresponde ao checksum do Immich. Nada foi importado."))
+        }
+        // Share bounded Foundation buffers and per-chunk cancellation with uploads.
+        let actual = try ImmichClient.checksum(file)
+        let hex = Data(base64Encoded: actual)?.map { String(format: "%02x", $0) }.joined()
+        guard actual == checksum || hex == checksum.lowercased() else {
+            throw BridgeError(message: M("O original baixado não corresponde ao checksum do Immich. Nada foi importado."))
+        }
     }
 }
 
