@@ -13,23 +13,21 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 0.9.12 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 1.0.0 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-Version 0.9.7 adds transfer account selection and connection by URL availability. It retains the media diagnostics and post-import verification introduced in 0.9.6, including an explicit recheck action for pending results. The app reports format and preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
-
-Version 0.9.12 keeps temporary read buffers bounded while hashing and packaging large originals, reducing memory peaks.
+The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0).
 
 ## Large transfers — bounded concurrency
 
-Version 0.9.8 prepares small windows of up to eight complete media items with a 128 MiB soft target. A final whole item can exceed that target. Existing standalone images can be checked by SHA-1 in batches and reused only after current identity, ownership, checksum, availability and non-Live status are revalidated. Videos and Live Photos retain the ordinary upload path; the paired video remains before its image. The same hash is reused for upload, and multipart disk work runs on a utility task. Known free disk space is checked before copying/building temporary bodies, with a reserve; unknown PhotoKit resource sizes and changing capacity can still cause write failures.
+The upload pipeline prepares small windows of up to eight complete media items with a 128 MiB soft target. A final whole item can exceed that target. Existing standalone images can be checked by SHA-1 in batches and reused only after current identity, ownership, checksum, availability and non-Live status are revalidated. Videos and Live Photos retain the ordinary upload path; the paired video remains before its image. The same hash is reused for upload, and multipart disk work runs on a utility task. Known free disk space is checked before copying/building temporary bodies, with a reserve; unknown PhotoKit resource sizes and changing capacity can still cause write failures.
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-Version 0.9.9 processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
+The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0).
 
 ## Transfer accounts and connection availability
 
@@ -41,7 +39,7 @@ A transfer freezes its connection for the batch. A network change pauses after t
 
 Account selection uses the same row sizing as sidebar navigation. Transfer buttons use the native macOS bordered style, matching the other toolbar actions in both appearances. Existing presentation video illustrates earlier versions; the updated screenshots below show 0.9.9.
 
-Validation for 0.9.7 includes synthetic routing/account/history tests and real JPEG/Live Photo uploads through a dedicated test account. Repeating the upload and rechecking the previously imported Photos items created no new copies; independent downloads matched the server and approved samples. Fresh Photos original creation and physical Remote/VPN access were not exercised in this round. [Validation details and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
+Validation includes synthetic routing, account, history and failure tests, plus limited real JPEG/Live Photo transfers through an authorized test account. Repeated uploads and checks of previously imported Photos items reused existing copies; independent downloads matched approved originals. Fresh Photos original creation, physical VPN switching, large iCloud batches and real trash/restore operations have not been validated in this consolidation.
 
 ## 📥 Immich → Apple Photos
 
@@ -81,9 +79,9 @@ The library screenshot shows the 0.9.9 sidebar account menu and primary transfer
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 0.9.12 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.12/Ponte-Fotos-0.9.12-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 1.0.0 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.0/Ponte-Fotos-1.0.0-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
@@ -107,7 +105,7 @@ The main screen keeps the source, destination, media list, and actions visible w
 | Export | Exports originals with XMP sidecars without modifying the Apple library or source files. |
 | Upload | Uploads to the timeline, an existing album, or a new album; checks checksums, dates, available GPS, and Live Photo associations. |
 | Network connection | Tries the local URL before the remote URL by availability in Automatic mode; Local and Remote remain exclusive. |
-| Duplicates | Finds files with identical checksums across selected accounts and albums, identifies Live Photos, and lets you review extra still copies. |
+| Duplicates | Finds exact-checksum copies and separately suggests metadata-based pairs for manual comparison, keep selection and review before moving a static copy to the trash. |
 | Comparison | Compares the contents of two albums and organizes album membership without deleting library files. |
 | Person and age | Selects images by person, birth date recorded in Immich, and an inclusive age range. |
 | Accounts and history | Uses account-specific keys and records the last 20 management operations, including uncertain results. The app also allows selecting a registered account for transfers, with separate profile/account histories. |
@@ -208,11 +206,18 @@ With a validated connection, open **Manage library** in the sidebar. In **Accoun
 
 ### Albums and duplicates
 
-Select albums and run the query. Comparison uses exact checksums and media types, including the main image of Live Photos. Matching names or similar appearance alone do not establish duplication. Recompressed, edited, or otherwise byte-different files may be absent from the results.
+Select albums and run the query. The result shows two separate counts and views:
 
-Each copy shows its account, name, format, metadata, and accessible albums. **Live Photo · with motion** and **Still photo** appear in separate groups. A Live Photo is suggested for retention; moving any Live Photo to the trash is blocked. Groups without a connected owner account may also be blocked.
+- **Exact copies by hash** groups files with identical checksums. This check includes Live Photo images and remains separate from metadata suggestions.
+- **Possible duplicates** suggests image pairs with different hashes, equal dimensions and capture times within one second. The pair must share a normalized filename or have matching, nonempty camera make and model. The analysis compares at most ten nearby items per bucket and returns up to 500 pairs. It can miss variants and does not guarantee a duplicate-free library.
 
-Before moving items to the trash, the app revalidates content, ownership, motion, access, and album membership; it adds and confirms membership in accessible albums on the retained copy before the first deletion. Deletion is recoverable in Immich (`force: false`); the app does not empty the trash. It cannot preserve album membership invisible to the connected accounts.
+Use **Compare enlarged** to inspect the server-generated previews, then choose a copy to keep only for pairs you recognize as duplicates. The previews are not originals and do not prove original quality, HDR fidelity or motion. Suggestions start unselected; **Review possible duplicates** shows the selected keep/trash choices before explicit confirmation.
+
+Each copy shows its account, name, media type, metadata and accessible albums. Live Photos cannot be discarded by either workflow. A pair containing two Live Photos is therefore blocked, as are overlapping selected pairs and actions without the required owner accounts or permissions.
+
+Before changes, the app revalidates content, ownership, motion, access and album membership. Suggestions also require unchanged reviewed metadata and album sets. The retained copy is added to the other copy's accessible albums, and those additions are confirmed before any trash request. Album membership invisible to the connected accounts cannot be preserved.
+
+The app requires the server to confirm that trash is enabled with a positive retention period before the workflow writes changes, and checks again before each trash request. An unavailable or unconfirmed setting blocks the action. The app sends `force: false` and never empties trash; an administrator's later policy changes remain outside its control. Real trash and restore operations were not exercised in this consolidation; their app-side guards were tested with simulated server responses.
 
 ### Compare albums
 
@@ -237,8 +242,6 @@ Every management change goes through a review screen and explicit confirmation. 
 - Completed analyses are not restored after closing the management window.
 - Creating albums or selecting additional destination albums in the duplicates workflow, and bulk decisions in comparison, are not yet available.
 - Large operations can be slow because of safety revalidation.
-
-Metadata suggestions complement exact-checksum checks with manual keep selection, enlarged server previews and explicit review before moving a static copy to trash. Matches require equal dimensions and capture within one second, plus the same filename or matching camera make/model. Live Photos, overlapping choices and changes to reviewed content, metadata or album memberships are protected. This bounded metadata check may miss variants and does not guarantee a duplicate-free library.
 
 ## Privacy and local storage
 
@@ -279,14 +282,14 @@ The public repository contains the files needed to build the app and display thi
 | Wrong address or account | Check Automatic/Local/Remote, configured URLs and the selected transfer account. Routing does not require a Wi-Fi name or Location permission. Refresh the source albums after a source change. |
 | Empty library or access denied | System Settings → Privacy & Security → Photos; confirm access and the library selected in Photos. |
 | iCloud original unavailable | iCloud access, internet, free space, and the option to download originals. |
-| Management action blocked | Owner account's key, API permissions, album access, and the workflow's media exclusions. |
-| Visually similar duplicates missing | The method requires exact checksums; it does not use perceptual recognition of similar images. |
+| Management action blocked | Owner account's key, API permissions, album access, media exclusions and, for trash actions, an enabled trash with positive retention confirmed by the server. |
+| Possible duplicates missing | Exact copies require equal checksums. The separate metadata suggestions have filename/camera, dimensions, date and result limits; the app does not perform automatic visual recognition. |
 | Invalid signature | Rebuild in a local folder, check `codesign`, and install the bundle outside synced folders. |
 | Uncertain result | Check history and the server; do not blindly repeat the operation. |
 
 ## Project status
 
-The app is under active development, with local signing and automated tests. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
+Version 1.0.0 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
 This is an independent project with no official affiliation with Apple or Immich. Licensed under the [MIT License](LICENSE).
 

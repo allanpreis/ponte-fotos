@@ -13,23 +13,21 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 0.9.12 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 1.0.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-A versão 0.9.7 adiciona seleção de conta por transferência e conexão por disponibilidade das URLs. Mantém o diagnóstico de mídia e a conferência após importar no Fotos da Apple introduzidos na 0.9.6, incluindo reconferência explícita de resultados pendentes. O app informa formato e disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
-
-A versão 0.9.12 limita os buffers temporários durante o cálculo de hash e a preparação de originais grandes, reduzindo picos de memória.
+O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0).
 
 ## Operações grandes — concorrência limitada
 
-A versão 0.9.8 prepara janelas de até oito mídias completas, com alvo flexível de 128 MiB. A última mídia inteira pode ultrapassar esse alvo. Imagens comuns existentes podem ser consultadas por SHA-1 em lotes e reutilizadas somente após revalidar identidade, proprietário, checksum, disponibilidade e ausência de associação Live. Vídeos e Live Photos mantêm o envio normal; o vídeo pareado continua antes da imagem. O hash calculado é reaproveitado no envio e a preparação multipart roda fora da interface. Há conferência do espaço livre conhecido antes de copiar/montar temporários, com reserva; tamanhos PhotoKit desconhecidos e mudanças no espaço ainda podem causar falhas de gravação.
+O fluxo de envio prepara janelas de até oito mídias completas, com alvo flexível de 128 MiB. A última mídia inteira pode ultrapassar esse alvo. Imagens comuns existentes podem ser consultadas por SHA-1 em lotes e reutilizadas somente após revalidar identidade, proprietário, checksum, disponibilidade e ausência de associação Live. Vídeos e Live Photos mantêm o envio normal; o vídeo pareado continua antes da imagem. O hash calculado é reaproveitado no envio e a preparação multipart roda fora da interface. Há conferência do espaço livre conhecido antes de copiar/montar temporários, com reserva; tamanhos PhotoKit desconhecidos e mudanças no espaço ainda podem causar falhas de gravação.
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-A versão 0.9.9 processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12).
+O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -41,7 +39,7 @@ A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia
 
 O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.9.
 
-A validação da 0.9.7 inclui testes sintéticos de roteamento/contas/histórico e envio real de JPEG/Live Photo pela conta de teste. Repetir o envio e reconferir itens já importados no Fotos não criou novas cópias; downloads independentes corresponderam ao servidor e às amostras aprovadas. Nova criação de originais no Fotos e acesso físico Remoto/VPN não foram exercitados nesta rodada. [Detalhes e limites da validação](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.7).
+A validação inclui testes sintéticos de roteamento, contas, histórico e falhas, além de transferências reais limitadas de JPEG/Live Photo por uma conta de teste autorizada. Envios repetidos e conferências de itens já importados no Fotos reutilizaram cópias existentes; downloads independentes corresponderam aos originais aprovados. Nova criação de originais no Fotos, alternância física de VPN, lotes grandes do iCloud e operações reais de lixeira/restauração não foram validados nesta consolidação.
 
 ## 📥 Immich → Fotos da Apple
 
@@ -82,9 +80,9 @@ A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.9 com
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 0.9.12 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v0.9.12/Ponte-Fotos-0.9.12-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 1.0.0 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.0/Ponte-Fotos-1.0.0-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v0.9.12) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.0) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -108,7 +106,7 @@ A opção **Usar transparência e vidro** controla o acabamento da navegação. 
 | Exportação | Exporta originais com XMP complementar, sem modificar a biblioteca Apple ou arquivos de origem. |
 | Upload | Envia para a linha do tempo, um álbum existente ou um novo álbum; confere checksum, data, GPS disponível e associação Live Photo. |
 | Conexão por rede | Tenta a URL local antes da remota por disponibilidade no modo Automático; Local e Remoto permanecem exclusivos. |
-| Duplicatas | Encontra arquivos com checksum idêntico entre contas e álbuns selecionados, identifica Live Photos e permite revisar cópias estáticas excedentes. |
+| Duplicatas | Encontra cópias por checksum exato e sugere separadamente pares por metadados para comparação manual, escolha da cópia mantida e revisão antes de enviar uma cópia estática à lixeira. |
 | Comparação | Compara conteúdos de dois álbuns e organiza seus vínculos sem apagar os arquivos da biblioteca. |
 | Pessoa e idade | Seleciona imagens por pessoa, aniversário registrado no Immich e intervalo inclusivo de idade. |
 | Contas e histórico | Usa chaves por conta e registra as últimas 20 operações de gestão, incluindo resultados incertos. O app também permite selecionar uma conta cadastrada para transferir, com históricos separados por perfil/conta. |
@@ -209,11 +207,18 @@ Com a conexão validada, abra **Gerenciar biblioteca** na barra lateral. Em **Co
 
 ### Álbuns e duplicatas
 
-Selecione os álbuns e consulte. A comparação é por checksum exato e tipo de mídia, incluindo a imagem principal de Live Photos. Nome igual ou aparência semelhante, isoladamente, não comprovam duplicação. Arquivos recompactados, editados ou com bytes diferentes podem ficar fora do resultado.
+Selecione os álbuns e consulte. O resultado mostra duas contagens e visualizações separadas:
 
-Cada cópia mostra conta, nome, formato, metadados e álbuns acessíveis. **Live Photo · com movimento** e **Foto estática** aparecem em blocos próprios. Uma Live Photo é sugerida para manter; o envio de qualquer Live Photo à lixeira é bloqueado. Grupos sem conta proprietária conectada também podem ser bloqueados.
+- **Cópias exatas por hash** agrupam arquivos com checksums idênticos. Essa conferência inclui imagens de Live Photos e permanece separada das sugestões por metadados.
+- **Possíveis duplicatas** sugere pares de imagens com hashes diferentes, dimensões iguais e captura com até um segundo de diferença. O par precisa ter o mesmo nome normalizado ou fabricante e modelo de câmera preenchidos e coincidentes. A análise compara até dez itens próximos por agrupamento e retorna até 500 pares. Pode deixar variantes de fora e não garante uma biblioteca sem duplicatas.
 
-Antes da lixeira, o app revalida conteúdo, proprietário, movimento, acesso e vínculos; adiciona e confirma os álbuns acessíveis na cópia mantida antes da primeira exclusão. A exclusão é recuperável no Immich (`force: false`); o aplicativo não esvazia a lixeira. Vínculos invisíveis às contas conectadas não podem ser preservados pelo app.
+Use **Comparar ampliado** para conferir as prévias geradas pelo servidor e escolha uma cópia para manter somente nos pares que reconhecer como duplicatas. As prévias não são os originais e não comprovam qualidade original, fidelidade HDR ou movimento. As sugestões começam desmarcadas; **Revisar possíveis duplicatas** mostra quais cópias serão mantidas e enviadas à lixeira antes da confirmação explícita.
+
+Cada cópia mostra conta, nome, tipo de mídia, metadados e álbuns acessíveis. Nenhum dos fluxos descarta Live Photos. Um par com duas Live Photos fica, portanto, bloqueado, assim como pares selecionados que compartilhem fotos e ações sem contas proprietárias ou permissões necessárias.
+
+Antes das alterações, o app revalida conteúdo, proprietário, movimento, acesso e vínculos de álbuns. Nas sugestões, também exige que os metadados e o conjunto de álbuns revisados permaneçam iguais. A cópia mantida é adicionada aos álbuns acessíveis da outra, e essas adições são confirmadas antes de qualquer solicitação de lixeira. Vínculos invisíveis às contas conectadas não podem ser preservados.
+
+O app exige que o servidor confirme lixeira ativa e prazo de retenção positivo antes de o fluxo gravar alterações, e confere novamente antes de cada solicitação de lixeira. Configuração indisponível ou não confirmada bloqueia a ação. O app envia `force: false` e nunca esvazia a lixeira; mudanças posteriores de política pelo administrador ficam fora do seu controle. Operações reais de lixeira e restauração não foram exercitadas nesta consolidação; as guardas do app foram testadas com respostas simuladas do servidor.
 
 ### Comparar álbuns
 
@@ -238,8 +243,6 @@ Toda alteração da gestão passa por uma tela de revisão e uma confirmação e
 - Análises prontas não são restauradas depois de fechar a janela de gestão.
 - Criação/destinos extras de álbuns no fluxo de duplicatas e decisões em lote da comparação ainda não estão disponíveis.
 - Operações grandes podem ser lentas devido às revalidações de segurança.
-
-As sugestões por metadados complementam a comparação exata por hash, com escolha manual da cópia para manter, prévias ampliadas do servidor e revisão antes de enviar uma cópia estática à lixeira. Os pares exigem dimensões iguais e captura com até um segundo de diferença, além de mesmo nome ou fabricante/modelo de câmera coincidentes. Live Photos, escolhas conflitantes e mudanças no conteúdo, nos metadados ou nos vínculos revisados são protegidos. Essa análise limitada pode deixar variantes de fora e não garante uma biblioteca sem duplicatas.
 
 ## Privacidade e armazenamento local
 
@@ -280,14 +283,14 @@ O repositório público contém os arquivos necessários para compilar o aplicat
 | Endereço ou conta incorretos | Confira Automático/Local/Remoto, URLs configuradas e conta selecionada para transferir. A conexão dispensa nome de Wi-Fi e Localização. Atualize os álbuns após mudar a origem. |
 | Biblioteca vazia ou acesso negado | Ajustes do Sistema → Privacidade e Segurança → Fotos; confirme acesso e biblioteca selecionada no Fotos. |
 | Original do iCloud indisponível | Acesso ao iCloud, internet, espaço livre e opção de baixar originais. |
-| Ação da gestão bloqueada | Chave da conta proprietária, permissões da API, acesso aos álbuns e exclusões de mídia do fluxo. |
-| Duplicatas visuais não aparecem | O método exige checksum exato; não faz reconhecimento perceptual de imagens semelhantes. |
+| Ação da gestão bloqueada | Chave da conta proprietária, permissões da API, acesso aos álbuns, exclusões de mídia e, para lixeira, confirmação do servidor de que ela está ativa com retenção positiva. |
+| Possíveis duplicatas não aparecem | Cópias exatas exigem checksums iguais. As sugestões separadas por metadados têm limites de nome/câmera, dimensões, data e quantidade; o app não faz reconhecimento visual automático. |
 | Assinatura inválida | Recompile em pasta local, confira `codesign` e instale o bundle fora de sincronizadores. |
 | Resultado incerto | Confira histórico e servidor; não repita cegamente a operação. |
 
 ## Estado do projeto
 
-Aplicativo em evolução, com assinatura local e testes automatizados. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
+A versão 1.0.0 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distribuído sob a [licença MIT](LICENSE).
 
