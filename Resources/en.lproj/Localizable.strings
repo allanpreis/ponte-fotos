@@ -720,3 +720,10 @@
 "O XMP do par mudou. Analise a pasta novamente antes de enviar." = "The pair’s XMP changed. Scan the folder again before uploading.";
 "Análise cancelada. Analise a pasta novamente antes de enviar." = "Analysis cancelled. Scan the folder again before uploading.";
 "O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar." = "The existing file does not confirm the expected Live Photo association. Review the pair in Immich before continuing.";
+
+"%@ contas" = "%@ accounts";
+"Sem data de nascimento" = "No birth date";
+"Pessoas com o mesmo nome e a mesma data de nascimento aparecem juntas. A busca consulta as contas selecionadas; pessoas sem nome ficam ocultas." = "People with the same name and birth date appear together. Search uses the selected accounts; unnamed people are hidden.";
+"Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente." = "Check the person’s name and birth date in Immich, then search again.";
+"O nome ou nascimento da pessoa mudou; consulte novamente." = "The person’s name or birth date changed; search again.";
+"A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente." = "The selected source is no longer available. Refresh the albums and search again.";
