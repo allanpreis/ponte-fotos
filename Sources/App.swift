@@ -13,12 +13,18 @@ struct PhotoItem: Identifiable {
     var external: ExternalMedia? = nil
     var id: String {
         if let asset { return asset.localIdentifier }
-        return "file-" + SHA256.hash(data: Data((external?.url.standardizedFileURL.path ?? "").utf8)).map { String(format: "%02x", $0) }.joined()
+        var identity = external?.url.standardizedFileURL.path ?? ""
+        if let media = external, let video = media.pairedVideo {
+            let parts = [video.standardizedFileURL.path, media.contentChecksum ?? "", media.pairedChecksum ?? "",
+                         media.sidecarChecksum ?? "", media.pairedSidecarChecksum ?? ""]
+            identity += "|live|" + parts.joined(separator: "|")
+        }
+        return "file-" + SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
     }
     var title: String { external?.url.lastPathComponent ?? resources.first(where: { $0.type == .photo || $0.type == .video })?.originalFilename ?? L("Sem nome") }
-    var live: Bool { asset?.mediaSubtypes.contains(.photoLive) ?? false }
+    var live: Bool { external?.pairedVideo != nil || asset?.mediaSubtypes.contains(.photoLive) == true }
     var raw: Bool { external.map { UTType(filenameExtension: $0.url.pathExtension)?.conforms(to: .rawImage) == true } ?? resources.contains { UTType($0.uniformTypeIdentifier)?.conforms(to: .rawImage) == true } }
-    var fileNames: String { external?.url.path ?? resources.map(\.originalFilename).joined(separator: " + ") }
+    var fileNames: String { external.map { [$0.url.path, $0.pairedVideo?.path].compactMap { $0 }.joined(separator: " + ") } ?? resources.map(\.originalFilename).joined(separator: " + ") }
 }
 struct ResourceDescriptor { let type: PHAssetResourceType; let originalFilename: String }
 struct PFPreparedUploadResource {
@@ -502,6 +508,9 @@ struct AlbumItem: Identifiable {
         let task = Task { await ExternalReader.scan(folder) }; scanTask = task
         let result = await task.value
         scanTask = nil; scanning = false
+        guard !task.isCancelled, !Task.isCancelled else {
+            statusMessage = M("Análise cancelada. Analise a pasta novamente antes de enviar."); return
+        }
         externalItems = result.media.map { PhotoItem(asset: nil, resources: [], metadata: $0.metadata, external: $0) }
         loadMore()
         let missing = externalItems.filter { $0.metadata.date == nil }.count
@@ -651,14 +660,26 @@ struct AlbumItem: Identifiable {
         if let external = item.external {
             let folder = root.appendingPathComponent(item.id, isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            let file = folder.appendingPathComponent(external.url.lastPathComponent)
-            if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
-            try await TransferFileIO.copyOriginal(from: external.url, to: file)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
-            let xmp = file.appendingPathExtension("xmp")
-            try ExternalReader.mergedXMP(item.metadata, sidecar: external.sidecar).write(to: xmp, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: xmp.path)
-            return [(0, ResourceDescriptor(type: external.isVideo ? .video : .photo, originalFilename: external.url.lastPathComponent), file, xmp)]
+            if external.pairedVideo != nil { try ExternalReader.validateSidecars(external) }
+            let sources = [(external.url, external.isVideo ? PHAssetResourceType.video : .photo, external.sidecar)] +
+                (external.pairedVideo.map { [($0, PHAssetResourceType.pairedVideo, external.pairedSidecar)] } ?? [])
+            var files: [(Int, ResourceDescriptor, URL, URL)] = []
+            for (index, source) in sources.enumerated() {
+                let resourceFolder = folder.appendingPathComponent(String(index), isDirectory: true)
+                try FileManager.default.createDirectory(at: resourceFolder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                let file = resourceFolder.appendingPathComponent(source.0.lastPathComponent)
+                try await TransferFileIO.copyOriginal(from: source.0, to: file)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+                let xmp = file.appendingPathExtension("xmp")
+                try ExternalReader.mergedXMP(item.metadata, sidecar: source.2).write(to: xmp, options: .atomic)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: xmp.path)
+                files.append((index, ResourceDescriptor(type: source.1, originalFilename: source.0.lastPathComponent), file, xmp))
+            }
+            if external.pairedVideo != nil {
+                try ExternalReader.validateSidecars(external)
+                try await ExternalReader.validateStagedPair(image: files[0].2, video: files[1].2, identifier: external.liveIdentifier, imageChecksum: external.contentChecksum, videoChecksum: external.pairedChecksum)
+            }
+            return files
         }
         guard !item.resources.isEmpty else { throw BridgeError(message: M("Nenhum recurso original disponível.")) }
         if item.live && !item.resources.contains(where: { $0.type == .pairedVideo }) { throw BridgeError(message: M("Live Photo sem vídeo original disponível. Envio interrompido.")) }
@@ -811,7 +832,7 @@ struct AlbumItem: Identifiable {
                 let file = preparedResource.file, xmp = preparedResource.sidecar, checksum = preparedResource.checksum
                 if duplicates?[preparedResource.token]?.isTrashed == true { throw PFUploadCheckError.rejectedResource }
                 var result: UploadResult
-                if let previous = records.first(where: { $0.resourceIndex == index && $0.checksum == checksum }), try await client.matchesHistory(assetID: previous.result.id, checksum: checksum, userID: userID) {
+                if let previous = records.first(where: { $0.resourceIndex == index && $0.checksum == checksum }), try await client.matchesHistory(assetID: previous.result.id, checksum: checksum, userID: userID, liveVideoID: resource.type == .photo ? videoID : nil) {
                     result = previous.result
                     try ConnectionHistory.save(records, to: recordURL)
                     uploadMetrics?.reusedResources += 1
@@ -828,7 +849,7 @@ struct AlbumItem: Identifiable {
                     result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil, checksum: checksum)
                     uploadMetrics?.transferSeconds += ProcessInfo.processInfo.systemUptime - started
                     if result.status == "duplicate" {
-                        guard try await client.matchesHistory(assetID: result.id, checksum: checksum, userID: userID) else {
+                        guard try await client.matchesHistory(assetID: result.id, checksum: checksum, userID: userID, liveVideoID: resource.type == .photo ? videoID : nil) else {
                             throw BridgeError(message: M("O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar."))
                         }
                     }
@@ -1186,7 +1207,7 @@ struct ContentView: View {
                 }
                 Text(metadata.date.map { PFLocalization.formatDate($0, date: .abbreviated, time: .shortened) } ?? L("Complete a data de captura")).font(.caption).foregroundStyle(metadata.date == nil ? Color.orange : Color.secondary)
                 Text(item.fileNames).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
-                if let external = item.external, !external.displayNote.isEmpty { Text(external.displayNote).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                if let external = item.external, !external.displayNote.isEmpty { Text(external.displayNote).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 5) {

@@ -115,11 +115,11 @@ struct ImmichClient {
         }
         return ConnectionIdentity(userID: id.uuidString.lowercased(), serverVersion: version.label)
     }
-    func matchesHistory(assetID: String, checksum: String, userID: String) async throws -> Bool {
-        try await matchesHistory(assetID: assetID, checksum: checksum, userID: userID, session: transport)
+    func matchesHistory(assetID: String, checksum: String, userID: String, liveVideoID: String? = nil) async throws -> Bool {
+        try await matchesHistory(assetID: assetID, checksum: checksum, userID: userID, session: transport, liveVideoID: liveVideoID)
     }
-    func matchesHistory(assetID: String, checksum: String, userID: String, session: URLSession) async throws -> Bool {
-        struct HistoryAsset: Decodable { let checksum: String; let ownerId: String; let isTrashed: Bool; let isOffline: Bool }
+    func matchesHistory(assetID: String, checksum: String, userID: String, session: URLSession, liveVideoID: String? = nil) async throws -> Bool {
+        struct HistoryAsset: Decodable { let checksum: String; let ownerId: String; let isTrashed: Bool; let isOffline: Bool; let livePhotoVideoId: String? }
         var r = request("assets/\(assetID)")
         r.timeoutInterval = 5
         let (data, response) = try await session.data(for: r)
@@ -128,6 +128,9 @@ struct ImmichClient {
         let asset = try JSONDecoder().decode(HistoryAsset.self, from: data)
         guard !asset.isTrashed && !asset.isOffline else {
             throw BridgeError(message: M("O arquivo existente está na lixeira ou indisponível no Immich. Revise antes de continuar."))
+        }
+        if let liveVideoID, asset.livePhotoVideoId != liveVideoID {
+            throw BridgeError(message: M("O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar."))
         }
         return asset.checksum == checksum && asset.ownerId == userID
     }

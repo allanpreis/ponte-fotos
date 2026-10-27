@@ -48,7 +48,11 @@ struct PFMediaDiagnosticsView: View {
         defer { ui.inspecting = false; ui.inspected = true; model.busy = false }
         if let external = item.external {
             let result = await PFMediaDiagnostics.inspect(url: external.url, isVideo: external.isVideo)
-            ui.messages = result.messages
+            ui.messages = [.verbatim(external.url.lastPathComponent)] + result.messages
+            if let video = external.pairedVideo {
+                let motion = await PFMediaDiagnostics.inspect(url: video, isVideo: true)
+                ui.messages += [.verbatim(video.lastPathComponent)] + motion.messages
+            }
             return
         }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ponte-diagnostics-" + UUID().uuidString, isDirectory: true)

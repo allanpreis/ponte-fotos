@@ -61,6 +61,15 @@ struct ReviewEditor: View {
                         }
                         Spacer(minLength: 0)
                     }
+                    if let external = item.external, let video = external.pairedVideo {
+                        GroupBox {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(external.url.lastPathComponent).textSelection(.enabled)
+                                Text(video.lastPathComponent).textSelection(.enabled)
+                                Text(external.displayNote).font(.caption).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        } label: { Label("Live Photo", systemImage: "livephoto") }
+                    }
                     Text(L("Os ajustes serão usados na exportação e no envio. Os arquivos de origem permanecem intactos."))
                         .font(.callout).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
