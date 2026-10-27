@@ -31,6 +31,8 @@ DerivedData/
 history/
 management/
 reverse-import/
+album-follow/
+upload-album-follow/
 staging/
 exports/
 reviews.json
@@ -75,3 +77,9 @@ test-results/
 /AGENTS.md
 /DESIGN.md
 /CHANGELOG.md
+
+# Assets distribuídos no aplicativo
+/Assets/*
+!/Assets/AppLogo.png
+!/Assets/AppLogoDisplay.png
+!/Assets/AppIcon.icns

@@ -15,7 +15,7 @@ A native macOS app that connects Apple Photos and Immich in both directions. Upl
 
 **Version: 1.0.4 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
-**Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. This README, its screenshots, and presentation video use English; the [Portuguese README](README.pt-BR.md) keeps the Portuguese media.
+**Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. Installation and usage instructions are also available in the [Portuguese README](README.pt-BR.md).
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
@@ -53,7 +53,7 @@ The account menu below Settings in the sidebar lets you select an account for up
 
 A transfer freezes its connection for the batch. A network change pauses after the current media item, including all Live Photo resources, and requires revalidation before continuing. This is an item-level restart, without partial-byte resume.
 
-Account selection uses the same row sizing as sidebar navigation. Transfer buttons use the native macOS bordered style, matching the other toolbar actions in both appearances. Existing presentation video illustrates earlier versions; the updated screenshots below show 0.9.9.
+Account selection uses the same row sizing as sidebar navigation. Transfer buttons use the native macOS bordered style, matching the other toolbar actions in both appearances.
 
 Validation includes synthetic routing, account, history and failure tests, plus limited real JPEG/Live Photo transfers through an authorized test account. Repeated uploads and checks of previously imported Photos items reused existing copies; independent downloads matched approved originals. Fresh Photos original creation, physical VPN switching, large iCloud batches and real trash/restore operations have not been validated in this consolidation.
 
@@ -72,26 +72,6 @@ Photos previously imported by the app can be selected and added to another album
 Use the info button beside a source item to inspect its original locally. Inspection reports the format, local preview availability, available colour properties and PQ/HLG video signalling. JXL files are included in folder scans, but recognition or a working preview does not establish Photos import support. Inspecting Photos resources may download temporary originals from iCloud according to the access setting. Temporary copies are removed afterwards. HDR image gain maps, Dolby Vision and slow-motion editing behaviour are not validated.
 
 After a new Immich → Photos import, the app checks that the created item is visible and that its capture date, available location and Live Photo subtype match the source. A mismatch or inconclusive result keeps the history pending and blocks repeat imports until the library is checked. Previously imported items are checked before being added to another album. These checks do not re-export or compare the original stored in Photos, and do not validate HDR playback.
-
-![Media diagnostics](Assets/diagnostics-en-096.png)
-
-Interface preview with synthetic data; no real transfer is shown.
-
-## Presentation
-
-https://github.com/user-attachments/assets/937288e1-6684-49f7-9696-dfd71f2f05e8
-
-[Watch or download the video](Assets/ponte-fotos-promo-en.mp4) · [Poster](Assets/ponte-fotos-poster-en.png) · 66 seconds · no audio · 1080p · English text.
-
-This illustrative video predates 0.9.7 and does not show the current sidebar account menu or availability-based routing. It illustrates transfers in both directions, metadata review, importing into existing or new Photos albums, adding previously imported items to albums without more copies, Live Photo protection, organization, and automatic connection selection. The diagrams use synthetic data and are not recordings of the interface.
-
-## Interface
-
-![Ponte Fotos: library and navigation (English interface)](Assets/library-en-099.png)
-
-![Importing from Immich into Apple Photos (English interface)](Assets/reverse-import-en-094.png)
-
-The library screenshot shows the 0.9.9 sidebar account menu and primary transfer button with synthetic data. The import screenshot illustrates the earlier 0.9.4 interface. Neither screenshot shows a real transfer or accesses a personal library.
 
 ## 📦 Install a release
 
@@ -280,7 +260,8 @@ Reverse import history is stored in `~/Library/Application Support/PonteFotos/re
 
 ```text
 Sources/          Swift application source code
-Assets/           Logo, icons, localized strings, screenshots, presentation videos and posters
+Assets/           Application logo and icon
+Resources/        English and Brazilian Portuguese localization
 Info.plist        Version, identifier, and macOS permissions
 build.sh          Build and local signing
 README.md         English installation, features, usage, and limitations
@@ -288,7 +269,7 @@ README.pt-BR.md   Brazilian Portuguese documentation
 .gitignore        Excludes builds, credentials, and local data
 ```
 
-The public repository contains the files needed to build the app and display this presentation. Releases provide downloads and the change history.
+The repository contains the application source, build resources, usage instructions and GitHub community files. Releases provide application downloads and the change history.
 
 ## Troubleshooting
 
