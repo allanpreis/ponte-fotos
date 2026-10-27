@@ -15,7 +15,7 @@ Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois se
 
 **Versão: 1.0.4 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
-**Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. Este README mantém os prints e o vídeo em português; o [README em inglês](README.md) usa mídia em inglês.
+**Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. As instruções também estão disponíveis no [README em inglês](README.md).
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
@@ -53,7 +53,7 @@ O menu de conta abaixo de Configurações na barra lateral permite escolher uma 
 
 A conexão fica fixa durante o lote. Uma mudança de rede pausa depois da mídia atual, incluindo todos os recursos de uma Live Photo, e exige revalidação antes de continuar. A retomada ocorre por item, sem retomada parcial de bytes.
 
-O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas. O vídeo de apresentação ilustra versões anteriores; as capturas atualizadas abaixo mostram a 0.9.9.
+O seletor acompanha o tamanho e alinhamento dos itens da barra lateral. Os botões de transferência usam o estilo nativo com borda do macOS, acompanhando as outras ações da barra nos dois temas.
 
 A validação inclui testes sintéticos de roteamento, contas, histórico e falhas, além de transferências reais limitadas de JPEG/Live Photo por uma conta de teste autorizada. Envios repetidos e conferências de itens já importados no Fotos reutilizaram cópias existentes; downloads independentes corresponderam aos originais aprovados. Nova criação de originais no Fotos, alternância física de VPN, lotes grandes do iCloud e operações reais de lixeira/restauração não foram validados nesta consolidação.
 
@@ -73,26 +73,6 @@ Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbu
 Use o botão de informação ao lado de um item de origem para inspecionar o original localmente. O diagnóstico informa formato, disponibilidade de prévia local, propriedades de cor disponíveis e sinalização PQ/HLG de vídeos. Arquivos JXL entram na busca em pastas, mas reconhecimento ou prévia funcional não comprovam suporte à importação no Fotos. Inspecionar recursos do Fotos pode baixar originais temporários do iCloud conforme a opção de acesso; as cópias temporárias são removidas ao terminar. Gain maps de imagens HDR, Dolby Vision e comportamento das edições de câmera lenta não são validados.
 
 Depois de uma nova importação Immich → Fotos, o app confere presença do item criado, data de captura, localização disponível e subtipo Live Photo. Divergências ou resultados inconclusivos mantêm o histórico pendente e bloqueiam novas tentativas até conferir a biblioteca. Itens previamente importados são conferidos antes de adicioná-los a outro álbum. Essa conferência não reexporta nem compara o original armazenado no Fotos e não valida reprodução HDR.
-
-![Diagnóstico de mídia](Assets/diagnostics-en-096.png)
-
-Prévia da interface em inglês com dados sintéticos; não mostra uma transferência real.
-
-## Apresentação
-
-https://github.com/user-attachments/assets/256027d1-94bc-454b-8237-e7e4977729b8
-
-[Assistir ou baixar o vídeo](Assets/ponte-fotos-promo.mp4) · [Pôster](Assets/ponte-fotos-poster.png) · 66 segundos · sem áudio · 1080p.
-
-Este vídeo ilustrativo é anterior à 0.9.7 e não mostra o menu de conta atual nem o roteamento por disponibilidade. Ilustra os dois sentidos da transferência, revisão de metadados, importação para álbuns existentes ou novos no Fotos, vínculos sem novas cópias para itens já importados, proteção de Live Photos, organização e conexão automática. Os diagramas usam dados sintéticos e não são gravações da interface.
-
-## Interface
-
-![Ponte Fotos: biblioteca e navegação](Assets/library-pt-099.png)
-
-![Importação do Immich com destino no Fotos da Apple](Assets/reverse-import-093.png)
-
-A captura da biblioteca mostra o menu de conta e o botão principal da 0.9.9 com dados sintéticos. A captura de importação ilustra a interface anterior da 0.9.3. Nenhuma delas mostra transferência real ou acessa uma biblioteca pessoal.
 
 ## 📦 Instalar pela release
 
@@ -281,7 +261,8 @@ O histórico da importação inversa fica em `~/Library/Application Support/Pont
 
 ```text
 Sources/       Código Swift do aplicativo
-Assets/        Logo, ícones, traduções, prints, vídeos e pôsteres da apresentação
+Assets/        Logo e ícone do aplicativo
+Resources/     Traduções em inglês e português do Brasil
 Info.plist     Versão, identificador e permissões do macOS
 build.sh       Compilação e assinatura local
 README.md      Documentação principal em inglês
@@ -289,7 +270,7 @@ README.pt-BR.md Documentação em português (Brasil)
 .gitignore     Exclusões de builds, credenciais e dados locais
 ```
 
-O repositório público contém os arquivos necessários para compilar o aplicativo e exibir esta apresentação. As releases mantêm os downloads e o histórico de mudanças.
+O repositório contém o código do aplicativo, recursos de compilação, instruções de uso e arquivos da comunidade do GitHub. As releases fornecem o aplicativo e o histórico de mudanças.
 
 ## Solução de problemas
 
