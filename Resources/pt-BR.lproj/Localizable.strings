@@ -709,3 +709,14 @@
 "Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar." = "Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar.";
 "A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente." = "A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente.";
 "Fotos → Immich" = "Fotos → Immich";
+
+"Identificadores Live Photo conflitantes; arquivo independente." = "Identificadores Live Photo conflitantes; arquivo independente.";
+"Sem identificador interno Live Photo; arquivo independente." = "Sem identificador interno Live Photo; arquivo independente.";
+"O arquivo mudou durante a análise. Analise a pasta novamente." = "O arquivo mudou durante a análise. Analise a pasta novamente.";
+"Identificação Live Photo sem par único; arquivos independentes." = "Identificação Live Photo sem par único; arquivos independentes.";
+"Par Live Photo não validado pelo PhotoKit; arquivos independentes." = "Par Live Photo não validado pelo PhotoKit; arquivos independentes.";
+"Live Photo · vídeo: %@. Par validado pelo PhotoKit; revise antes de enviar." = "Live Photo · vídeo: %@. Par validado pelo PhotoKit; revise antes de enviar.";
+"O par Live Photo mudou ou não é compatível. Analise a pasta novamente antes de enviar." = "O par Live Photo mudou ou não é compatível. Analise a pasta novamente antes de enviar.";
+"O XMP do par mudou. Analise a pasta novamente antes de enviar." = "O XMP do par mudou. Analise a pasta novamente antes de enviar.";
+"Análise cancelada. Analise a pasta novamente antes de enviar." = "Análise cancelada. Analise a pasta novamente antes de enviar.";
+"O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar." = "O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar.";
