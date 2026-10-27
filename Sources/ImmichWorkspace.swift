@@ -118,6 +118,7 @@ final class IMWorkspaceModel: ObservableObject {
             let snapshot = self.session
             self.albums = try await snapshot.albums()
             self.people = try await snapshot.people()
+            self.age = nil; self.ageChoices = []; self.ui.personKey = ""
         }
     }
     func scanDuplicates(_ selected: Set<String>) {
@@ -138,11 +139,25 @@ final class IMWorkspaceModel: ObservableObject {
             self.comparisonChoices = [:]
         }
     }
-    func searchAge(personKey: String, sourceID: String, destinationID: String, min: Int, max: Int) {
-        guard let person = people.first(where: { $0.key == personKey }), let destination = albums.first(where: { $0.id == destinationID }) else { return }
+    func personLabel(_ group: IMPersonGroup) -> String {
+        let accounts = Set(group.people.map(\.accountID))
+        let scope = accounts.count > 1 ? L("\(accounts.count) contas") : name(group.people[0].accountID)
+        return group.name + " · " + (group.birthDate ?? L("Sem data de nascimento")) + " · " + scope
+    }
+    func personOptions(accountID: String) -> [IMPersonGroup] {
+        IMPersonGroup.options(people, accountID: accountID)
+    }
+    func searchAge(personKey: String, sourceID: String, destinationID: String, min: Int, max: Int, accountID: String = "") {
+        guard !busy else { return }
+        age = nil; ageChoices = []
+        guard let group = personOptions(accountID: accountID).first(where: { $0.id == personKey }),
+              let destination = albums.first(where: { $0.id == destinationID }) else { return }
         let source = albums.first { $0.id == sourceID }
+        guard sourceID.isEmpty || source != nil else {
+            errorMessage = M("A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente."); return
+        }
         run(M("Buscando fotos por idade…")) {
-            let result = try await IMOrganization.ageSearch(session: self.session, person: person, source: source, destination: destination, minAge: min, maxAge: max, progress: self.updateProgress)
+            let result = try await IMOrganization.ageSearch(session: self.session, people: group.people, source: source, destination: destination, minAge: min, maxAge: max, progress: self.updateProgress)
             self.age = result; self.ageChoices = Set(result.assets.map(\.id))
         }
     }
@@ -525,21 +540,24 @@ struct ImmichWorkspaceView: View {
         }
     }
     private var ageView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let options = model.personOptions(accountID: ui.ageAccount)
+        let selected = options.first { $0.id == ui.personKey }
+        return VStack(alignment: .leading, spacing: 16) {
             PFSectionHeading(L("Pessoa e idade"), subtitle: L("Reúna cada fase da vida em um álbum."), systemImage: "person.crop.rectangle")
             Text(L("A idade considera a data da captura e o aniversário registrado no Immich. Os limites são inclusivos. Live Photos, pilhas, arquivos offline e editados ficam fora da análise.")).foregroundStyle(.secondary)
+            Text(L("Pessoas com o mesmo nome e a mesma data de nascimento aparecem juntas. A busca consulta as contas selecionadas; pessoas sem nome ficam ocultas.")).font(.caption).foregroundStyle(.secondary)
             Button(L("Atualizar álbuns e pessoas")) { model.refresh() }.disabled(model.credentials.isEmpty || !model.connectionReady)
             PFCard {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 16) {
-                GridRow { Text(L("Conta")); Picker(L("Conta"), selection: $ui.ageAccount) { Text(L("Todas as contas")).tag(""); ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().onChange(of: ui.ageAccount) { ui.personKey = "" } }
-                GridRow { Text(L("Pessoa")); Picker(L("Pessoa"), selection: $ui.personKey) { Text(L("Selecione uma pessoa")).tag(""); ForEach(model.people.filter { ui.ageAccount.isEmpty || $0.accountID == ui.ageAccount }, id: \.key) { Text("\($0.displayName) · \(model.name($0.accountID))").tag($0.key) } }.id(PFLocalization.languageCode).labelsHidden() }
-                GridRow { Text(L("Aniversário")); Text(model.people.first { $0.key == ui.personKey }?.birthDate ?? L("Cadastre a data de nascimento no Immich.")).foregroundStyle(.secondary) }
+                GridRow { Text(L("Conta")); Picker(L("Conta"), selection: $ui.ageAccount) { Text(L("Todas as contas")).tag(""); ForEach(model.credentials.map(\.account)) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().onChange(of: ui.ageAccount) { ui.personKey = ""; model.age = nil; model.ageChoices = [] } }
+                GridRow { Text(L("Pessoa")); Picker(L("Pessoa"), selection: $ui.personKey) { Text(L("Selecione uma pessoa")).tag(""); ForEach(options) { group in Text(model.personLabel(group)).tag(group.id) } }.id(PFLocalization.languageCode).labelsHidden() }
+                GridRow { Text(L("Aniversário")); Text(selected?.birthDate ?? L("Cadastre a data de nascimento no Immich.")).foregroundStyle(.secondary) }
                 GridRow { Text(L("Origem")); Picker(L("Origem"), selection: $ui.sourceID) { Text(L("Todos os álbuns acessíveis")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden() }
                 GridRow { Text(L("Destino")); Picker(L("Destino"), selection: $ui.destinationID) { Text(L("Selecione um álbum")).tag(""); ForEach(model.albums) { Text($0.name).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden() }
                 GridRow { Text(L("Idade em anos")); HStack { Stepper(L("De \(ui.minAge)"), value: $ui.minAge, in: 0...150).frame(maxWidth: 180); Spacer(minLength: 20); Stepper(L("Até \(ui.maxAge)"), value: $ui.maxAge, in: 0...150).frame(maxWidth: 180) } }
             }
             }
-            Button(L("Buscar fotos")) { ui.agePage = 0; model.searchAge(personKey: ui.personKey, sourceID: ui.sourceID, destinationID: ui.destinationID, min: ui.minAge, max: ui.maxAge) }.buttonStyle(.borderedProminent).disabled(!model.connectionReady || ui.personKey.isEmpty || ui.destinationID.isEmpty || ui.sourceID == ui.destinationID || ui.minAge > ui.maxAge || model.people.first { $0.key == ui.personKey }?.birthDate == nil)
+            Button(L("Buscar fotos")) { ui.agePage = 0; model.searchAge(personKey: ui.personKey, sourceID: ui.sourceID, destinationID: ui.destinationID, min: ui.minAge, max: ui.maxAge, accountID: ui.ageAccount) }.buttonStyle(.borderedProminent).disabled(!model.connectionReady || ui.personKey.isEmpty || ui.destinationID.isEmpty || ui.sourceID == ui.destinationID || ui.minAge > ui.maxAge || selected?.birthDate?.count != 10 || (selected?.birthDate.flatMap { IMOrganization.day($0) } == nil))
             if let result = model.age {
                 Text(L("\(result.assets.count) fotos · \(result.skipped) itens fora da análise · destino: \(result.destination.name)")).font(.headline)
                 HStack { Button(L("Selecionar todas")) { model.ageChoices = Set(result.assets.map(\.id)) }; Button(L("Desmarcar todas")) { model.ageChoices = [] }; Spacer(); Button(L("Revisar movimentação")) { openReview("age") }.disabled(!model.connectionReady || model.ageChoices.isEmpty) }
@@ -549,6 +567,11 @@ struct ImmichWorkspaceView: View {
                 pager(count: result.assets.count, index: $ui.agePage)
             }
         }
+        .onChange(of: ui.personKey) { model.age = nil; model.ageChoices = [] }
+        .onChange(of: ui.sourceID) { model.age = nil; model.ageChoices = [] }
+        .onChange(of: ui.destinationID) { model.age = nil; model.ageChoices = [] }
+        .onChange(of: ui.minAge) { model.age = nil; model.ageChoices = [] }
+        .onChange(of: ui.maxAge) { model.age = nil; model.ageChoices = [] }
     }
     private var historyView: some View {
         VStack(alignment: .leading, spacing: 14) {

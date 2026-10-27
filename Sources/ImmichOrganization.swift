@@ -14,6 +14,41 @@ struct IMComparisonAnalysis: Codable, Identifiable {
     var total: Int
     var skipped: Int
 }
+// This is a query grouping only; remote people and face records are never merged.
+struct IMPersonGroup: Identifiable {
+    let id: String
+    let name: String
+    let birthDate: String?
+    let people: [IMPerson]
+    static func normalizedName(_ name: String) -> String {
+        name.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            .precomposedStringWithCanonicalMapping.lowercased(with: Locale(identifier: "en_US_POSIX"))
+    }
+    @MainActor static func options(_ people: [IMPerson], accountID: String = "") -> [IMPersonGroup] {
+        let named = people.filter { (accountID.isEmpty || $0.accountID == accountID) && !normalizedName($0.name).isEmpty }
+        let buckets = Dictionary(grouping: named) { person in
+            if let birth = person.birthDate, birth.count == 10, IMOrganization.day(birth) != nil {
+                return "group:" + Data((normalizedName(person.name) + "\n" + birth).utf8).base64EncodedString()
+            }
+            return "person:" + person.key
+        }
+        return buckets.map { key, members in
+            let sorted = members.sorted { $0.key < $1.key }
+            return IMPersonGroup(id: key, name: sorted[0].name.split(whereSeparator: { $0.isWhitespace }).joined(separator: " "),
+                                 birthDate: sorted[0].birthDate, people: sorted)
+        }.sorted {
+            let order = $0.name.localizedStandardCompare($1.name)
+            if order != .orderedSame { return order == .orderedAscending }
+            if $0.birthDate != $1.birthDate { return ($0.birthDate ?? "") < ($1.birthDate ?? "") }
+            return $0.id < $1.id
+        }
+    }
+}
+struct IMAgePersonScope: Codable {
+    var person: IMPerson
+    var sourceAlbums: [IMAlbum]
+    var assetIDs: Set<String>
+}
 struct IMAgeAnalysis: Codable, Identifiable {
     var id: String
     var profileID: String
@@ -29,6 +64,7 @@ struct IMAgeAnalysis: Codable, Identifiable {
     // Sources visible to the person's account at analysis time. Other accounts'
     // private albums must never become implicit removal sources.
     var sourceAlbums: [IMAlbum] = []
+    var peopleScopes: [IMAgePersonScope]? = nil
 }
 
 @MainActor enum IMOrganization {
@@ -116,28 +152,65 @@ struct IMAgeAnalysis: Codable, Identifiable {
     }
 
     static func ageSearch(session: IMSession, person: IMPerson, source: IMAlbum?, destination: IMAlbum, minAge: Int, maxAge: Int, progress: @escaping IMProgress) async throws -> IMAgeAnalysis {
+        try await ageSearch(session: session, people: [person], source: source, destination: destination,
+                            minAge: minAge, maxAge: maxAge, progress: progress, restrictDestinationAccess: true)
+    }
+    static func ageSearch(session: IMSession, people: [IMPerson], source: IMAlbum?, destination: IMAlbum, minAge: Int, maxAge: Int, progress: @escaping IMProgress, restrictDestinationAccess: Bool = false) async throws -> IMAgeAnalysis {
         try validateRange(minAge, maxAge)
         guard source?.id != destination.id else { throw failure(M("Origem e destino precisam ser diferentes.")) }
-        let client = try session.owner(person.accountID)
-        let currentPerson = try await client.person(person.id)
-        guard currentPerson.birthDate == person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure(M("Confira a data de nascimento da pessoa no Immich e consulte novamente.")) }
-        let accessible = try await client.albums()
-        guard accessible.contains(where: { $0.id == destination.id }), source == nil || accessible.contains(where: { $0.id == source!.id }) else { throw failure(M("A conta da pessoa precisa ter acesso aos álbuns escolhidos.")) }
-        let sources = source.map { [$0] } ?? accessible.filter { $0.id != destination.id }
-        guard !sources.isEmpty, sources.count <= 100 else { throw failure(M("Selecione uma origem; a busca permite de 1 a 100 álbuns de origem.")) }
-        let sourceIDs = Set(sources.map(\.id))
-        progress(M("Buscando fotos da pessoa"), 0, 0)
-        let results = try await client.search(personID: person.id, albumIDs: sourceIDs.sorted())
-        var matches: [IMAsset] = [], skipped = 0
-        var seen: Set<String> = []
-        for var asset in results where seen.insert(asset.id).inserted {
-            guard asset.eligible(allowLive: false), let age = capturedAge(asset, birthday: birthday), (minAge...maxAge).contains(age) else { skipped += 1; continue }
-            asset.albums = try await session.memberships(asset.id)
-            guard asset.albums.contains(where: { sourceIDs.contains($0.id) }) else { skipped += 1; continue }
-            matches.append(asset)
-            progress(M("Conferindo álbuns e idade"), seen.count, results.count)
+        guard let first = people.first, let birthday = first.birthDate, birthday.count == 10, day(birthday) != nil,
+              !IMPersonGroup.normalizedName(first.name).isEmpty,
+              Set(people.map(\.key)).count == people.count,
+              people.allSatisfy({ IMPersonGroup.normalizedName($0.name) == IMPersonGroup.normalizedName(first.name) && $0.birthDate == birthday }) else {
+            throw failure(M("Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente."))
         }
-        return IMAgeAnalysis(id: UUID().uuidString, profileID: session.profileID, accountID: person.accountID, person: person, source: source, destination: destination, minAge: minAge, maxAge: maxAge, createdAt: Date(), assets: matches.sorted(by: order), skipped: skipped, sourceAlbums: sources)
+        _ = try session.reader(destination)
+        var matches: [String: IMAsset] = [:], scopes: [IMAgePersonScope] = []
+        var sourcesByID: [String: IMAlbum] = [:], skippedIDs = Set<String>(), queriedIDs = Set<String>()
+        for person in people.sorted(by: { $0.key < $1.key }) {
+            try Task.checkCancellation()
+            let client = try session.owner(person.accountID)
+            let current = try await client.person(person.id)
+            guard current.birthDate == person.birthDate, IMPersonGroup.normalizedName(current.name) == IMPersonGroup.normalizedName(person.name) else {
+                throw failure(M("O nome ou nascimento da pessoa mudou; consulte novamente."))
+            }
+            let accessible = try await client.albums()
+            if restrictDestinationAccess {
+                guard accessible.contains(where: { $0.id == destination.id }), source == nil || accessible.contains(where: { $0.id == source!.id }) else {
+                    throw failure(M("A conta da pessoa precisa ter acesso aos álbuns escolhidos."))
+                }
+            }
+            let sources = source.map { selected in accessible.filter { $0.id == selected.id } } ?? accessible.filter { $0.id != destination.id }
+            for album in sources { sourcesByID[album.id] = album }
+            guard sourcesByID.count <= 100, (!restrictDestinationAccess || !sources.isEmpty) else {
+                throw failure(M("Selecione uma origem; a busca permite de 1 a 100 álbuns de origem."))
+            }
+            let sourceIDs = Set(sources.map(\.id))
+            var scope = IMAgePersonScope(person: person, sourceAlbums: sources, assetIDs: [])
+            if !sources.isEmpty {
+                progress(M("Buscando fotos da pessoa"), scopes.count, people.count)
+                let results = try await client.search(personID: person.id, albumIDs: sourceIDs.sorted())
+                queriedIDs.formUnion(results.map(\.id))
+                guard queriedIDs.count <= 30000 else { throw failure(M("Limite de 30 mil arquivos por busca.")) }
+                for var asset in results {
+                    guard asset.eligible(allowLive: false), let age = capturedAge(asset, birthday: birthday), (minAge...maxAge).contains(age) else { skippedIDs.insert(asset.id); continue }
+                    if let previous = matches[asset.id] {
+                        try validateContent(previous, asset)
+                        guard previous.fileCreatedAt == asset.fileCreatedAt, previous.localDateTime == asset.localDateTime else { throw failure(M("Há itens inconsistentes na seleção; consulte novamente.")) }
+                        asset.albums = previous.albums
+                    } else { asset.albums = try await session.memberships(asset.id) }
+                    guard asset.albums.contains(where: { sourceIDs.contains($0.id) }) else { skippedIDs.insert(asset.id); continue }
+                    scope.assetIDs.insert(asset.id); matches[asset.id] = asset
+                    guard matches.count <= 30000 else { throw failure(M("Limite de 30 mil arquivos por busca.")) }
+                }
+            }
+            scopes.append(scope)
+        }
+        guard !sourcesByID.isEmpty else { throw failure(M("Selecione uma origem; a busca permite de 1 a 100 álbuns de origem.")) }
+        return IMAgeAnalysis(id: UUID().uuidString, profileID: session.profileID, accountID: first.accountID, person: first,
+            source: source, destination: destination, minAge: minAge, maxAge: maxAge, createdAt: Date(),
+            assets: matches.values.sorted(by: order), skipped: skippedIDs.subtracting(matches.keys).count,
+            sourceAlbums: sourcesByID.values.sorted { $0.id < $1.id }, peopleScopes: scopes)
     }
 
     static func ageMove(session: IMSession, analysis: IMAgeAnalysis, selectedIDs: Set<String>, progress: @escaping IMProgress, report: @escaping IMReport) async throws {
@@ -146,28 +219,45 @@ struct IMAgeAnalysis: Codable, Identifiable {
         guard analysis.accountID == analysis.person.accountID, analysis.source?.id != analysis.destination.id else { throw failure(M("Análise de idade inválida; consulte novamente.")) }
         let byID = Dictionary(uniqueKeysWithValues: analysis.assets.map { ($0.id, $0) })
         guard selectedIDs.isSubset(of: Set(byID.keys)) else { throw failure(M("A seleção não pertence a esta busca.")) }
-        let client = try session.owner(analysis.accountID)
-        let accessible = try await client.albums()
-        let accessibleIDs = Set(accessible.map(\.id))
-        let sourceAlbums = analysis.source.map { [$0] } ?? analysis.sourceAlbums
-        let sourceIDs = Set(sourceAlbums.map(\.id))
-        guard !sourceIDs.contains(analysis.destination.id), sourceIDs.isSubset(of: accessibleIDs), accessibleIDs.contains(analysis.destination.id) else { throw failure(M("O acesso aos álbuns mudou; consulte novamente.")) }
+        let scopes = analysis.peopleScopes ?? [IMAgePersonScope(person: analysis.person, sourceAlbums: analysis.source.map { [$0] } ?? analysis.sourceAlbums, assetIDs: Set(byID.keys))]
+        guard !scopes.isEmpty, Set(scopes.map { $0.person.key }).count == scopes.count,
+              scopes.allSatisfy({ $0.person.birthDate == analysis.person.birthDate && IMPersonGroup.normalizedName($0.person.name) == IMPersonGroup.normalizedName(analysis.person.name) }),
+              selectedIDs.isSubset(of: scopes.reduce(into: Set<String>()) { $0.formUnion($1.assetIDs) }) else { throw failure(M("Análise de idade inválida; consulte novamente.")) }
+        var sourcesByAsset: [String: Set<String>] = [:], relevant = Set<String>()
+        for scope in scopes {
+            let client = try session.owner(scope.person.accountID)
+            let accessible = Set(try await client.albums().map(\.id))
+            let sourceIDs = Set(scope.sourceAlbums.map(\.id))
+            guard !sourceIDs.contains(analysis.destination.id), sourceIDs.isSubset(of: accessible),
+                  analysis.source == nil || sourceIDs.isSubset(of: [analysis.source!.id]) else { throw failure(M("O acesso aos álbuns mudou; consulte novamente.")) }
+            relevant.formUnion(sourceIDs)
+            for id in scope.assetIDs.intersection(selectedIDs) { sourcesByAsset[id, default: []].formUnion(sourceIDs) }
+        }
+        _ = try session.reader(analysis.destination)
         let snapshots = selectedIDs.sorted().map { byID[$0]! }
         let revalidate = {
-            let person = try await client.person(analysis.person.id)
-            guard person.birthDate == analysis.person.birthDate, let birthday = person.birthDate, day(birthday) != nil else { throw failure(M("O nascimento da pessoa mudou; consulte novamente.")) }
-            for snapshot in snapshots {
-                let current = try await session.asset(snapshot)
-                let associated = try await client.matchesPerson(personID: analysis.person.id, assetID: snapshot.id, albumIDs: [])
-                try validateContent(snapshot, current)
-                guard associated, captureDay(current) == captureDay(snapshot), current.localDateTime == snapshot.localDateTime, current.fileCreatedAt == snapshot.fileCreatedAt, let age = capturedAge(current, birthday: birthday), (analysis.minAge...analysis.maxAge).contains(age) else { throw failure(M("Pessoa ou data da foto mudou; consulte novamente.")) }
+            // Every original person/account remains part of this reviewed identity.
+            for scope in scopes {
+                let client = try session.owner(scope.person.accountID)
+                let person = try await client.person(scope.person.id)
+                guard person.birthDate == scope.person.birthDate, IMPersonGroup.normalizedName(person.name) == IMPersonGroup.normalizedName(scope.person.name),
+                      let birthday = person.birthDate, day(birthday) != nil else { throw failure(M("O nome ou nascimento da pessoa mudou; consulte novamente.")) }
+                for id in scope.assetIDs.intersection(selectedIDs).sorted() {
+                    let snapshot = byID[id]!
+                    let current = try await session.asset(snapshot)
+                    let associated = try await client.matchesPerson(personID: scope.person.id, assetID: snapshot.id, albumIDs: [])
+                    try validateContent(snapshot, current)
+                    guard associated, captureDay(current) == captureDay(snapshot), current.localDateTime == snapshot.localDateTime,
+                          current.fileCreatedAt == snapshot.fileCreatedAt, let age = capturedAge(current, birthday: birthday),
+                          (analysis.minAge...analysis.maxAge).contains(age) else { throw failure(M("Pessoa ou data da foto mudou; consulte novamente.")) }
+                }
             }
         }
         try await revalidate()
-        try await validateSnapshots(session: session, assets: snapshots, relevantAlbums: sourceIDs.union([analysis.destination.id]))
+        try await validateSnapshots(session: session, assets: snapshots, relevantAlbums: relevant.union([analysis.destination.id]))
         var additions: [LinkChange] = [], removals: [LinkChange] = [], keep: [Preservation] = []
         for asset in snapshots {
-            let linkedSources = asset.albums.filter { sourceIDs.contains($0.id) }
+            let linkedSources = asset.albums.filter { sourcesByAsset[asset.id, default: []].contains($0.id) }
             guard !linkedSources.isEmpty else { throw failure(M("A foto não está na origem; consulte novamente.")) }
             keep.append(Preservation(asset: asset, album: analysis.destination))
             if !asset.albums.contains(where: { $0.id == analysis.destination.id }) { additions.append(LinkChange(asset: asset, album: analysis.destination)) }
