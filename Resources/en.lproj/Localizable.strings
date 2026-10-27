@@ -709,3 +709,14 @@
 "Escolha um álbum do Fotos e um álbum existente no Immich para acompanhar." = "Choose a Photos album and an existing Immich album to track.";
 "A consulta revisa todo o álbum do Fotos e monta uma fila manual. Selecione os itens e confirme o envio. Nada é enviado automaticamente." = "The check reviews the entire Photos album and creates a manual queue. Select items and confirm the upload. Nothing is uploaded automatically.";
 "Fotos → Immich" = "Photos → Immich";
+
+"Identificadores Live Photo conflitantes; arquivo independente." = "Conflicting Live Photo identifiers; independent file.";
+"Sem identificador interno Live Photo; arquivo independente." = "No internal Live Photo identifier; independent file.";
+"O arquivo mudou durante a análise. Analise a pasta novamente." = "The file changed during analysis. Scan the folder again.";
+"Identificação Live Photo sem par único; arquivos independentes." = "Live Photo identifier has no unique pair; independent files.";
+"Par Live Photo não validado pelo PhotoKit; arquivos independentes." = "PhotoKit did not validate the Live Photo pair; independent files.";
+"Live Photo · vídeo: %@. Par validado pelo PhotoKit; revise antes de enviar." = "Live Photo · video: %@. PhotoKit validated the pair; review before uploading.";
+"O par Live Photo mudou ou não é compatível. Analise a pasta novamente antes de enviar." = "The Live Photo pair changed or is incompatible. Scan the folder again before uploading.";
+"O XMP do par mudou. Analise a pasta novamente antes de enviar." = "The pair’s XMP changed. Scan the folder again before uploading.";
+"Análise cancelada. Analise a pasta novamente antes de enviar." = "Analysis cancelled. Scan the folder again before uploading.";
+"O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar." = "The existing file does not confirm the expected Live Photo association. Review the pair in Immich before continuing.";
