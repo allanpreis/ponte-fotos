@@ -13,13 +13,13 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 1.0.5 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 1.0.6 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. As instruções também estão disponíveis no [README em inglês](README.md).
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.5).
+O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
 
 ### Acompanhamento Fotos → Immich
 
@@ -43,7 +43,7 @@ O fluxo de envio prepara janelas de até oito mídias completas, com alvo flexí
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.5).
+O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -76,9 +76,9 @@ Depois de uma nova importação Immich → Fotos, o app confere presença do ite
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 1.0.5 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.5/Ponte-Fotos-1.0.5-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 1.0.6 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.6/Ponte-Fotos-1.0.6-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.5) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -222,7 +222,7 @@ Compara dois álbuns. Por padrão mostra conteúdos presentes nos dois; é poss�
 
 ### Pessoa e idade
 
-Selecione conta, pessoa, origem, destino e intervalo de idade. A pessoa precisa ter aniversário cadastrado no Immich. A seleção considera a data local de captura e os limites inclusivos; aniversário em 29 de fevereiro passa a 1º de março em ano não bissexto. A origem pode ser um álbum ou todos os álbuns acessíveis à conta, exceto o destino.
+Selecione conta, pessoa, origem, destino e intervalo de idade. Pessoas sem nome ficam ocultas. Registros com o mesmo nome e a mesma data completa de nascimento válida aparecem como uma opção; com Todas as contas, a consulta busca cada ID correspondente nas contas conectadas. Uma conta específica restringe a lista e a busca. Nascimentos diferentes ou ausentes mantêm registros separados; o agrupamento da consulta não mescla cadastros no servidor. Resultados compartilhados aparecem uma vez, preservando pessoa, conta e fontes para revalidação. Trocar os critérios limpa o resultado anterior; uma origem escolhida que ficou indisponível bloqueia a consulta. A pessoa precisa ter aniversário cadastrado no Immich. A seleção considera a data local de captura e os limites inclusivos; aniversário em 29 de fevereiro passa a 1º de março em ano não bissexto. A origem pode ser um álbum ou todos os álbuns acessíveis a cada conta correspondente da pessoa, exceto o destino.
 
 Revise os resultados antes de organizar. O fluxo revalida aniversário, associação à pessoa, captura e conteúdo; mantém vínculos com outros álbuns que não fazem parte da origem selecionada.
 
@@ -287,7 +287,7 @@ O repositório contém o código do aplicativo, recursos de compilação, instru
 
 ## Estado do projeto
 
-A versão 1.0.5 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
+A versão 1.0.6 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distribuído sob a [licença MIT](LICENSE).
 
