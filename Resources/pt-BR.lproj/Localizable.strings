@@ -720,3 +720,10 @@
 "O XMP do par mudou. Analise a pasta novamente antes de enviar." = "O XMP do par mudou. Analise a pasta novamente antes de enviar.";
 "Análise cancelada. Analise a pasta novamente antes de enviar." = "Análise cancelada. Analise a pasta novamente antes de enviar.";
 "O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar." = "O arquivo existente não comprova o vínculo Live Photo esperado. Revise o par no Immich antes de continuar.";
+
+"%@ contas" = "%@ contas";
+"Sem data de nascimento" = "Sem data de nascimento";
+"Pessoas com o mesmo nome e a mesma data de nascimento aparecem juntas. A busca consulta as contas selecionadas; pessoas sem nome ficam ocultas." = "Pessoas com o mesmo nome e a mesma data de nascimento aparecem juntas. A busca consulta as contas selecionadas; pessoas sem nome ficam ocultas.";
+"Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente." = "Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente.";
+"O nome ou nascimento da pessoa mudou; consulte novamente." = "O nome ou nascimento da pessoa mudou; consulte novamente.";
+"A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente." = "A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente.";
