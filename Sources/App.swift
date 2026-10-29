@@ -109,11 +109,16 @@ struct AlbumItem: Identifiable {
     @Published var connectionSaved = false
     @Published var allowCloud = true
     private var photosExportTask: Task<Void, Error>?
+    private var albumInventoryTask: Task<[PFPhotoOriginalIdentity], Error>?
     private var activeExportID: UUID?
     private var activeExportProgress = 0.0
     @Published var stopRequested = false {
-        didSet { if stopRequested { photosExportTask?.cancel() } }
+        didSet { if stopRequested { photosExportTask?.cancel(); albumInventoryTask?.cancel() } }
     }
+    @Published var automationRunning = false
+    var preparedWindowLimit = 8
+    @Published private(set) var uploadFollowQuerySucceeded = false
+    @Published private(set) var uploadFollowExistingCount = 0
     @Published var backgroundPreparation: PFBackgroundPreparation?
     @Published var showPreparation = false
     private var backgroundPreparationTask: Task<Void, Never>?
@@ -171,6 +176,7 @@ struct AlbumItem: Identifiable {
     var transferKey: String { currentTransferConnection?.credential.key ?? "" }
     var transferReady: Bool { currentTransferConnection != nil }
     var transferAccountID: String? { currentTransferConnection?.credential.account.id }
+    var preferenceTransferAccountID: String? { selectedTransferCredential?.account.id }
     @Published private(set) var primaryAccountName = ""
     var primaryAccountLabel: String { primaryAccountName.isEmpty ? L("Conta principal") : primaryAccountName }
     // The primary API key and a saved management key can identify the same person.
@@ -305,13 +311,20 @@ struct AlbumItem: Identifiable {
     @Published private(set) var uploadFollowLinks: [PFAlbumFollowLink] = []
     private let uploadFollowStore: PFAlbumFollowStore
     private let uploadFollowSource: ((String) throws -> [PhotoItem])?
+    private var ignoreUploadFollows = false
     private var uploadFollowScope: String?
     private var uploadFollowReadFailed = false
     private var uploadFollowReview: PFUploadFollowContext?
     private var uploadFollowFingerprints: [String: String] = [:]
+    private var uploadFollowOriginals: [String: PFPhotoOriginalIdentity] = [:]
+    var stopAlbumAutomation: ((String, String, String) -> Void)?
+    func stopAutomaticPair(photosID: String, immichID: String) {
+        guard let scope = currentUploadFollowScope else { return }
+        stopAlbumAutomation?(scope, photosID, immichID)
+    }
     var activeUploadFollow: PFAlbumFollowLink? {
-        guard sourceName == nil, let scope = currentUploadFollowScope, scope == uploadFollowScope else { return nil }
-        return uploadFollowLinks.first { $0.albumID == album }
+        guard !ignoreUploadFollows, sourceName == nil, let scope = currentUploadFollowScope, scope == uploadFollowScope else { return nil }
+        return uploadFollowLinks.first { $0.albumID == album && $0.destinationID == remoteAlbumID } ?? uploadFollowLinks.first { $0.albumID == album }
     }
     private var currentUploadFollowScope: String? {
         guard let connection = currentTransferConnection else { return nil }
@@ -337,7 +350,7 @@ struct AlbumItem: Identifiable {
     }
     private func invalidateUploadFollowReview() {
         if uploadFollowReview != nil { items = []; selection = []; fetched = nil; offset = 0 }
-        uploadFollowReview = nil; uploadFollowFingerprints = [:]
+        uploadFollowReview = nil; uploadFollowFingerprints = [:]; uploadFollowOriginals = [:]
     }
     private func reloadUploadFollows() {
         guard let scope = currentUploadFollowScope else { return }
@@ -356,7 +369,7 @@ struct AlbumItem: Identifiable {
         destination = .existing; remoteAlbumID = link.destinationID
     }
     func startUploadFollowing() {
-        guard canStartUploadFollow, let scope = currentUploadFollowScope,
+        guard !automationRunning, canStartUploadFollow, let scope = currentUploadFollowScope,
               let target = remoteAlbums.first(where: { $0.id == remoteAlbumID }) else { return }
         do {
             var links = uploadFollowLinks
@@ -368,8 +381,9 @@ struct AlbumItem: Identifiable {
         } catch { statusMessage = PFMessage.error(error) }
     }
     func stopUploadFollowing() {
-        guard !busy, activeUploadFollow != nil, let scope = currentUploadFollowScope else { return }
+        guard !busy, !automationRunning, activeUploadFollow != nil, let scope = currentUploadFollowScope else { return }
         do {
+            for link in uploadFollowLinks where link.albumID == album { stopAutomaticPair(photosID: link.albumID, immichID: link.destinationID) }
             let links = uploadFollowLinks.filter { $0.albumID != album }
             try uploadFollowStore.save(links, scope: scope)
             uploadFollowLinks = links; invalidateUploadFollowReview(); loadAlbum()
@@ -392,7 +406,8 @@ struct AlbumItem: Identifiable {
         return rows
     }
     func checkUploadFollow() async {
-        guard !busy, connected, let context = currentUploadFollowContext, let link = activeUploadFollow else { return }
+        guard !busy, !automationRunning, connected, let context = currentUploadFollowContext, let link = activeUploadFollow else { return }
+        uploadFollowQuerySucceeded = false; uploadFollowExistingCount = 0
         busy = true; stopRequested = false; invalidateUploadFollowReview(); items = []; selection = []; fetched = nil; offset = 0
         defer { busy = false }
         do {
@@ -403,6 +418,34 @@ struct AlbumItem: Identifiable {
             let client = try uploadClientFactory(connection.address, connection.credential.key)
             let albumIDs = try await client.uploadFollowAlbumAssetIDs(context.destinationID, userID: connection.userID)
             let source = try readUploadFollowItems(context.albumID)
+            // Injected sources used by tests supply their own receipt evidence.
+            // Real Photos albums are also compared by original bytes, including copies
+            // that predate this application's history. The index keeps no originals.
+            var inventory: [PFPhotoOriginalIdentity] = []
+            var remoteOriginals: [String: [PFReverseAsset]] = [:]
+            if uploadFollowSource == nil {
+                try Task.checkCancellation()
+                if stopRequested { throw CancellationError() }
+                let scan = Task { [self] in try await PFPhotoAlbumInventory.scan(albumID: context.albumID, allowCloud: allowCloud,
+                    root: workspace.appendingPathComponent("original-index")) { [weak self] message, _, _ in self?.statusMessage = message } }
+                albumInventoryTask = scan
+                defer { albumInventoryTask = nil }
+                inventory = try await withTaskCancellationHandler(operation: { try await scan.value }, onCancel: { scan.cancel() })
+                let reader = PFReverseHTTP(client: IMClient(address: connection.address, credential: connection.credential, session: client.transport), profileID: profile.id)
+                for id in albumIDs.sorted() {
+                    try Task.checkCancellation()
+                    if stopRequested { throw CancellationError() }
+                    var remote = try await reader.asset(id)
+                    guard remote.item.selectable else { continue }
+                    if let motion = remote.livePhotoVideoId {
+                        let paired = try await reader.asset(motion)
+                        guard paired.type == "VIDEO", paired.isOffline != true, paired.isTrashed != true else { continue }
+                        remote.pairedChecksum = paired.checksum
+                    }
+                    if let checksum = PFPhotoOriginalIdentity.normalizedChecksum(remote.checksum) { remoteOriginals[checksum, default: []].append(remote) }
+                }
+            }
+            let localOriginals = Dictionary(uniqueKeysWithValues: inventory.map { ($0.photosID, $0) })
             var queue: [PhotoItem] = [], fingerprints: [String: String] = [:]
             for (index, item) in source.enumerated() {
                 try Task.checkCancellation()
@@ -411,7 +454,7 @@ struct AlbumItem: Identifiable {
                 }
                 let fingerprint = uploadFollowFingerprint(item)
                 var completed = false
-                if link.completed[item.id] == fingerprint {
+                if uploadFollowSource != nil && link.completed[item.id] == fingerprint {
                     let file = ConnectionHistory.recordURL(directory: workspace.appendingPathComponent("history"), profileID: profile.id, userID: connection.userID, itemID: item.id)
                     let records = ConnectionHistory.load([file])
                     let expectedCount = item.external == nil ? item.resources.count : 1
@@ -427,6 +470,20 @@ struct AlbumItem: Identifiable {
                         }
                     }
                 }
+                if !completed, let original = localOriginals[item.id] {
+                    for remote in remoteOriginals[original.checksum] ?? [] {
+                        let kind: PFPhotoOriginalIdentity.Kind = remote.livePhotoVideoId != nil ? .live : remote.type == "VIDEO" ? .video : .image
+                        guard original.matches(kind: kind, checksum: remote.checksum, pairedChecksum: remote.pairedChecksum) else { continue }
+                        let info = try await client.info(remote.id)
+                        if kind != .live && info.visibility == "hidden" { continue }
+                        if let motion = remote.livePhotoVideoId {
+                            let motionInfo = try await client.info(motion)
+                            guard metadata(for: item).verify(motionInfo, liveVideoID: nil, isLiveMotion: true) else { continue }
+                        }
+                        guard metadata(for: item).verify(info, liveVideoID: remote.livePhotoVideoId) else { continue }
+                        completed = true; uploadFollowExistingCount += 1; break
+                    }
+                }
                 if !completed { queue.append(item); fingerprints[item.id] = fingerprint }
                 statusMessage = M("Consultando novidades: \(index + 1) de \(source.count)…")
                 await Task.yield()
@@ -435,10 +492,12 @@ struct AlbumItem: Identifiable {
                   let index = uploadFollowLinks.firstIndex(where: { $0.albumID == context.albumID && $0.destinationID == context.destinationID }) else {
                 throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar."))
             }
+            if uploadFollowSource == nil { try PFPhotoAlbumInventory.validate(albumID: context.albumID, identities: inventory) }
             var links = uploadFollowLinks; links[index].lastChecked = Date()
             try uploadFollowStore.save(links, scope: context.scope)
-            uploadFollowLinks = links; items = queue; uploadFollowFingerprints = fingerprints; uploadFollowReview = context
-            statusMessage = M("\(queue.count) itens para revisar antes do envio. Nada foi enviado automaticamente.")
+            uploadFollowLinks = links; items = queue; uploadFollowFingerprints = fingerprints; uploadFollowReview = context; uploadFollowOriginals = localOriginals
+            uploadFollowQuerySucceeded = true
+            statusMessage = M("\(queue.count) itens ausentes ou pendentes; \(uploadFollowExistingCount) cópias conferidas por conteúdo. Nada foi enviado automaticamente.")
         } catch { invalidateUploadFollowReview(); items = []; selection = []; statusMessage = PFMessage.error(error) }
     }
     private func validateUploadFollowBeforeSend(_ context: PFUploadFollowContext?) throws {
@@ -471,6 +530,7 @@ struct AlbumItem: Identifiable {
         items.filter { selection.contains($0.id) }.map { PhotoItem(asset: $0.asset, resources: $0.resources, metadata: metadata(for: $0), external: $0.external) }
     }
     func saveReview(_ edit: MetadataOverride?, id: String) throws {
+        guard !automationRunning else { throw BridgeError(message: M("Pause o acompanhamento antes de alterar revisões.")) }
         var updated = edits
         updated[id] = edit?.hasChanges == true ? edit : nil
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -491,7 +551,7 @@ struct AlbumItem: Identifiable {
         }
     }
     var canSend: Bool {
-        uploadFollowSelectionReady && !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && transferReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        !automationRunning && uploadFollowSelectionReady && !selection.isEmpty && chosen.allSatisfy { $0.metadata.date != nil } && transferReady && (destination == .timeline || destination == .existing && !remoteAlbumID.isEmpty || destination == .new && !newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     func refreshAlbums(timeout: TimeInterval = 15) async {
         do {
@@ -807,6 +867,50 @@ struct AlbumItem: Identifiable {
             return true
         } catch { job.status = PFMessage.error(error); return false }
     }
+    func isolatedTransferWorker() throws -> LibraryModel {
+        guard !busy, let connection = currentTransferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
+        let worker = LibraryModel(loadSavedState: false, observeNetwork: false, initialCredential: connection.credential,
+            credentialLoader: { _ in [] }, transferResolver: transferResolver, workspaceOverride: workspace,
+            uploadConcurrency: 1, uploadFollowStore: uploadFollowStore, uploadFollowSource: uploadFollowSource,
+            uploadClientFactory: uploadClientFactory)
+        worker.profile = profile; worker.allowCloud = allowCloud; worker.edits = edits
+        worker.preparedWindowLimit = 1; worker.connected = true
+        return worker
+    }
+    func disableFollowForManualBatch() { ignoreUploadFollows = true }
+    func configureBackgroundFollow(photosAlbumID: String, immichAlbumID: String, createsFollow: Bool = true) async throws {
+        try await validateTransfer(requiredPermissions: ["asset.read", "album.read"])
+        guard let connection = currentTransferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
+        let api = try uploadClientFactory(connection.address, connection.credential.key)
+        let all = try await IMClient(address: connection.address, credential: connection.credential, session: api.transport).albums()
+        guard let target = all.first(where: { $0.id == immichAlbumID }) else { throw BridgeError(message: M("Atualize e selecione um álbum de destino.")) }
+        remoteAlbums = all.map { ImmichAlbum(id: $0.id, albumName: $0.name, shared: $0.shared) }
+        album = photosAlbumID; destination = .existing; remoteAlbumID = immichAlbumID
+        guard createsFollow else { return }
+        let scope = PFUploadFollowIdentity.scope(profileID: profile.id, userID: connection.userID)
+        var links = try uploadFollowStore.load(scope: scope)
+        if !links.contains(where: { $0.albumID == photosAlbumID && $0.destinationID == immichAlbumID }) {
+            links.append(PFAlbumFollowLink(albumID: photosAlbumID, destinationID: immichAlbumID, destinationTitle: target.name, completed: [:], lastChecked: nil))
+            try uploadFollowStore.save(links, scope: scope)
+        }
+        uploadFollowLinks = links; uploadFollowScope = scope
+    }
+    func legacyAlbumSyncLinks() throws -> [PFAlbumSyncLink] {
+        guard let scope = currentUploadFollowScope else { return [] }
+        var values = uploadFollowLinks.map { link in PFAlbumSyncLink(photosID: link.albumID,
+            photosTitle: albums.first(where: { $0.id == link.albumID })?.displayTitle ?? L("Álbum do Fotos"),
+            immichID: link.destinationID, immichTitle: link.destinationTitle, direction: .upload) }
+        let imports = try PFAlbumFollowDiskStore(root: workspace.appendingPathComponent("album-follow")).load(scope: scope)
+        for link in imports {
+            if let index = values.firstIndex(where: { $0.photosID == link.destinationID && $0.immichID == link.albumID }) { values[index].direction = .both }
+            else { values.append(PFAlbumSyncLink(photosID: link.destinationID, photosTitle: link.destinationTitle,
+                immichID: link.albumID, immichTitle: remoteAlbums.first(where: { $0.id == link.albumID })?.albumName ?? L("Álbum Immich"), direction: .download)) }
+        }
+        return values
+    }
+    func finishBackgroundTransfers() {
+        automationRunning = false; reloadUploadFollows()
+    }
     func exportSelected() async {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
         panel.prompt = L("Exportar aqui")
@@ -833,6 +937,8 @@ struct AlbumItem: Identifiable {
         do {
             let permissions = PFTransferConnection.uploadPermissions(addingToAlbum: destination != .timeline, creatingAlbum: destination == .new, applyingReview: chosen.contains { edits[$0.id]?.hasChanges == true })
             try await validateTransfer(requiredPermissions: permissions)
+            try Task.checkCancellation()
+            if stopRequested { throw CancellationError() }
             guard let resolved = transferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
             try validateUploadFollowBeforeSend(followContext)
             if let prepared = resumedPreparation {
@@ -849,6 +955,14 @@ struct AlbumItem: Identifiable {
             }
             // Freeze endpoint, account and key through every resource in this batch.
             let client = try uploadClientFactory(resolved.address, resolved.credential.key)
+            if preparedWindowLimit == 1 && destination == .existing {
+                let available = try await IMClient(address: resolved.address, credential: resolved.credential, session: client.transport).albums()
+                guard available.contains(where: { $0.id == remoteAlbumID && ($0.ownerID == resolved.userID || $0.writerIDs.contains(resolved.userID)) }) else {
+                    throw BridgeError(message: M("O álbum preparado não está disponível para edição nesta conta."))
+                }
+                try Task.checkCancellation()
+                if stopRequested { throw CancellationError() }
+            }
             let userID = resolved.userID
             let transferProfile = profile
             // Establish owned local storage before creating any remote album.
@@ -876,7 +990,7 @@ struct AlbumItem: Identifiable {
                 var windowBytes: Int64 = 0
                 // At most 8 complete media items and 128 MiB before the last item.
                 // A single large media item is never split merely to meet the window target.
-                while nextPosition < batch.count && window.count < 8 && windowBytes < 128 * 1024 * 1024 && !stopRequested {
+                while nextPosition < batch.count && window.count < max(1, min(8, preparedWindowLimit)) && windowBytes < 128 * 1024 * 1024 && !stopRequested {
                     let position = nextPosition
                     let item = batch[position]
                     resultsMessages[item.id] = M("Preparando…")
@@ -947,7 +1061,16 @@ struct AlbumItem: Identifiable {
         userID: String, transferProfile: ConnectionProfile, resolvedAddress: String,
         history: URL, targetAlbumID: String?, duplicates: [String: PFUploadCheckCandidate]?, followContext: PFUploadFollowContext?) async {
         let item = prepared.item, folder = prepared.folder
+        func validateCurrentSource() throws {
+            guard let context = followContext else { return }
+            guard currentUploadFollowContext == context else { throw BridgeError(message: M("O acompanhamento de envio mudou. Consulte novamente antes de enviar.")) }
+            if uploadFollowSource == nil {
+                guard let identity = uploadFollowOriginals[item.id] else { throw BridgeError(message: M("O álbum do Fotos mudou. Consulte as novidades novamente antes de enviar.")) }
+                try PFPhotoAlbumInventory.validateCandidate(albumID: context.albumID, identity: identity)
+            }
+        }
         do {
+            try validateCurrentSource()
             let recordURL = ConnectionHistory.recordURL(directory: history, profileID: transferProfile.id, userID: userID, itemID: item.id)
             let legacy = ConnectionHistory.legacyURLs(directory: history, addresses: [transferProfile.localAddress, transferProfile.remoteAddress, resolvedAddress], itemID: item.id)
             var records = ConnectionHistory.load([recordURL] + legacy)
@@ -975,6 +1098,7 @@ struct AlbumItem: Identifiable {
                 } else {
                     statusMessage = M("Enviando \(resource.originalFilename)…")
                     let started = ProcessInfo.processInfo.systemUptime
+                    try validateCurrentSource()
                     result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil, checksum: checksum, isLiveMotion: resource.type == .pairedVideo)
                     uploadMetrics?.transferSeconds += ProcessInfo.processInfo.systemUptime - started
                     if result.status == "duplicate" {
@@ -989,6 +1113,7 @@ struct AlbumItem: Identifiable {
                     try JSONEncoder().encode(records).write(to: recordURL, options: .atomic)
                     try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordURL.path)
                 }
+                try validateCurrentSource()
                 if let edit = edits[item.id], edit.hasChanges {
                     statusMessage = M("Aplicando sua revisão no Immich…")
                     try await client.applyReview(edit, to: result.id)
@@ -1007,6 +1132,7 @@ struct AlbumItem: Identifiable {
                 if !verified { allVerified = false }
             }
             if let targetAlbumID {
+                try validateCurrentSource()
                 statusMessage = M("Adicionando ao álbum…")
                 try await client.addToAlbum(targetAlbumID, assetIDs: albumAssetIDs)
             }
@@ -1073,7 +1199,8 @@ extension Notification.Name { static let pfOpenSettings = Notification.Name("Pon
 
 struct ContentView: View {
     @ObservedObject private var localization = PFLocalization.shared
-    @StateObject private var model = LibraryModel()
+    @ObservedObject var model: LibraryModel
+    @ObservedObject var automation: PFAlbumSyncCoordinator
     @StateObject private var volumes = VolumeMonitor()
     @StateObject private var navigation = PFNavigationState()
     @StateObject private var reverseImport = PFReverseImportModel()
@@ -1086,6 +1213,16 @@ struct ContentView: View {
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 pageHeader.padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 18)
+                if automation.running || automation.attention != nil {
+                    HStack {
+                        if automation.running { ProgressView().controlSize(.small) }
+                        Text((automation.running ? automation.status : automation.attention ?? automation.status).text).font(.caption).lineLimit(2)
+                        Spacer()
+                        Button(L("Ver acompanhamentos")) { automation.showing = true }
+                        if automation.running { Button(L("Pausar")) { automation.pause() } }
+                        else { Button(L("Concluir")) { automation.attention = nil } }
+                    }.padding(12).padding(.horizontal, 12)
+                }
                 if let preparation = model.backgroundPreparation {
                     PFPreparationBanner(job: preparation, showing: $model.showPreparation, busy: model.busy,
                         cancel: { model.cancelBackgroundPreparation() }, resume: {
@@ -1096,6 +1233,7 @@ struct ContentView: View {
                     PFSettingsView(model: model, themeRaw: $themeRaw, glassEnabled: $glassEnabled)
                 } else if navigation.reverse {
                     PFReverseImportView(model: reverseImport, connection: model, configure: { navigation.settings = true })
+                        .disabled(model.automationRunning)
                 } else {
                     HStack(alignment: .top, spacing: 16) { sourcePanel; destinationPanel }
                         .fixedSize(horizontal: false, vertical: true)
@@ -1112,11 +1250,19 @@ struct ContentView: View {
         .background(PFTheme.background).tint(PFTheme.accent)
         .environment(\.pfGlassEnabled, glassEnabled)
         .environment(\.locale, PFLocalization.locale)
-        .onAppear { PFAppearanceController.apply(selectedTheme) }
+        .onAppear { [automation] in PFAppearanceController.apply(selectedTheme); automation.startAutomatic(model: model)
+            model.stopAlbumAutomation = { [weak automation] scope, photos, immich in automation?.disablePair(scope: scope, photosID: photos, immichID: immich) }
+        }
         .onDisappear { model.shutdownPreparation() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            model.shutdownPreparation()
+            model.shutdownPreparation(); automation.shutdown()
         }
+        .onChange(of: model.automationRunning) { _, active in if !active { reverseImport.invalidate(); automation.reload(model) } }
+        .onChange(of: model.transferReady) { _, _ in if !automation.running { automation.reload(model) } }
+        .onChange(of: model.profile) { _, _ in automation.pauseIfRunning() }
+        .onChange(of: model.apiKey) { _, _ in automation.pauseIfRunning() }
+        .onChange(of: model.selectedTransferAccountID) { _, _ in automation.pauseIfRunning() }
+        .onChange(of: model.networkRevision) { _, _ in automation.pauseIfRunning() }
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
         .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
@@ -1133,6 +1279,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pfOpenSettings)) { _ in
             if !model.busy { navigation.settings = true }
         }
+        .sheet(isPresented: $automation.showing) { PFAlbumSyncView(coordinator: automation, model: model) }
         .sheet(item: $model.inspectingMedia) { item in
             PFMediaDiagnosticsView(item: item, model: model)
         }
@@ -1144,7 +1291,7 @@ struct ContentView: View {
         .sheet(isPresented: $model.showManagement, onDismiss: { model.managementModel?.endReview() }) {
             if let workspace = model.managementModel {
                 ImmichWorkspaceView(model: workspace, address: model.address, connectionReady: model.serverReady)
-                    .disabled(model.busy && !model.managementBusy)
+                    .disabled(model.automationRunning || model.busy && !model.managementBusy)
                     .interactiveDismissDisabled(model.managementBusy)
                         .environment(\.pfGlassEnabled, glassEnabled)
         .environment(\.locale, PFLocalization.locale)
@@ -1152,6 +1299,9 @@ struct ContentView: View {
         }
         .confirmationDialog(L("Enviar \(model.selection.count) itens para o Immich?"), isPresented: $model.showUpload, titleVisibility: .visible) {
             Button(L("Enviar com originais e XMP")) { Task { await model.sendSelected() } }
+            if model.sourceName == nil && model.activeUploadFollow == nil && !model.hasPreparedFiles {
+                Button(L("Enviar em segundo plano, uma mídia por vez")) { automation.sendSelection(model) }
+            }
             if model.canPrepareInBackground {
                 Button(L("Preparar em segundo plano")) { model.startBackgroundPreparation() }
             }
@@ -1179,8 +1329,14 @@ struct ContentView: View {
                 navigation.settings = false; navigation.reverse = true
             }.disabled(model.busy)
                 .help(L("Trazer originais do Immich para a biblioteca do Fotos da Apple"))
+            sidebarAction(L("Álbuns acompanhados"), icon: "arrow.triangle.2.circlepath") {
+                Task {
+                    if !model.connected && !automation.running { await model.connectLibrary() }
+                    automation.reload(model); automation.showing = true
+                }
+            }.disabled(model.busy)
             sidebarAction(L("Gerenciar biblioteca"), icon: "square.grid.2x2") { model.openManagement() }
-                .disabled(model.busy || !model.serverReady)
+                .disabled(model.busy || model.automationRunning || !model.serverReady)
                 .help(model.serverReady ? L("Duplicatas, álbuns, pessoas e histórico") : L("Teste a conexão para gerenciar o Immich"))
             HStack {
                 Text(L("DISPOSITIVOS")).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
@@ -1282,7 +1438,7 @@ struct ContentView: View {
                     Text(L("Última consulta: \(PFLocalization.formatDate(date, date: .abbreviated, time: .shortened))"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Button(L("Parar acompanhamento")) { model.stopUploadFollowing(); navigation.showingUploadFollow = false }
+                Button(L("Parar acompanhamento")) { automation.pauseIfRunning(); model.stopUploadFollowing(); navigation.showingUploadFollow = false }
                     .disabled(model.busy)
             } else {
                 Button(L("Acompanhar este álbum")) { model.startUploadFollowing(); navigation.showingUploadFollow = false }
@@ -1391,10 +1547,16 @@ struct ContentView: View {
         }.controlSize(.large)
     }
 }
+final class PFApplicationDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}
 @main struct PonteFotosApp: App {
+    @NSApplicationDelegateAdaptor(PFApplicationDelegate.self) private var appDelegate
     @ObservedObject private var localization = PFLocalization.shared
+    @StateObject private var library = LibraryModel()
+    @StateObject private var automation = PFAlbumSyncCoordinator()
     init() { NSApplication.shared.setActivationPolicy(.regular) }
-    var body: some Scene { WindowGroup { ContentView().environment(\.locale, PFLocalization.locale) }.defaultSize(width: 1180, height: 800)
+    var body: some Scene { WindowGroup { ContentView(model: library, automation: automation).environment(\.locale, PFLocalization.locale) }.defaultSize(width: 1180, height: 800)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button(L("Configurações…")) { NotificationCenter.default.post(name: .pfOpenSettings, object: nil) }

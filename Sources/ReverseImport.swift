@@ -226,11 +226,17 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func verifyOriginals(id: String, asset: PFReverseAsset) async throws
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws
     func listAlbums() async throws -> [PFPhotosAlbum]
+    func inventory(albumID: String, allowCloud: Bool, root: URL, progress: @escaping (PFMessage, Int, Int) -> Void) async throws -> [PFPhotoOriginalIdentity]
+    func validateInventory(albumID: String, identities: [PFPhotoOriginalIdentity]) throws
+    func validateInventoryCandidate(albumID: String, identity: PFPhotoOriginalIdentity) throws
     func prepareDestination(_ destination: PFPhotosDestination) throws
     func addExisting(id: String, destination: PFPhotosDestination) async throws -> String
     func create(asset: PFReverseAsset, original: URL, paired: URL?, destination: PFPhotosDestination) async throws -> PFPhotosImportResult
 }
 extension PFReversePhotos {
+    func inventory(albumID: String, allowCloud: Bool, root: URL, progress: @escaping (PFMessage, Int, Int) -> Void) async throws -> [PFPhotoOriginalIdentity] { [] }
+    func validateInventory(albumID: String, identities: [PFPhotoOriginalIdentity]) throws {}
+    func validateInventoryCandidate(albumID: String, identity: PFPhotoOriginalIdentity) throws {}
     func verifyOriginals(id: String, asset: PFReverseAsset) async throws {
         throw BridgeError(message: M("Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente."))
     }
@@ -291,6 +297,15 @@ enum PFOriginalResourceSelection {
             }
         } else { status = current }
         guard status == .authorized else { throw BridgeError(message: M("Permita acesso completo ao Fotos para importar e conferir o histórico sem criar cópias repetidas.")) }
+    }
+    func inventory(albumID: String, allowCloud: Bool, root: URL, progress: @escaping (PFMessage, Int, Int) -> Void) async throws -> [PFPhotoOriginalIdentity] {
+        try await PFPhotoAlbumInventory.scan(albumID: albumID, allowCloud: allowCloud, root: root, progress: progress)
+    }
+    func validateInventory(albumID: String, identities: [PFPhotoOriginalIdentity]) throws {
+        try PFPhotoAlbumInventory.validate(albumID: albumID, identities: identities)
+    }
+    func validateInventoryCandidate(albumID: String, identity: PFPhotoOriginalIdentity) throws {
+        try PFPhotoAlbumInventory.validateCandidate(albumID: albumID, identity: identity)
     }
     func exists(_ id: String) -> Bool { PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).count == 1 }
     func contains(id: String, albumID: String) -> Bool {
@@ -458,16 +473,23 @@ enum PFOriginalResourceSelection {
 @MainActor final class PFReverseImportModel: ObservableObject {
     @Published var albums: [IMAlbum] = []
     @Published var items: [PFReverseItem] = []
+    @Published private(set) var albumQuerySucceeded = false
+    @Published private(set) var lastImportSucceeded = false
     @Published var selection = Set<String>()
     @Published var verifyOriginalBytes = false
     @Published var albumID = "" {
         didSet {
-            if albumID != oldValue && !importing { generation = UUID(); items = []; selection = []; assets = [:]; reviewFollowID = nil; restoreFollowDestination() }
+            if albumID != oldValue && !importing { generation = UUID(); albumQuerySucceeded = false; lastImportSucceeded = false; items = []; selection = []; assets = [:]; reviewFollowID = nil; restoreFollowDestination() }
         }
     }
-    @Published var destinationMode: PFPhotosDestinationMode = .new
+    @Published var destinationMode: PFPhotosDestinationMode = .new { didSet { if destinationMode != oldValue { invalidateDestinationComparison() } } }
     @Published var photosAlbums: [PFPhotosAlbum] = []
-    @Published var destinationAlbumID = ""
+    @Published var destinationAlbumID = "" { didSet { if destinationAlbumID != oldValue { invalidateDestinationComparison() } } }
+    @Published private(set) var existingPhotosCount = 0
+    @Published private(set) var existingPhotosConflicts = 0
+    @Published private(set) var comparedPhotosDestination = false
+    private var comparisonDestinationID: String?
+    private var inventoryTask: Task<[PFPhotoOriginalIdentity], Error>?
     @Published private var customDestinationAlbumName: String?
     var destinationAlbumName: String {
         get { customDestinationAlbumName ?? L("Importadas do Immich") }
@@ -489,6 +511,62 @@ enum PFOriginalResourceSelection {
         }
     }
     var isDestinationValid: Bool { destination?.isValid == true }
+    private func invalidateDestinationComparison() {
+        guard !importing, comparisonDestinationID != nil else { return }
+        inventoryTask?.cancel(); generation = UUID(); albumQuerySucceeded = false; lastImportSucceeded = false
+        comparisonDestinationID = nil; comparedPhotosDestination = false; existingPhotosCount = 0; existingPhotosConflicts = 0
+        items = []; selection = []; assets = [:]; reviewFollowID = nil
+        statusMessage = M("O destino no Fotos mudou. Consulte os itens novamente para comparar os originais.")
+    }
+    private func scanDestination(_ albumID: String, token: UUID) async throws -> [PFPhotoOriginalIdentity] {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("PonteFotos/photos-album-inventory", isDirectory: true)
+        let task = Task { [photos, weak self] in
+            try await photos.inventory(albumID: albumID, allowCloud: true, root: root) { [weak self] message, _, _ in
+                guard let self, self.generation == token else { return }
+                self.statusMessage = message
+            }
+        }
+        inventoryTask = task
+        defer { inventoryTask = nil }
+        return try await withTaskCancellationHandler(operation: { try await task.value }, onCancel: { task.cancel() })
+    }
+    private enum ExistingPhotoMatch { case missing, verified(String), metadataConflict }
+    private typealias InventoryIndex = [String: [PFPhotoOriginalIdentity]]
+    private static func identityKey(kind: PFPhotoOriginalIdentity.Kind, checksum: String, pairedChecksum: String?) -> String? {
+        guard let checksum = PFPhotoOriginalIdentity.normalizedChecksum(checksum) else { return nil }
+        if kind == .live {
+            guard let paired = pairedChecksum.flatMap(PFPhotoOriginalIdentity.normalizedChecksum) else { return nil }
+            return kind.rawValue + ":" + checksum + ":" + paired
+        }
+        guard pairedChecksum == nil else { return nil }
+        return kind.rawValue + ":" + checksum
+    }
+    private static func inventoryIndex(_ identities: [PFPhotoOriginalIdentity]) -> InventoryIndex {
+        var result: InventoryIndex = [:]
+        for identity in identities {
+            if let key = identityKey(kind: identity.kind, checksum: identity.checksum, pairedChecksum: identity.pairedChecksum) {
+                result[key, default: []].append(identity)
+            }
+        }
+        return result
+    }
+    private func existingMatch(_ asset: PFReverseAsset, albumID: String, inventory: InventoryIndex, token: UUID) async throws -> ExistingPhotoMatch {
+        let kind: PFPhotoOriginalIdentity.Kind = asset.livePhotoVideoId != nil ? .live : asset.type == "VIDEO" ? .video : .image
+        guard let key = Self.identityKey(kind: kind, checksum: asset.checksum, pairedChecksum: asset.pairedChecksum) else { return .missing }
+        let candidates = inventory[key, default: []]
+        guard !candidates.isEmpty else { return .missing }
+        for candidate in candidates {
+            try Task.checkCancellation()
+            guard generation == token, photos.contains(id: candidate.photosID, albumID: albumID) else { throw CancellationError() }
+            try photos.validateInventoryCandidate(albumID: albumID, identity: candidate)
+            let verification = try await photos.verify(id: candidate.photosID, asset: asset)
+            guard generation == token else { throw CancellationError() }
+            try photos.validateInventoryCandidate(albumID: albumID, identity: candidate)
+            if verification.isVerified { return .verified(candidate.photosID) }
+        }
+        return .metadataConflict
+    }
     func loadPhotosAlbums() async {
         guard !busy && !importing && !loadingDestinations else { return }
         loadingDestinations = true; busy = true; defer { loadingDestinations = false; busy = false }
@@ -513,10 +591,21 @@ enum PFOriginalResourceSelection {
     @Published private(set) var followedAlbums: [PFAlbumFollowLink] = []
     private let followStore: PFAlbumFollowStore
     private var reviewFollowID: String?
-    var activeFollow: PFAlbumFollowLink? { followedAlbums.first { $0.albumID == albumID } }
+    var activeFollow: PFAlbumFollowLink? { followedAlbums.first { $0.albumID == albumID && $0.destinationID == destinationAlbumID } ?? followedAlbums.first { $0.albumID == albumID } }
     private func restoreFollowDestination() {
         guard let link = activeFollow else { return }
         destinationMode = .existing; destinationAlbumID = link.destinationID
+    }
+    func configureBackgroundFollow(immichAlbumID: String, photosAlbumID: String) throws {
+        guard !busy, !importing, let remote, let target = photosAlbums.first(where: { $0.id == photosAlbumID }),
+              albums.contains(where: { $0.id == immichAlbumID }) else { throw BridgeError(message: M("O álbum de destino do Fotos não está disponível. Atualize a lista antes de continuar.")) }
+        albumID = immichAlbumID; destinationMode = .existing; destinationAlbumID = photosAlbumID
+        var links = try followStore.load(scope: remote.scope)
+        if !links.contains(where: { $0.albumID == immichAlbumID && $0.destinationID == photosAlbumID }) {
+            links.append(PFAlbumFollowLink(albumID: immichAlbumID, destinationID: photosAlbumID, destinationTitle: target.displayTitle, completed: [:], lastChecked: nil))
+            try followStore.save(links, scope: remote.scope)
+        }
+        followedAlbums = links
     }
     func startFollowing() {
         guard !busy && !importing, let remote, !albumID.isEmpty,
@@ -597,6 +686,9 @@ enum PFOriginalResourceSelection {
     func loadAlbum(preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing, let remote else { return }
         busy = true; defer { busy = false }; selection = []; items = []; assets = [:]
+        albumQuerySucceeded = false; lastImportSucceeded = false
+        comparedPhotosDestination = false; existingPhotosCount = 0; existingPhotosConflicts = 0; comparisonDestinationID = nil
+        let targetSnapshot = destination
         let token = generation, album = albumID, follow = activeFollow
         reviewFollowID = nil
         do {
@@ -610,7 +702,7 @@ enum PFOriginalResourceSelection {
                 var asset = try await remote.asset(id)
                 if let videoID = asset.livePhotoVideoId {
                     let video = try await remote.asset(videoID)
-                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
+                    guard video.id == videoID, video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
                         throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
                     }
                     asset.pairedChecksum = video.checksum
@@ -630,8 +722,34 @@ enum PFOriginalResourceSelection {
             guard generation == token, albumID == album else { return }
             let pairedIDs = Set(loaded.values.compactMap(\.livePhotoVideoId))
             rows = rows.filter { !pairedIDs.contains($0.id) }
+            if photos.canRead, case .existing(let destinationID, _)? = targetSnapshot {
+                comparisonDestinationID = destinationID
+                let inventory = try await scanDestination(destinationID, token: token)
+                guard generation == token, destination == targetSnapshot else { throw CancellationError() }
+                let index = Self.inventoryIndex(inventory)
+                var remaining: [PFReverseItem] = []
+                for var item in rows {
+                    guard let asset = loaded[item.id], item.selectable,
+                          !records.contains(where: { $0.assetID == item.id && $0.pending }) else { remaining.append(item); continue }
+                    switch try await existingMatch(asset, albumID: destinationID, inventory: index, token: token) {
+                    case .missing: remaining.append(item)
+                    case .verified: existingPhotosCount += 1
+                    case .metadataConflict:
+                        existingPhotosConflicts += 1
+                        item.setIssue(M("O original já existe no álbum do Fotos, mas a data ou localização difere. Confira esse item antes de importar; nenhuma nova cópia será criada."))
+                        remaining.append(item)
+                    }
+                }
+                try photos.validateInventory(albumID: destinationID, identities: inventory)
+                guard generation == token, destination == targetSnapshot else { throw CancellationError() }
+                rows = remaining; comparedPhotosDestination = true
+            }
             if let follow {
                 rows = rows.filter { item in
+                    // A current byte inventory supersedes old completion receipts.
+                    // Only exact matches already removed above can leave this queue.
+                    if comparedPhotosDestination { return true }
+                    guard item.selectable else { return true }
                     guard !records.contains(where: { $0.assetID == item.id && $0.pending }),
                           let asset = loaded[item.id], follow.completed[item.id] == followFingerprint(asset),
                           photos.canRead, let record = records.last(where: { $0.assetID == item.id && $0.checksum == asset.checksum }),
@@ -646,7 +764,7 @@ enum PFOriginalResourceSelection {
                 try followStore.save(links, scope: remote.scope)
                 followedAlbums = links; reviewFollowID = album
             }
-            assets = loaded; items = rows; statusMessage = follow == nil ? M("\(rows.count) originais encontrados. Selecione os itens para importar.") : M("\(rows.count) itens para revisar no acompanhamento. Nenhuma importação foi iniciada.")
+            assets = loaded; items = rows; albumQuerySucceeded = true; statusMessage = follow == nil ? M("\(rows.count) originais encontrados. Selecione os itens para importar.") : M("\(rows.count) itens para revisar no acompanhamento. Nenhuma importação foi iniciada.")
         } catch { if generation == token { statusMessage = PFMessage.error(error) } }
     }
     // Explicit recovery reads an already-known PhotoKit identifier. It never
@@ -722,12 +840,18 @@ enum PFOriginalResourceSelection {
         try await preflight(sourceContext)
     }
     func cancel() {
+        inventoryTask?.cancel()
         cancellationRequested = true; showConfirmation = false
-        if !importing { generation = UUID(); items = []; selection = []; assets = [:] }
+        if !importing {
+            generation = UUID(); items = []; selection = []; assets = [:]
+            albumQuerySucceeded = false; lastImportSucceeded = false; comparisonDestinationID = nil
+            comparedPhotosDestination = false; existingPhotosCount = 0; existingPhotosConflicts = 0
+        }
     }
     func invalidate() { invalidateConnection() }
     func invalidateConnection(preservingProgress: Bool = false) {
-        sourceContext = nil
+        inventoryTask?.cancel(); comparisonDestinationID = nil; comparedPhotosDestination = false; existingPhotosCount = 0; existingPhotosConflicts = 0
+        sourceContext = nil; albumQuerySucceeded = false; lastImportSucceeded = false
         generation = UUID(); cancellationRequested = true; showConfirmation = false
         if !importing {
             remote = nil; followedAlbums = []; reviewFollowID = nil; albums = []; albumID = ""; items = []; selection = []; assets = [:]
@@ -743,6 +867,7 @@ enum PFOriginalResourceSelection {
     }
     func importSelected(preflight: (([String]) async throws -> Void)? = nil) async {
         guard !busy && !importing && !loadingDestinations, let remote else { return }
+        lastImportSucceeded = false
         let selected = items.filter { selection.contains($0.id) && $0.selectable }.compactMap { assets[$0.id] }
         guard !selected.isEmpty, var target = destination, target.isValid else { statusMessage = M("Selecione originais válidos e informe o álbum de destino."); return }
         if reviewFollowID != nil {
@@ -770,12 +895,21 @@ enum PFOriginalResourceSelection {
             try await photos.authorize()
             try photos.prepareDestination(target)
             var records = try history.load(scope: remote.scope)
+            var inventoryAlbumID: String?
+            let destinationInventory: [PFPhotoOriginalIdentity]
+            if case .existing(let id, _) = target {
+                inventoryAlbumID = id
+                destinationInventory = try await scanDestination(id, token: token)
+                guard token == generation, !cancellationRequested else { return }
+                try photos.validateInventory(albumID: id, identities: destinationInventory)
+            } else { inventoryAlbumID = nil; destinationInventory = [] }
+            var destinationIndex = Self.inventoryIndex(destinationInventory)
             for originalAsset in selected {
                 if cancellationRequested || pauseAfterItem || generation != token { statusMessage = M("Importação interrompida entre itens. \(done) concluídos."); return }
                 var asset = try await remote.asset(originalAsset.id)
                 if let videoID = asset.livePhotoVideoId {
                     let video = try await remote.asset(videoID)
-                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
+                    guard video.id == videoID, video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
                         throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
                     }
                     asset.pairedChecksum = video.checksum
@@ -786,6 +920,22 @@ enum PFOriginalResourceSelection {
                 guard asset.item.selectable, asset.checksum == originalAsset.checksum, asset.livePhotoVideoId == originalAsset.livePhotoVideoId,
                       asset.item.captureDate == originalAsset.item.captureDate, asset.item.latitude == originalAsset.item.latitude, asset.item.longitude == originalAsset.item.longitude else { throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar.")) }
                 if records.contains(where: { $0.assetID == asset.id && $0.pending }) { throw BridgeError(message: M("Há um resultado pendente para este item. Confira o Fotos antes de repetir.")) }
+                if let destinationID = inventoryAlbumID {
+                    switch try await existingMatch(asset, albumID: destinationID, inventory: destinationIndex, token: token) {
+                    case .missing: break
+                    case .verified:
+                        guard token == generation, !cancellationRequested else { return }
+                        recordVerification(PFImportVerification(problems: [], originalsVerified: true), id: asset.id)
+                        markImported(asset.id); done += 1; existingPhotosCount += 1
+                        continue
+                    case .metadataConflict:
+                        existingPhotosConflicts += 1
+                        let issue = M("O original já existe no álbum do Fotos, mas a data ou localização difere. Confira esse item antes de importar; nenhuma nova cópia será criada.")
+                        if let row = items.firstIndex(where: { $0.id == asset.id }) { items[row].setIssue(issue) }
+                        selection.remove(asset.id)
+                        throw BridgeError(message: issue)
+                    }
+                }
                 if let previous = records.last(where: { $0.assetID == asset.id && $0.checksum == asset.checksum }), let id = previous.photosID, photos.exists(id) {
                     if asset.livePhotoVideoId != nil || previous.pairSignature != nil {
                         guard previous.pairSignature == followFingerprint(asset) else {
@@ -823,7 +973,7 @@ enum PFOriginalResourceSelection {
                     if cancellationRequested || generation != token { return }
                     let albumID = try await photos.addExisting(id: id, destination: target)
                     rememberResolvedAlbum(id: albumID, destination: target)
-                    target = .existing(id: albumID, title: target.title)
+                    target = .existing(id: albumID, title: target.title); inventoryAlbumID = albumID
                     try completeFollow(asset, scope: remote.scope, destinationID: albumID)
                     markImported(asset.id); done += 1; continue
                 }
@@ -836,19 +986,41 @@ enum PFOriginalResourceSelection {
                 if let videoID = asset.livePhotoVideoId {
                     guard asset.type == "IMAGE" else { throw BridgeError(message: M("Par Live Photo inválido.")) }
                     let video = try await remote.asset(videoID)
-                    guard video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, video.checksum == asset.pairedChecksum else { throw BridgeError(message: M("Vídeo da Live Photo indisponível.")) }
+                    guard video.id == videoID, video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, video.checksum == asset.pairedChecksum else { throw BridgeError(message: M("Vídeo da Live Photo indisponível.")) }
                     paired = try await remote.download(video, directory: dir)
                 }
                 if cancellationRequested || generation != token { statusMessage = M("Importação interrompida antes de gravar no Fotos."); return }
                 try await photos.validate(asset: asset, original: file, paired: paired)
                 if cancellationRequested || generation != token { statusMessage = M("Importação interrompida antes de gravar no Fotos."); return }
+                var creationInventory: [PFPhotoOriginalIdentity]?
+                if let destinationID = inventoryAlbumID {
+                    let fresh = try await scanDestination(destinationID, token: token)
+                    try photos.validateInventory(albumID: destinationID, identities: fresh)
+                    destinationIndex = Self.inventoryIndex(fresh); creationInventory = fresh
+                    switch try await existingMatch(asset, albumID: destinationID, inventory: destinationIndex, token: token) {
+                    case .verified:
+                        recordVerification(PFImportVerification(problems: [], originalsVerified: true), id: asset.id)
+                        markImported(asset.id); done += 1; existingPhotosCount += 1
+                        continue
+                    case .metadataConflict:
+                        throw BridgeError(message: M("O original já existe no álbum do Fotos, mas a data ou localização difere. Confira esse item antes de importar; nenhuma nova cópia será criada."))
+                    case .missing: break
+                    }
+                }
+                if let followedID = reviewFollowID {
+                    let currentIDs = Set(try await remote.ids(album: followedID))
+                    guard currentIDs.contains(asset.id) else { throw BridgeError(message: M("O acompanhamento mudou. Consulte as novidades novamente.")) }
+                }
+                try await validateSource(preflight)
+                guard token == generation, !cancellationRequested else { return }
+                if let destinationID = inventoryAlbumID, let fresh = creationInventory { try photos.validateInventory(albumID: destinationID, identities: fresh) }
                 // Persist intent BEFORE PhotoKit. Crashes/ambiguous errors must never trigger blind retries.
                 records.removeAll { $0.assetID == asset.id }
                 records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true, pairSignature: asset.livePhotoVideoId == nil ? nil : followFingerprint(asset), originalVerificationRequired: verifyBytes ? true : nil, originalsVerified: verifyBytes ? false : nil))
                 try history.save(records, scope: remote.scope)
                 let result = try await photos.create(asset: asset, original: file, paired: paired, destination: target)
                 rememberResolvedAlbum(id: result.albumID, destination: target)
-                target = .existing(id: result.albumID, title: target.title)
+                target = .existing(id: result.albumID, title: target.title); inventoryAlbumID = result.albumID
                 records[records.count - 1].photosID = result.assetID
                 try history.save(records, scope: remote.scope)
                 setCanRecheck(true, id: asset.id)
@@ -868,6 +1040,7 @@ enum PFOriginalResourceSelection {
                 try completeFollow(asset, scope: remote.scope, destinationID: result.albumID)
                 markImported(asset.id); done += 1
             }
+            lastImportSucceeded = done == selected.count
             statusMessage = M("\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados.")
         } catch { statusMessage = PFMessage.error(error) + M(" Importação interrompida; confira os itens e o histórico antes de repetir.") }
     }

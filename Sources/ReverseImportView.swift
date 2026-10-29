@@ -33,6 +33,14 @@ struct PFReverseImportView: View {
                 }
             }
             sourceControls
+            if model.comparedPhotosDestination {
+                Text(L("\(model.existingPhotosCount) originais já presentes no álbum do Fotos ficaram fora da fila."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if model.existingPhotosConflicts > 0 {
+                    Label(L("\(model.existingPhotosConflicts) originais existentes precisam de revisão de metadados."), systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+            }
             selectionHeader
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
@@ -94,7 +102,7 @@ struct PFReverseImportView: View {
                                     originalVerificationControls
                                     Text(L("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados."))
                                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                                    Text(L("O histórico evita repetir importações feitas pelo Ponte Fotos. Ele não compara toda a biblioteca existente do Fotos. Pessoas reconhecidas e histórico de edições não são transferidos."))
+                                    Text(L("Álbuns de destino existentes são comparados pelos bytes dos originais, inclusive imagem e vídeo de Live Photos. A consulta pode baixar originais do iCloud. Só cópias com data, localização e tipo conferidos ficam fora da fila; divergências exigem revisão. Pessoas reconhecidas e histórico de edições não são transferidos."))
                                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -123,12 +131,15 @@ struct PFReverseImportView: View {
                 if let date = link.lastChecked {
                     Text(L("Última consulta: \(PFLocalization.formatDate(date, date: .abbreviated, time: .shortened))")).font(.caption).foregroundStyle(.secondary)
                 }
-                Button(L("Parar acompanhamento")) { model.stopFollowing() }.disabled(working)
+                Button(L("Parar acompanhamento")) {
+                    for link in model.followedAlbums where link.albumID == model.albumID { connection.stopAutomaticPair(photosID: link.destinationID, immichID: link.albumID) }
+                    model.stopFollowing()
+                }.disabled(working)
             } else {
                 Button(L("Acompanhar este álbum")) { model.startFollowing() }
                     .disabled(working || !connectionReady || model.albumID.isEmpty || model.destinationMode != .existing || !model.isDestinationValid)
             }
-            Text(L("Vincule um álbum existente do Fotos. A consulta é manual; todos os itens ainda não concluídos entram na revisão, inclusive os já existentes na primeira consulta. Nada é importado automaticamente."))
+            Text(L("Vincule um álbum existente do Fotos. A consulta manual também compara originais já presentes no destino, mesmo sem histórico do app. Cópias exatas com metadados conferidos ficam fora da fila. Nada é importado automaticamente."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }
