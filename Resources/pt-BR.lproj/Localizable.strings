@@ -727,3 +727,19 @@
 "Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente." = "Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente.";
 "O nome ou nascimento da pessoa mudou; consulte novamente." = "O nome ou nascimento da pessoa mudou; consulte novamente.";
 "A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente." = "A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente.";
+
+"Conferir originais por hash após importar" = "Conferir originais por hash após importar";
+
+"Reexporta temporariamente o original armazenado no Fotos e compara com o Immich. Live Photos conferem imagem e vídeo. Pode baixar originais do iCloud e levar mais tempo. Falhas ficam pendentes; nada é apagado. Não verifica reprodução HDR nem aparência de edições." = "Reexporta temporariamente o original armazenado no Fotos e compara com o Immich. Live Photos conferem imagem e vídeo. Pode baixar originais do iCloud e levar mais tempo. Falhas ficam pendentes; nada é apagado. Não verifica reprodução HDR nem aparência de edições.";
+
+"Conferência dos originais por hash ativada" = "Conferência dos originais por hash ativada";
+
+"Metadados e bytes dos originais reexportados conferidos no Fotos. A reprodução HDR não foi conferida." = "Metadados e bytes dos originais reexportados conferidos no Fotos. A reprodução HDR não foi conferida.";
+
+"Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente." = "Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente.";
+
+"Os recursos originais no Fotos estão ausentes ou são ambíguos." = "Os recursos originais no Fotos estão ausentes ou são ambíguos.";
+
+"Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente." = "Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente.";
+
+"Reexportando e conferindo os originais no Fotos…" = "Reexportando e conferindo os originais no Fotos…";
