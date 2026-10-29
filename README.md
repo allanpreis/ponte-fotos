@@ -15,6 +15,12 @@ A native macOS app that connects Apple Photos and Immich in both directions. Upl
 
 **Version: 1.1.1 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
+## App overview
+
+https://github.com/user-attachments/assets/918e75f9-a9e3-4c1d-9eb0-bb8c1a689588
+
+*2 min 15 s · English · Illustrative overview of version 1.1.1. Upcoming features are explicitly marked as planned.*
+
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. Installation and usage instructions are also available in the [Portuguese README](README.pt-BR.md).
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
