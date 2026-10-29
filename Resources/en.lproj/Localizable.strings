@@ -727,3 +727,19 @@
 "Confira o nome e a data de nascimento da pessoa no Immich e consulte novamente." = "Check the person’s name and birth date in Immich, then search again.";
 "O nome ou nascimento da pessoa mudou; consulte novamente." = "The person’s name or birth date changed; search again.";
 "A origem escolhida não está mais disponível. Atualize os álbuns e consulte novamente." = "The selected source is no longer available. Refresh the albums and search again.";
+
+"Conferir originais por hash após importar" = "Verify original hashes after import";
+
+"Reexporta temporariamente o original armazenado no Fotos e compara com o Immich. Live Photos conferem imagem e vídeo. Pode baixar originais do iCloud e levar mais tempo. Falhas ficam pendentes; nada é apagado. Não verifica reprodução HDR nem aparência de edições." = "Temporarily re-exports the original stored in Photos and compares it with Immich. Live Photos verify both image and video. This may download iCloud originals and take longer. Failures stay pending; nothing is deleted. HDR playback and the appearance of edits are not verified.";
+
+"Conferência dos originais por hash ativada" = "Original hash verification enabled";
+
+"Metadados e bytes dos originais reexportados conferidos no Fotos. A reprodução HDR não foi conferida." = "Metadata and re-exported original bytes verified in Photos. HDR playback was not verified.";
+
+"Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente." = "Could not verify the original bytes in Photos. The item remains pending.";
+
+"Os recursos originais no Fotos estão ausentes ou são ambíguos." = "Original resources in Photos are missing or ambiguous.";
+
+"Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente." = "The bytes re-exported from Photos do not match the Immich original. The item remains pending.";
+
+"Reexportando e conferindo os originais no Fotos…" = "Re-exporting and verifying originals in Photos…";
