@@ -755,3 +755,51 @@
 "O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente." = "O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente.";
 
 "O Fotos retornou um original vazio. A preparação foi interrompida." = "O Fotos retornou um original vazio. A preparação foi interrompida.";
+
+"O Fotos ficou 15 minutos sem entregar dados nem progresso. A preparação foi interrompida; confira o original no Fotos e tente novamente." = "O Fotos ficou 15 minutos sem entregar dados nem progresso. A preparação foi interrompida; confira o original no Fotos e tente novamente.";
+
+"Fotos/iCloud sem avanço há 2 minutos. Continuamos aguardando; você pode pausar." = "Fotos/iCloud sem avanço há 2 minutos. Continuamos aguardando; você pode pausar.";
+
+"Preparando originais…" = "Preparando originais…";
+
+"Originais prontos. Volte ao envio para conferir e confirmar." = "Originais prontos. Volte ao envio para conferir e confirmar.";
+
+"Preparação cancelada." = "Preparação cancelada.";
+
+"Conta, seleção ou destino mudou. Volte à operação preparada ou descarte o preparo." = "Conta, seleção ou destino mudou. Volte à operação preparada ou descarte o preparo.";
+
+"A revisão mudou durante a preparação. Descarte o preparo e prepare novamente." = "A revisão mudou durante a preparação. Descarte o preparo e prepare novamente.";
+
+"Selecione a conexão original para voltar ao envio preparado." = "Selecione a conexão original para voltar ao envio preparado.";
+
+"Selecione e valide a conta original para voltar ao envio preparado." = "Selecione e valide a conta original para voltar ao envio preparado.";
+
+"Preparo recuperado. Confira o destino e confirme o envio." = "Preparo recuperado. Confira o destino e confirme o envio.";
+
+"O álbum preparado não está disponível para edição nesta conta." = "O álbum preparado não está disponível para edição nesta conta.";
+
+"Preparar em segundo plano" = "Preparar em segundo plano";
+
+"Um original ou arquivo preparado mudou. Descarte o preparo e prepare novamente." = "Um original ou arquivo preparado mudou. Descarte o preparo e prepare novamente.";
+
+"Originais prontos para enviar" = "Originais prontos para enviar";
+
+"Preparação em segundo plano" = "Preparação em segundo plano";
+
+"Ver preparo" = "Ver preparo";
+
+"%@ de %@ itens preparados" = "%@ de %@ itens preparados";
+
+"espaço temporário usado" = "espaço temporário usado";
+
+"Você pode fechar este painel e usar o app. Mantenha o app aberto. O envio só começa após sua confirmação." = "Você pode fechar este painel e usar o app. Mantenha o app aberto. O envio só começa após sua confirmação.";
+
+"Descartar preparo" = "Descartar preparo";
+
+"Cancelar preparo" = "Cancelar preparo";
+
+"Voltar ao envio" = "Voltar ao envio";
+
+"Conta: %@" = "Conta: %@";
+
+"espaço dos itens preparados" = "espaço dos itens preparados";
