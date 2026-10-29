@@ -25,12 +25,16 @@ struct PFReverseItem: Identifiable, Equatable {
     var selectable: Bool { issue == nil }
 }
 
-// This verifies PhotoKit metadata, not exported original bytes or HDR playback.
+// Metadata and optional original-byte checks are distinct; neither certifies HDR playback.
 struct PFImportVerification: Equatable {
     let problems: [PFMessage]
+    var originalsVerified = false
     var isVerified: Bool { problems.isEmpty }
     var summary: PFMessage {
-        isVerified ? M("Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos.") : PFMessage.joined(problems, separator: " ")
+        guard isVerified else { return PFMessage.joined(problems, separator: " ") }
+        return originalsVerified
+            ? M("Metadados e bytes dos originais reexportados conferidos no Fotos. A reprodução HDR não foi conferida.")
+            : M("Presença, data, localização e tipo Live Photo conferidos no Fotos. O conteúdo do original e a reprodução HDR não foram conferidos.")
     }
     static func evaluate(expected: PFReverseItem, present: Bool, date: Date?, latitude: Double?, longitude: Double?, isLive: Bool) -> Self {
         guard present else { return Self(problems: [M("O item criado não foi encontrado no Fotos.")]) }
@@ -149,6 +153,8 @@ struct PFReverseRecord: Codable, Equatable {
     var photosID: String?
     var pending: Bool
     var pairSignature: String? = nil
+    var originalVerificationRequired: Bool? = nil
+    var originalsVerified: Bool? = nil
 }
 protocol PFReverseHistory {
     func load(scope: String) throws -> [PFReverseRecord]
@@ -217,6 +223,7 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func exists(_ id: String) -> Bool
     func contains(id: String, albumID: String) -> Bool
     func verify(id: String, asset: PFReverseAsset) async throws -> PFImportVerification
+    func verifyOriginals(id: String, asset: PFReverseAsset) async throws
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws
     func listAlbums() async throws -> [PFPhotosAlbum]
     func prepareDestination(_ destination: PFPhotosDestination) throws
@@ -224,6 +231,9 @@ struct PFPhotosImportResult { let assetID: String; let albumID: String }
     func create(asset: PFReverseAsset, original: URL, paired: URL?, destination: PFPhotosDestination) async throws -> PFPhotosImportResult
 }
 extension PFReversePhotos {
+    func verifyOriginals(id: String, asset: PFReverseAsset) async throws {
+        throw BridgeError(message: M("Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente."))
+    }
     // Unknown membership must stay in the review queue.
     func contains(id: String, albumID: String) -> Bool { false }
 }
@@ -246,6 +256,26 @@ enum PFPhotosAuthorization {
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout) {
                 gate.finish(.failure(BridgeError(message: M("O macOS não respondeu ao pedido de acesso ao Fotos. Confira Privacidade e Segurança → Fotos e tente novamente."))))
             }
+        }
+    }
+}
+// Only original resource roles are candidates; rendered/adjusted resources never
+// substitute for a missing original. RAW alternatives are ambiguous in this flow.
+enum PFOriginalResourceSelection {
+    static func indices(types: [PHAssetResourceType], assetType: String, isLive: Bool) throws -> [Int] {
+        let wanted: [PHAssetResourceType]
+        if isLive, assetType == "IMAGE" { wanted = [.photo, .pairedVideo] }
+        else if !isLive, assetType == "IMAGE" { wanted = [.photo] }
+        else if !isLive, assetType == "VIDEO" { wanted = [.video] }
+        else { throw BridgeError(message: M("Os recursos originais no Fotos estão ausentes ou são ambíguos.")) }
+        let originals: Set<PHAssetResourceType> = [.photo, .video, .pairedVideo, .alternatePhoto]
+        guard types.filter({ originals.contains($0) }).count == wanted.count else {
+            throw BridgeError(message: M("Os recursos originais no Fotos estão ausentes ou são ambíguos."))
+        }
+        return try wanted.map { role in
+            let matching = types.indices.filter { types[$0] == role }
+            guard matching.count == 1 else { throw BridgeError(message: M("Os recursos originais no Fotos estão ausentes ou são ambíguos.")) }
+            return matching[0]
         }
     }
 }
@@ -284,6 +314,53 @@ enum PFPhotosAuthorization {
             if attempt < 2 { try await Task.sleep(nanoseconds: 500_000_000) }
         }
         return .evaluate(expected: asset.item, present: false, date: nil, latitude: nil, longitude: nil, isLive: false)
+    }
+    func verifyOriginals(id: String, asset: PFReverseAsset) async throws {
+        try Task.checkCancellation()
+        guard canRead, let found = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else {
+            throw BridgeError(message: M("O item criado não foi encontrado no Fotos."))
+        }
+        guard PFReverseAsset.validChecksum(asset.checksum) else {
+            throw BridgeError(message: M("Checksum original ausente ou inválido."))
+        }
+        let resources = PHAssetResource.assetResources(for: found)
+        let indices = try PFOriginalResourceSelection.indices(types: resources.map(\.type), assetType: asset.type, isLive: asset.livePhotoVideoId != nil)
+        let checksums: [String]
+        if asset.livePhotoVideoId != nil {
+            guard let paired = asset.pairedChecksum, PFReverseAsset.validChecksum(paired) else {
+                throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
+            }
+            checksums = [asset.checksum, paired]
+        } else { checksums = [asset.checksum] }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ponte-original-check-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: directory) }
+        for (offset, index) in indices.enumerated() {
+            try Task.checkCancellation()
+            let file = directory.appendingPathComponent("resource-\(offset)")
+            let options = PHAssetResourceRequestOptions(); options.isNetworkAccessAllowed = true
+            // writeData has no cancellable request ID. Await completion before
+            // cleaning the private directory, even when the surrounding task stops.
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().writeData(for: resources[index], toFile: file, options: options) { error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume() }
+                }
+            }
+            try Task.checkCancellation()
+            let expected = checksums[offset]
+            let hashTask = Task.detached(priority: .utility) { try ImmichClient.checksum(file) }
+            let actual: String
+            do {
+                actual = try await withTaskCancellationHandler(operation: { try await hashTask.value }, onCancel: { hashTask.cancel() })
+            }
+            catch is CancellationError { throw CancellationError() }
+            catch { throw BridgeError(message: M("Não foi possível conferir os bytes dos originais no Fotos. O item permanece pendente.")) }
+            let hex = Data(base64Encoded: actual)?.map { String(format: "%02x", $0) }.joined()
+            guard actual == expected || hex == expected.lowercased() else {
+                throw BridgeError(message: M("Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente."))
+            }
+        }
     }
     func validate(asset: PFReverseAsset, original: URL, paired: URL?) async throws {
         if let paired {
@@ -382,6 +459,7 @@ enum PFPhotosAuthorization {
     @Published var albums: [IMAlbum] = []
     @Published var items: [PFReverseItem] = []
     @Published var selection = Set<String>()
+    @Published var verifyOriginalBytes = false
     @Published var albumID = "" {
         didSet {
             if albumID != oldValue && !importing { generation = UUID(); items = []; selection = []; assets = [:]; reviewFollowID = nil; restoreFollowDestination() }
@@ -584,14 +662,29 @@ enum PFPhotosAuthorization {
             let records = try history.load(scope: remote.scope)
             guard let pending = records.last(where: { $0.assetID == id && $0.pending }),
                   let photosID = pending.photosID, !photosID.isEmpty else { return }
-            let asset = try await remote.asset(id)
+            var asset = try await remote.asset(id)
+            if let videoID = asset.livePhotoVideoId {
+                let video = try await remote.asset(videoID)
+                guard video.id == videoID, video.type == "VIDEO", video.isOffline != true, video.isTrashed != true, PFReverseAsset.validChecksum(video.checksum) else {
+                    throw BridgeError(message: M("Vídeo da Live Photo indisponível."))
+                }
+                asset.pairedChecksum = video.checksum
+            } else { asset.pairedChecksum = nil }
             guard token == generation else { return }
-            guard asset.id == id, asset.item.selectable, asset.checksum == pending.checksum else {
+            guard asset.id == id, asset.item.selectable, asset.checksum == pending.checksum,
+                  (asset.livePhotoVideoId == nil && pending.pairSignature == nil) || pending.pairSignature == followFingerprint(asset) else {
                 throw BridgeError(message: M("O original ou seus metadados mudaram. Consulte o álbum novamente antes de importar."))
             }
             try await photos.authorize()
             guard token == generation else { return }
-            let report = try await photos.verify(id: photosID, asset: asset)
+            let requiresOriginals = verifyOriginalBytes || pending.originalVerificationRequired == true
+            if requiresOriginals {
+                var intent = records
+                guard let index = intent.lastIndex(where: { $0 == pending }) else { return }
+                intent[index].originalVerificationRequired = true; intent[index].originalsVerified = false
+                try history.save(intent, scope: remote.scope)
+            }
+            let report = try await verifyImported(id: photosID, asset: asset, originals: requiresOriginals, generation: token)
             guard token == generation else { return }
             recordVerification(report, id: id)
             guard report.isVerified else { statusMessage = report.summary; return }
@@ -599,6 +692,7 @@ enum PFPhotosAuthorization {
             var current = try history.load(scope: remote.scope)
             guard let index = current.lastIndex(where: { $0.assetID == id && $0.pending && $0.photosID == photosID && $0.checksum == pending.checksum }) else { return }
             current[index].pending = false
+            if requiresOriginals { current[index].originalVerificationRequired = true; current[index].originalsVerified = report.originalsVerified }
             try history.save(current, scope: remote.scope)
             if let row = items.firstIndex(where: { $0.id == id }) {
                 items[row].issue = nil; items[row].localizedIssue = nil; items[row].canRecheck = false
@@ -658,6 +752,7 @@ enum PFPhotosAuthorization {
         }
         importing = true; cancellationRequested = false; pauseAfterItem = false; showConfirmation = false; done = 0; total = selected.count
         let token = generation
+        let verifyBytes = verifyOriginalBytes
         defer {
             importing = false
             if pauseAfterItem { invalidateConnection(preservingProgress: true) }
@@ -698,8 +793,14 @@ enum PFPhotosAuthorization {
                         }
                     }
                     if cancellationRequested || generation != token { return }
+                    let requiresOriginals = verifyBytes || previous.originalVerificationRequired == true
+                    if requiresOriginals, let index = records.lastIndex(where: { $0.assetID == asset.id && $0.photosID == id }) {
+                        records[index].pending = true
+                        records[index].originalVerificationRequired = true; records[index].originalsVerified = false
+                        try history.save(records, scope: remote.scope)
+                    }
                     let verification: PFImportVerification
-                    do { verification = try await photos.verify(id: id, asset: asset) }
+                    do { verification = try await verifyImported(id: id, asset: asset, originals: requiresOriginals, generation: token) }
                     catch {
                         let report = PFImportVerification(problems: [M("Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir.")])
                         recordVerification(report, id: asset.id)
@@ -714,6 +815,10 @@ enum PFPhotosAuthorization {
                         try history.save(records, scope: remote.scope)
                         setCanRecheck(true, id: asset.id)
                         throw BridgeError(message: verification.summary)
+                    }
+                    if requiresOriginals, let index = records.lastIndex(where: { $0.assetID == asset.id && $0.photosID == id }) {
+                        records[index].pending = false; records[index].originalsVerified = verification.originalsVerified
+                        try history.save(records, scope: remote.scope)
                     }
                     if cancellationRequested || generation != token { return }
                     let albumID = try await photos.addExisting(id: id, destination: target)
@@ -739,7 +844,7 @@ enum PFPhotosAuthorization {
                 if cancellationRequested || generation != token { statusMessage = M("Importação interrompida antes de gravar no Fotos."); return }
                 // Persist intent BEFORE PhotoKit. Crashes/ambiguous errors must never trigger blind retries.
                 records.removeAll { $0.assetID == asset.id }
-                records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true, pairSignature: asset.livePhotoVideoId == nil ? nil : followFingerprint(asset)))
+                records.append(PFReverseRecord(assetID: asset.id, checksum: asset.checksum, photosID: nil, pending: true, pairSignature: asset.livePhotoVideoId == nil ? nil : followFingerprint(asset), originalVerificationRequired: verifyBytes ? true : nil, originalsVerified: verifyBytes ? false : nil))
                 try history.save(records, scope: remote.scope)
                 let result = try await photos.create(asset: asset, original: file, paired: paired, destination: target)
                 rememberResolvedAlbum(id: result.albumID, destination: target)
@@ -748,7 +853,7 @@ enum PFPhotosAuthorization {
                 try history.save(records, scope: remote.scope)
                 setCanRecheck(true, id: asset.id)
                 let verification: PFImportVerification
-                do { verification = try await photos.verify(id: result.assetID, asset: asset) }
+                do { verification = try await verifyImported(id: result.assetID, asset: asset, originals: verifyBytes, generation: token) }
                 catch {
                     let report = PFImportVerification(problems: [M("Não foi possível concluir a conferência no Fotos. Confira a biblioteca antes de repetir.")])
                     recordVerification(report, id: asset.id)
@@ -757,6 +862,7 @@ enum PFPhotosAuthorization {
                 recordVerification(verification, id: asset.id)
                 guard verification.isVerified else { throw BridgeError(message: verification.summary) }
                 records[records.count - 1].pending = false
+                if verifyBytes { records[records.count - 1].originalsVerified = verification.originalsVerified }
                 try history.save(records, scope: remote.scope)
                 setCanRecheck(false, id: asset.id)
                 try completeFollow(asset, scope: remote.scope, destinationID: result.albumID)
@@ -764,6 +870,18 @@ enum PFPhotosAuthorization {
             }
             statusMessage = M("\(done) itens confirmados no Fotos da Apple. Os originais do Immich foram preservados.")
         } catch { statusMessage = PFMessage.error(error) + M(" Importação interrompida; confira os itens e o histórico antes de repetir.") }
+    }
+    private func verifyImported(id: String, asset: PFReverseAsset, originals: Bool, generation token: UUID) async throws -> PFImportVerification {
+        var report = try await photos.verify(id: id, asset: asset)
+        guard token == generation else { throw CancellationError() }
+        try Task.checkCancellation()
+        guard report.isVerified, originals else { return report }
+        statusMessage = M("Reexportando e conferindo os originais no Fotos…")
+        try await photos.verifyOriginals(id: id, asset: asset)
+        guard token == generation else { throw CancellationError() }
+        try Task.checkCancellation()
+        report.originalsVerified = true
+        return report
     }
     private func setCanRecheck(_ value: Bool, id: String) {
         if let index = items.firstIndex(where: { $0.id == id }) { items[index].canRecheck = value }

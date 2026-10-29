@@ -72,6 +72,10 @@ struct PFReverseImportView: View {
                         .font(.callout).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 0)
                 }
+                if model.verifyOriginalBytes {
+                    Label(L("Conferência dos originais por hash ativada"), systemImage: "checkmark.shield")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Button(L("Destino e acompanhamento"), systemImage: "slider.horizontal.3") { ui.configuring = true }
                     .disabled(working)
                     .popover(isPresented: $ui.configuring, arrowEdge: .bottom) {
@@ -87,6 +91,7 @@ struct PFReverseImportView: View {
                                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                                     destinationControls
                                     followControls
+                                    originalVerificationControls
                                     Text(L("Originais, data de captura e localização disponível serão preservados. Live Photos precisam de um par compatível; itens sem data válida ou com recursos indisponíveis ficam bloqueados."))
                                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                                     Text(L("O histórico evita repetir importações feitas pelo Ponte Fotos. Ele não compara toda a biblioteca existente do Fotos. Pessoas reconhecidas e histórico de edições não são transferidos."))
@@ -99,6 +104,15 @@ struct PFReverseImportView: View {
             }
         }
         .onChange(of: model.items.count) { _, count in if count > 0 { ui.configuring = false } }
+    }
+
+    private var originalVerificationControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(L("Conferir originais por hash após importar"), isOn: $model.verifyOriginalBytes)
+                .disabled(working)
+            Text(L("Reexporta temporariamente o original armazenado no Fotos e compara com o Immich. Live Photos conferem imagem e vídeo. Pode baixar originais do iCloud e levar mais tempo. Falhas ficam pendentes; nada é apagado. Não verifica reprodução HDR nem aparência de edições."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var followControls: some View {
