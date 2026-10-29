@@ -13,15 +13,23 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 1.1.0 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 1.1.1 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. As instruções também estão disponíveis no [README em inglês](README.md).
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.0).
+O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.1).
 
 ## Preparação dos originais do Fotos
+
+### Vários álbuns acompanhados e menos espaço temporário
+
+Abra **Álbuns acompanhados** para selecionar vários álbuns do Fotos, definir o destino no Immich e escolher **Fotos → Immich**, **Immich → Fotos** ou **Nos dois sentidos**. Adicione grupos com destinos diferentes quando necessário. É possível consultar ou executar um par, os selecionados ou todos. **Automático** exige ativação por par e consulta a cada cinco minutos na conexão/conta atual, enquanto o app estiver aberto, inclusive com a janela fechada. Encerrar o app interrompe a execução. Vínculos assistidos antigos são migrados com o automático desligado. Parar um vínculo antigo também desativa seu par automático; pausar desliga o automático até nova ativação. Falhas, resultados pendentes e originais ambíguos impedem repetição automática desse par.
+
+A comparação lê o conteúdo real dos álbuns escolhidos e usa SHA-1 dos originais, incluindo imagem e vídeo de Live Photos, além do histórico do app. Cópias exatas com metadados conferidos ficam fora da fila; divergências exigem revisão. A primeira varredura pode baixar originais do iCloud para calcular hashes. Um cache privado guarda hashes e assinaturas de alteração, sem reter os originais; fontes alteradas são conferidas novamente. A comparação considera os álbuns vinculados, sem garantir localizar toda cópia anterior em outros lugares da biblioteca. Pessoas reconhecidas, edições e exclusões não são sincronizadas.
+
+A confirmação de envio também oferece **Enviar em segundo plano, uma mídia por vez**. Prepara, transfere, confere e remove os temporários da unidade antes da próxima. Isso evita acumular o lote inteiro. Ainda é necessário espaço para o(s) original(is), multipart e conferências da mídia atual; o Fotos pode manter seus próprios downloads do iCloud. Uma Live Photo continua sendo uma unidade completa. A opção **Preparar em segundo plano** mantém o comportamento de reter todos os originais até a confirmação manual. Importações automáticas exigem conferência dos originais por hash e têm acesso serial à biblioteca/histórico com outras transferências do app.
 
 ### Preparar originais do Fotos em segundo plano
 
@@ -33,7 +41,7 @@ A exportação informa o progresso nativo de download do iCloud e distingue expo
 
 ### Acompanhamento Fotos → Immich
 
-Escolha um álbum específico do Fotos e um álbum existente no Immich; use **Acompanhar este álbum** no card de origem. **Consultar novidades** revisa o álbum inteiro, inclusive além da primeira página, e monta uma fila sem seleção automática. Confirme o envio no diálogo existente. Somente envios completos verificados e inclusão confirmada no álbum de destino são concluídos; recursos indisponíveis, metadados alterados e falhas continuam para revisão. Checksum, proprietário e presença no álbum remoto são consultados novamente antes de omitir itens concluídos. Os vínculos persistem por perfil/conta, separados dos vínculos de importação. Nada é enviado em segundo plano.
+Escolha um álbum específico do Fotos e um álbum existente no Immich; use **Acompanhar este álbum** no card de origem. **Consultar novidades** revisa o álbum inteiro, inclusive além da primeira página, e monta uma fila sem seleção automática. Confirme o envio no diálogo existente. Somente envios completos verificados e inclusão confirmada no álbum de destino são concluídos; recursos indisponíveis, metadados alterados e falhas continuam para revisão. Checksum, proprietário e presença no álbum remoto são consultados novamente antes de omitir itens concluídos. Os vínculos persistem por perfil/conta, separados dos vínculos de importação. Esses controles assistidos exigem confirmação; o envio automático em segundo plano é configurado separadamente em **Álbuns acompanhados**.
 
 Na importação, os controles agora exibem um resumo compacto do destino. Abra **Destino e acompanhamento** para ajustar o destino ou o vínculo, deixando mais espaço para revisar as fotos. Os dois sentidos exigem revisão manual, sem comparação universal de cópias existentes ou sincronização bidirecional automática.
 
@@ -44,7 +52,7 @@ Em **Immich → Fotos**, escolha a origem e um álbum existente do Fotos, depois
 
 Somente importações confirmadas são marcadas como concluídas. Itens concluídos e inalterados saem da fila enquanto a foto conhecida ainda pertence ao álbum vinculado. Vínculos removidos do álbum, metadados alterados e resultados pendentes voltam para revisão; importações conhecidas podem ser adicionadas ao destino sem nova cópia. Um destino ausente bloqueia a importação. Parar o acompanhamento remove só o vínculo, preservando mídia e histórico. Os vínculos e comprovantes ficam localmente em `~/Library/Application Support/PonteFotos/album-follow/`, sem chaves de API.
 
-O fluxo é manual e em uma direção, sem sincronização em segundo plano, propagação de exclusões ou comparação de toda a biblioteca do Fotos. A proteção contra repetição usa o histórico conhecido pelo app; não reconhece todas as cópias preexistentes ou envios antigos com outro ID remoto. Revise os casos incertos antes de importar.
+Os controles assistidos são manuais; o menu **Álbuns acompanhados** acrescenta execução automática opcional nos sentidos escolhidos. Não há propagação de exclusões nem comparação global de toda a biblioteca. A proteção combina histórico e hashes dos originais nos álbuns escolhidos; cópias fora desses álbuns podem exigir revisão. Revise os casos incertos antes de importar.
 
 
 ## Operações grandes — concorrência limitada
@@ -53,7 +61,7 @@ O fluxo de envio prepara janelas de até oito mídias completas, com alvo flexí
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.0).
+O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.1).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -86,9 +94,9 @@ Depois de uma nova importação Immich → Fotos, o app confere presença do ite
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 1.1.0 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.1.0/Ponte-Fotos-1.1.0-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 1.1.1 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.1.1/Ponte-Fotos-1.1.1-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.0) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.1.1) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -297,7 +305,7 @@ O repositório contém o código do aplicativo, recursos de compilação, instru
 
 ## Estado do projeto
 
-A versão 1.1.0 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
+A versão 1.1.1 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distribuído sob a [licença MIT](LICENSE).
 
