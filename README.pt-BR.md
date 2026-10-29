@@ -15,6 +15,12 @@ Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois se
 
 **Versão: 1.1.1 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
+## Apresentação do app
+
+https://github.com/user-attachments/assets/e9490030-9763-4649-816b-bcbed6b451e4
+
+*2min15s · Português · Apresentação ilustrativa da versão 1.1.1. Funcionalidades futuras estão identificadas como planejadas.*
+
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. As instruções também estão disponíveis no [README em inglês](README.md).
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
