@@ -13,13 +13,13 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 1.0.6 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 1.0.7 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. Installation and usage instructions are also available in the [Portuguese README](README.pt-BR.md).
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
+The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
 
 ### Photos → Immich tracking
 
@@ -43,7 +43,7 @@ The upload pipeline prepares small windows of up to eight complete media items w
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
+The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
 
 ## Transfer accounts and connection availability
 
@@ -71,13 +71,13 @@ Photos previously imported by the app can be selected and added to another album
 
 Use the info button beside a source item to inspect its original locally. Inspection reports the format, local preview availability, available colour properties and PQ/HLG video signalling. JXL files are included in folder scans, but recognition or a working preview does not establish Photos import support. Inspecting Photos resources may download temporary originals from iCloud according to the access setting. Temporary copies are removed afterwards. HDR image gain maps, Dolby Vision and slow-motion editing behaviour are not validated.
 
-After a new Immich → Photos import, the app checks that the created item is visible and that its capture date, available location and Live Photo subtype match the source. A mismatch or inconclusive result keeps the history pending and blocks repeat imports until the library is checked. Previously imported items are checked before being added to another album. These checks do not re-export or compare the original stored in Photos, and do not validate HDR playback.
+After a new Immich → Photos import, the app checks that the created item is visible and that its capture date, available location and Live Photo subtype match the source. A mismatch or inconclusive result keeps the history pending and blocks repeat imports until the library is checked. Previously imported items are checked before being added to another album. Enable **Verify original hashes after import** in **Destination and tracking** to temporarily re-export the original stored in Photos and compare its SHA-1 with Immich. Live Photos require both image and video to match. This optional check may download originals from iCloud and take additional time. A mismatch or export failure keeps the known Photos item pending for rechecking, even if the option is later disabled; it never creates a replacement copy. Metadata-only checks remain the default. Neither check validates HDR playback or the appearance of edits.
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 1.0.6 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.6/Ponte-Fotos-1.0.6-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 1.0.7 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.7/Ponte-Fotos-1.0.7-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
@@ -286,7 +286,7 @@ The repository contains the application source, build resources, usage instructi
 
 ## Project status
 
-Version 1.0.6 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
+Version 1.0.7 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
 This is an independent project with no official affiliation with Apple or Immich. Licensed under the [MIT License](LICENSE).
 

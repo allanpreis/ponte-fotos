@@ -13,13 +13,13 @@
 
 Aplicativo nativo para macOS que conecta o Fotos da Apple e o Immich nos dois sentidos. Envie originais do Fotos ou de pastas para o Immich, importe álbuns do Immich para o Fotos e revise data e localização. Também oferece ferramentas para organizar a biblioteca do servidor.
 
-**Versão: 1.0.6 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
+**Versão: 1.0.7 · macOS 14 ou superior · Apple Silicon · Immich 3.x**
 
 **Idiomas:** o aplicativo oferece português (Brasil) e inglês. Por padrão, acompanha o idioma do macOS e usa inglês para outros idiomas. Em **Configurações → Aparência → Idioma do aplicativo**, escolha **Sistema**, **English** ou **Português (Brasil)**. Na primeira abertura, **Sistema** vem selecionado. A mudança é imediata e a preferência fica salva. As instruções também estão disponíveis no [README em inglês](README.md).
 
 O aplicativo é escrito em Swift e SwiftUI, usa os frameworks do macOS e não depende de serviços de nuvem próprios, Node.js, Docker ou pacotes Swift externos. Um servidor Immich é necessário para conexão, envio, importação e gestão; exportação local e revisão de arquivos podem ser usadas sem ele.
 
-O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
+O app reúne transferências por conta, escolha de URL por disponibilidade, diagnóstico de mídia e conferência de metadados após importar. Informa formato, disponibilidade de prévia, propriedades de cor das imagens e sinalização PQ/HLG dos vídeos, sem tratar esses dados como comprovação de compatibilidade HDR completa. Os buffers temporários permanecem limitados durante o cálculo de hash e a preparação de originais grandes. [Notas da versão](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
 
 ### Acompanhamento Fotos → Immich
 
@@ -43,7 +43,7 @@ O fluxo de envio prepara janelas de até oito mídias completas, com alvo flexí
 
 Os contadores distinguem itens conferidos, recursos novos enviados e recursos reutilizados. Medições locais por fase apoiam a próxima otimização; não são telemetria de banda. Mudanças de rede e falhas pausam entre mídias completas, sem repetir automaticamente o lote. O indicador superior mostra apenas **URL local** ou **URL remota**, mantendo o diagnóstico nas configurações.
 
-O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6).
+O agendador processa no máximo duas mídias completas por vez. Itens que compartilham o hash de algum recurso são processados separadamente; unidades com mais de 16 MiB de conteúdo multipart preparado são exclusivas. A pausa aguarda os itens ativos, incluindo todos os recursos Live, antes de parar. O progresso conta unidades concluídas, mesmo fora de ordem. Linhas repetidas de uma mesma origem são agendadas uma vez por identidade. Esses limites não prometem ganho real de velocidade. A previsão de tamanho de todo o lote PhotoKit e a validação grande de vazão/memória em servidor real continuam limitadas. [Validação e limites](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
 
 ## Contas por transferência e conexão por disponibilidade
 
@@ -72,13 +72,13 @@ Fotos já importadas pelo app podem ser selecionadas e adicionadas a outro álbu
 
 Use o botão de informação ao lado de um item de origem para inspecionar o original localmente. O diagnóstico informa formato, disponibilidade de prévia local, propriedades de cor disponíveis e sinalização PQ/HLG de vídeos. Arquivos JXL entram na busca em pastas, mas reconhecimento ou prévia funcional não comprovam suporte à importação no Fotos. Inspecionar recursos do Fotos pode baixar originais temporários do iCloud conforme a opção de acesso; as cópias temporárias são removidas ao terminar. Gain maps de imagens HDR, Dolby Vision e comportamento das edições de câmera lenta não são validados.
 
-Depois de uma nova importação Immich → Fotos, o app confere presença do item criado, data de captura, localização disponível e subtipo Live Photo. Divergências ou resultados inconclusivos mantêm o histórico pendente e bloqueiam novas tentativas até conferir a biblioteca. Itens previamente importados são conferidos antes de adicioná-los a outro álbum. Essa conferência não reexporta nem compara o original armazenado no Fotos e não valida reprodução HDR.
+Depois de uma nova importação Immich → Fotos, o app confere presença do item criado, data de captura, localização disponível e subtipo Live Photo. Divergências ou resultados inconclusivos mantêm o histórico pendente e bloqueiam novas tentativas até conferir a biblioteca. Itens previamente importados são conferidos antes de adicioná-los a outro álbum. Ative **Conferir originais por hash após importar** em **Destino e acompanhamento** para reexportar temporariamente o original armazenado no Fotos e comparar seu SHA-1 com o Immich. Live Photos exigem imagem e vídeo iguais. A conferência opcional pode baixar originais do iCloud e levar mais tempo. Divergência ou falha de exportação mantém o item conhecido pendente para reconferência, mesmo se a opção for desligada depois; nunca cria uma cópia substituta. A conferência apenas de metadados continua como padrão. Nenhuma das conferências valida reprodução HDR ou aparência das edições.
 
 ## 📦 Instalar pela release
 
-Baixe o [Ponte Fotos 1.0.6 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.6/Ponte-Fotos-1.0.6-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
+Baixe o [Ponte Fotos 1.0.7 para Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.7/Ponte-Fotos-1.0.7-arm64.zip), extraia e mova **Ponte Fotos.app** para a pasta Aplicativos do seu usuário. Encerre a versão anterior antes de substituir. O pacote tem assinatura local ad hoc; ainda não possui Developer ID nem notarização. Não é necessário desativar proteções do macOS.
 
-[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.6) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release e arquivos](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7) · [📝 Histórico de versões](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Visual e configurações
 
@@ -287,7 +287,7 @@ O repositório contém o código do aplicativo, recursos de compilação, instru
 
 ## Estado do projeto
 
-A versão 1.0.6 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
+A versão 1.0.7 consolida os fluxos atuais, com assinatura local e testes automatizados. O workflow do GitHub confere compilação, metadados do bundle, assinatura e arquitetura arm64; os testes de comportamento são executados separadamente. O número da versão não certifica os cenários ainda não validados descritos acima. Faça backup da biblioteca e do servidor e comece com lotes pequenos antes de usar ferramentas que alteram vínculos ou enviam cópias à lixeira.
 
 Este é um projeto independente, sem vínculo oficial com Apple ou Immich. Distribuído sob a [licença MIT](LICENSE).
 
