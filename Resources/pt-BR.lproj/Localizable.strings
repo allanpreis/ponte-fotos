@@ -803,3 +803,87 @@
 "Conta: %@" = "Conta: %@";
 
 "espaço dos itens preparados" = "espaço dos itens preparados";
+
+"%@ itens ausentes ou pendentes; %@ cópias conferidas por conteúdo. Nada foi enviado automaticamente." = "%@ itens ausentes ou pendentes; %@ cópias conferidas por conteúdo. Nada foi enviado automaticamente.";
+
+"%@ originais existentes precisam de revisão de metadados." = "%@ originais existentes precisam de revisão de metadados.";
+
+"%@ originais já presentes no álbum do Fotos ficaram fora da fila." = "%@ originais já presentes no álbum do Fotos ficaram fora da fila.";
+
+"A conexão ou conta mudou. O acompanhamento foi pausado." = "A conexão ou conta mudou. O acompanhamento foi pausado.";
+
+"Adicionar álbuns selecionados" = "Adicionar álbuns selecionados";
+
+"As mídias ausentes serão enviadas ou importadas somente nos pares e sentidos selecionados. Os originais serão preservados. Resultados pendentes interrompem o automático desse par." = "As mídias ausentes serão enviadas ou importadas somente nos pares e sentidos selecionados. Os originais serão preservados. Resultados pendentes interrompem o automático desse par.";
+
+"Conclua ou pause a outra transferência e valide a conta antes de acompanhar álbuns." = "Conclua ou pause a outra transferência e valide a conta antes de acompanhar álbuns.";
+
+"Conferindo original do Fotos: %@ · %@%" = "Conferindo original do Fotos: %@ · %@%";
+
+"Conferindo álbum do Fotos: %@ de %@…" = "Conferindo álbum do Fotos: %@ de %@…";
+
+"Consulta concluída: %@. Nenhuma mídia transferida." = "Consulta concluída: %@. Nenhuma mídia transferida.";
+
+"Consultando o par de álbuns: %@ ↔ %@…" = "Consultando o par de álbuns: %@ ↔ %@…";
+
+"Consultar selecionados" = "Consultar selecionados";
+
+"Enviar em segundo plano, uma mídia por vez" = "Enviar em segundo plano, uma mídia por vez";
+
+"Escolha os álbuns do Fotos, o destino no Immich e o sentido. O automático transfere os itens ausentes a cada 5 minutos, enquanto o app estiver aberto. Não propaga exclusões." = "Escolha os álbuns do Fotos, o destino no Immich e o sentido. O automático transfere os itens ausentes a cada 5 minutos, enquanto o app estiver aberto. Não propaga exclusões.";
+
+"Escolha álbuns do Fotos e seus destinos no Immich." = "Escolha álbuns do Fotos e seus destinos no Immich.";
+
+"Executar" = "Executar";
+
+"Executar os acompanhamentos selecionados?" = "Executar os acompanhamentos selecionados?";
+
+"Executar selecionados" = "Executar selecionados";
+
+"Executar todos" = "Executar todos";
+
+"Há itens bloqueados no álbum. Confira a comparação antes de ativar o automático." = "Há itens bloqueados no álbum. Confira a comparação antes de ativar o automático.";
+
+"Há itens com falha ou conferência pendente. O automático deste par foi pausado para revisão." = "Há itens com falha ou conferência pendente. O automático deste par foi pausado para revisão.";
+
+"Nos dois sentidos" = "Nos dois sentidos";
+
+"O destino no Fotos mudou. Consulte os itens novamente para comparar os originais." = "O destino no Fotos mudou. Consulte os itens novamente para comparar os originais.";
+
+"O original já existe no álbum do Fotos, mas a data ou localização difere. Confira esse item antes de importar; nenhuma nova cópia será criada." = "O original já existe no álbum do Fotos, mas a data ou localização difere. Confira esse item antes de importar; nenhuma nova cópia será criada.";
+
+"O álbum contém originais ambíguos ou incompletos. A comparação por hash não foi concluída." = "O álbum contém originais ambíguos ou incompletos. A comparação por hash não foi concluída.";
+
+"O álbum de destino do Fotos não está disponível. Atualize a lista antes de continuar." = "O álbum de destino do Fotos não está disponível. Atualize a lista antes de continuar.";
+
+"O álbum do Fotos está indisponível para comparar os originais." = "O álbum do Fotos está indisponível para comparar os originais.";
+
+"O álbum ou os originais do Fotos mudaram durante a comparação. Consulte novamente." = "O álbum ou os originais do Fotos mudaram durante a comparação. Consulte novamente.";
+
+"Par de álbuns concluído: %@." = "Par de álbuns concluído: %@.";
+
+"Pausa solicitada. Envios param entre mídias; preparos locais podem ser cancelados." = "Pausa solicitada. Envios param entre mídias; preparos locais podem ser cancelados.";
+
+"Pausar" = "Pausar";
+
+"Pausar após a mídia atual" = "Pausar após a mídia atual";
+
+"Pause o acompanhamento antes de alterar revisões." = "Pause o acompanhamento antes de alterar revisões.";
+
+"Remover" = "Remover";
+
+"Sentido" = "Sentido";
+
+"Transferir itens ausentes" = "Transferir itens ausentes";
+
+"Uma mídia completa por vez. Ainda é necessário espaço para os originais da mídia atual e seu envio. O Fotos pode manter seus próprios downloads do iCloud. Cópias iguais são comparadas por hash; divergências ficam para revisão." = "Uma mídia completa por vez. Ainda é necessário espaço para os originais da mídia atual e seu envio. O Fotos pode manter seus próprios downloads do iCloud. Cópias iguais são comparadas por hash; divergências ficam para revisão.";
+
+"Ver acompanhamentos" = "Ver acompanhamentos";
+
+"Vincule um álbum existente do Fotos. A consulta manual também compara originais já presentes no destino, mesmo sem histórico do app. Cópias exatas com metadados conferidos ficam fora da fila. Nada é importado automaticamente." = "Vincule um álbum existente do Fotos. A consulta manual também compara originais já presentes no destino, mesmo sem histórico do app. Cópias exatas com metadados conferidos ficam fora da fila. Nada é importado automaticamente.";
+
+"Álbum Immich" = "Álbum Immich";
+
+"Álbuns acompanhados" = "Álbuns acompanhados";
+
+"Álbuns de destino existentes são comparados pelos bytes dos originais, inclusive imagem e vídeo de Live Photos. A consulta pode baixar originais do iCloud. Só cópias com data, localização e tipo conferidos ficam fora da fila; divergências exigem revisão. Pessoas reconhecidas e histórico de edições não são transferidos." = "Álbuns de destino existentes são comparados pelos bytes dos originais, inclusive imagem e vídeo de Live Photos. A consulta pode baixar originais do iCloud. Só cópias com data, localização e tipo conferidos ficam fora da fila; divergências exigem revisão. Pessoas reconhecidas e histórico de edições não são transferidos.";
