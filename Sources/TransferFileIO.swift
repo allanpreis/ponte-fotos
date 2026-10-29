@@ -4,8 +4,9 @@ import Photos
 /// File preparation runs outside the UI actor. Originals are never modified.
 enum TransferFileIO {
     static func exportPhotosResource(_ resource: PHAssetResource, to destination: URL, allowCloud: Bool,
-                                     progress: @escaping @Sendable (Double) -> Void) async throws {
-        try await exportStream(to: destination, progress: progress) { receive, reportProgress, finish in
+                                     progress: @escaping @Sendable (Double) -> Void,
+                                     waiting: @escaping @Sendable () -> Void = {}) async throws {
+        try await exportStream(to: destination, progress: progress, waiting: waiting) { receive, reportProgress, finish in
             let manager = PHAssetResourceManager.default()
             let options = PHAssetResourceRequestOptions()
             options.isNetworkAccessAllowed = allowCloud
@@ -16,13 +17,14 @@ enum TransferFileIO {
     }
 
     // Injectable callbacks exercise stream/cancel/timeout races without a Photos library.
-    static func exportStream(to destination: URL, inactivityTimeout: TimeInterval = 120,
+    static func exportStream(to destination: URL, inactivityTimeout: TimeInterval = 900, warningAfter: TimeInterval = 120,
                              progress: @escaping @Sendable (Double) -> Void,
+                             waiting: @escaping @Sendable () -> Void = {},
                              start: (@escaping @Sendable (Data) -> Void,
                                      @escaping @Sendable (Double) -> Void,
                                      @escaping @Sendable (Error?) -> Void) -> @Sendable () -> Void) async throws {
         try Task.checkCancellation()
-        let gate = try PFPhotosExportGate(destination: destination, inactivityTimeout: inactivityTimeout, progress: progress)
+        let gate = try PFPhotosExportGate(destination: destination, inactivityTimeout: inactivityTimeout, warningAfter: warningAfter, progress: progress, waiting: waiting)
         try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 guard gate.begin(continuation) else { return }
@@ -66,7 +68,11 @@ private final class PFPhotosExportGate: @unchecked Sendable {
     private let temporary: URL
     private let destination: URL
     private let progress: @Sendable (Double) -> Void
+    private let waiting: @Sendable () -> Void
+    private var didWarn = false
+    private var capacityBytes: Int64 = 0
     private let inactivityTimeout: TimeInterval
+    private let warningAfter: TimeInterval
     private var handle: FileHandle?
     private var continuation: CheckedContinuation<Void, Error>?
     private var terminal: Result<Void, Error>?
@@ -77,11 +83,13 @@ private final class PFPhotosExportGate: @unchecked Sendable {
     private var lastProgress = 0.0
     private var receivedData = false
 
-    init(destination: URL, inactivityTimeout: TimeInterval, progress: @escaping @Sendable (Double) -> Void) throws {
-        guard inactivityTimeout.isFinite && inactivityTimeout > 0 else { throw CocoaError(.fileWriteUnknown) }
+    init(destination: URL, inactivityTimeout: TimeInterval, warningAfter: TimeInterval, progress: @escaping @Sendable (Double) -> Void, waiting: @escaping @Sendable () -> Void) throws {
+        guard inactivityTimeout.isFinite && inactivityTimeout > 0 && warningAfter.isFinite && warningAfter > 0 else { throw CocoaError(.fileWriteUnknown) }
         self.destination = destination
         self.inactivityTimeout = inactivityTimeout
+        self.warningAfter = warningAfter
         self.progress = progress
+        self.waiting = waiting
         directory = destination.deletingLastPathComponent().appendingPathComponent(".ponte-photos-" + UUID().uuidString, isDirectory: true)
         temporary = directory.appendingPathComponent("original")
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw CocoaError(.fileWriteFileExists) }
@@ -103,7 +111,7 @@ private final class PFPhotosExportGate: @unchecked Sendable {
         self.continuation = continuation
         lastActivity = ProcessInfo.processInfo.systemUptime
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
-        let interval = min(1, inactivityTimeout / 2)
+        let interval = min(1, min(inactivityTimeout, warningAfter) / 2)
         timer.schedule(deadline: .now() + interval, repeating: interval)
         timer.setEventHandler { [weak self] in self?.checkInactivity() }
         self.timer = timer
@@ -124,8 +132,17 @@ private final class PFPhotosExportGate: @unchecked Sendable {
         lock.lock()
         guard terminal == nil, let handle else { lock.unlock(); return }
         do {
+            if !data.isEmpty && (capacityBytes == 0 || capacityBytes >= 64 * 1024 * 1024) {
+                try PFUploadFileIO.checkCapacity(fileSizes: [Int64(data.count)], availableBytes: PFUploadFileIO.availableCapacity(at: directory))
+                capacityBytes = 0
+            }
             try handle.write(contentsOf: data)
-            if !data.isEmpty { receivedData = true; lastActivity = ProcessInfo.processInfo.systemUptime }
+            if !data.isEmpty {
+                capacityBytes += Int64(data.count)
+                receivedData = true
+                lastActivity = ProcessInfo.processInfo.systemUptime
+                didWarn = false
+            }
             lock.unlock()
         } catch {
             completeLocked(.failure(error), cancelRequest: true)
@@ -139,6 +156,7 @@ private final class PFPhotosExportGate: @unchecked Sendable {
         guard next > lastProgress else { lock.unlock(); return }
         lastProgress = next
         lastActivity = ProcessInfo.processInfo.systemUptime
+        didWarn = false
         lock.unlock()
         progress(next)
     }
@@ -155,8 +173,15 @@ private final class PFPhotosExportGate: @unchecked Sendable {
 
     private func checkInactivity() {
         lock.lock()
-        guard terminal == nil, ProcessInfo.processInfo.systemUptime - lastActivity >= inactivityTimeout else { lock.unlock(); return }
-        completeLocked(.failure(BridgeError(message: M("O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente."))), cancelRequest: true)
+        guard terminal == nil else { lock.unlock(); return }
+        let elapsed = ProcessInfo.processInfo.systemUptime - lastActivity
+        if elapsed >= inactivityTimeout {
+            completeLocked(.failure(BridgeError(message: M("O Fotos ficou 15 minutos sem entregar dados nem progresso. A preparação foi interrompida; confira o original no Fotos e tente novamente."))), cancelRequest: true)
+        } else if elapsed >= warningAfter && !didWarn {
+            didWarn = true
+            lock.unlock()
+            waiting()
+        } else { lock.unlock() }
     }
 
     // Caller owns the lock. Finish all file work before resuming or cancelling

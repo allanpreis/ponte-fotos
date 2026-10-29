@@ -114,6 +114,11 @@ struct AlbumItem: Identifiable {
     @Published var stopRequested = false {
         didSet { if stopRequested { photosExportTask?.cancel() } }
     }
+    @Published var backgroundPreparation: PFBackgroundPreparation?
+    @Published var showPreparation = false
+    private var backgroundPreparationTask: Task<Void, Never>?
+    private var preparationWorker: LibraryModel?
+    @Published private var resumedPreparation: PFBackgroundPreparation?
     @Published var scanning = false
     private var scanTask: Task<ExternalScanResult, Never>?
     @Published var sourceName: String? {
@@ -657,13 +662,18 @@ struct AlbumItem: Identifiable {
         statusMessage = M("Exportando original do Fotos: \(name)…")
         let cloud = allowCloud
         let task = Task { [weak self] in
-            try await TransferFileIO.exportPhotosResource(resource, to: url, allowCloud: cloud) { [weak self] fraction in
+            try await TransferFileIO.exportPhotosResource(resource, to: url, allowCloud: cloud, progress: { [weak self] fraction in
                 Task { @MainActor [weak self] in
                     guard let self, self.activeExportID == exportID, fraction > self.activeExportProgress else { return }
                     self.activeExportProgress = fraction
                     self.statusMessage = M("Baixando do iCloud: \(name) · \(Int(fraction * 100))%")
                 }
-            }
+            }, waiting: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self, self.activeExportID == exportID else { return }
+                    self.statusMessage = M("Fotos/iCloud sem avanço há 2 minutos. Continuamos aguardando; você pode pausar.")
+                }
+            })
         }
         photosExportTask = task
         defer {
@@ -671,7 +681,10 @@ struct AlbumItem: Identifiable {
         }
         try await withTaskCancellationHandler(operation: { try await task.value }, onCancel: { task.cancel() })
     }
-    func prepare(_ item: PhotoItem, root: URL) async throws -> [(Int, ResourceDescriptor, URL, URL)] {
+    func prepare(_ item: PhotoItem, root: URL, usePreparedCache: Bool = false) async throws -> [(Int, ResourceDescriptor, URL, URL)] {
+        if usePreparedCache, let cached = resumedPreparation {
+            return try cached.take(item: item, into: root)
+        }
         guard item.metadata.date != nil else { throw BridgeError(message: M("Sem data de captura: preencha na revisão antes de enviar.")) }
         if let external = item.external {
             let folder = root.appendingPathComponent(item.id, isDirectory: true)
@@ -717,6 +730,83 @@ struct AlbumItem: Identifiable {
         try JSONEncoder().encode(item.metadata).write(to: folder.appendingPathComponent("metadata.json"), options: .atomic)
         return files
     }
+    var canPrepareInBackground: Bool {
+        !busy && canSend && sourceName == nil && activeUploadFollow == nil && backgroundPreparation == nil && resumedPreparation == nil && chosen.allSatisfy { $0.asset != nil }
+    }
+    func startBackgroundPreparation() {
+        guard canPrepareInBackground, let connection = currentTransferConnection else { return }
+        let batch = chosen
+        let originalItems = items.filter { selection.contains($0.id) }
+        let job = PFBackgroundPreparation(items: batch, originals: originalItems, fingerprints: Dictionary(uniqueKeysWithValues: originalItems.map { ($0.id, uploadFollowFingerprint($0)) }), profile: profile, accountID: connection.userID, accountLabel: transferAccountLabel, destination: destination, albumID: remoteAlbumID, newAlbumName: newAlbumName, destinationLabel: destinationLabel, sourceAlbum: album, sourceAlbums: albums, targetAlbums: remoteAlbums, root: workspace.appendingPathComponent("background-preparation").appendingPathComponent(UUID().uuidString))
+        let worker = LibraryModel(loadSavedState: false, observeNetwork: false)
+        worker.allowCloud = allowCloud
+        backgroundPreparation = job; preparationWorker = worker; showPreparation = true
+        job.observe(worker)
+        backgroundPreparationTask = Task { [weak self, job, worker] in
+            do {
+                try FileManager.default.createDirectory(at: job.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                for item in batch {
+                    try Task.checkCancellation()
+                    job.status = M("Preparando \(item.title)…")
+                    let files = try await worker.prepare(item, root: job.root)
+                    try Task.checkCancellation()
+                    try job.store(item: item, files: files)
+                }
+                job.ready = true; job.status = M("Originais prontos. Volte ao envio para conferir e confirmar.")
+            } catch {
+                job.status = error is CancellationError ? M("Preparação cancelada.") : PFMessage.error(error)
+                job.failed = true; job.removeFiles()
+            }
+            job.stopObserving()
+            if self?.backgroundPreparation === job { self?.preparationWorker = nil; self?.backgroundPreparationTask = nil }
+        }
+    }
+    func cancelBackgroundPreparation() {
+        backgroundPreparationTask?.cancel(); preparationWorker?.stopRequested = true
+        if backgroundPreparationTask == nil { backgroundPreparation?.removeFiles() }
+        backgroundPreparation = nil; showPreparation = false
+    }
+    func shutdownPreparation() {
+        let job = backgroundPreparation
+        cancelBackgroundPreparation()
+        job?.removeFiles()
+        discardPreparedFiles()
+    }
+    var hasPreparedFiles: Bool { resumedPreparation != nil }
+    func discardPreparedFiles() {
+        resumedPreparation?.removeFiles(); resumedPreparation = nil
+    }
+    private func validatePreparedContext(_ job: PFBackgroundPreparation) throws {
+        guard profile == job.profile, currentTransferConnection?.userID == job.accountID,
+              destination == job.destination, remoteAlbumID == job.albumID, newAlbumName == job.newAlbumName,
+              Set(chosen.map(\.id)) == Set(job.items.map(\.id)) else {
+            throw BridgeError(message: M("Conta, seleção ou destino mudou. Volte à operação preparada ou descarte o preparo."))
+        }
+        try job.validateSources()
+        for item in job.originals {
+            guard uploadFollowFingerprint(item) == job.fingerprints[item.id] else {
+                throw BridgeError(message: M("A revisão mudou durante a preparação. Descarte o preparo e prepare novamente."))
+            }
+        }
+    }
+    func resumeBackgroundPreparation() async -> Bool {
+        guard !busy, let job = backgroundPreparation, job.ready else { return false }
+        do {
+            guard profile == job.profile else { throw BridgeError(message: M("Selecione a conexão original para voltar ao envio preparado.")) }
+            guard currentTransferConnection?.userID == job.accountID else { throw BridgeError(message: M("Selecione e valide a conta original para voltar ao envio preparado.")) }
+            try job.validateSources()
+            for item in job.originals {
+                guard uploadFollowFingerprint(item) == job.fingerprints[item.id] else { throw BridgeError(message: M("A revisão mudou durante a preparação. Descarte o preparo e prepare novamente.")) }
+            }
+            sourceName = nil; album = job.sourceAlbum; albums = job.sourceAlbums
+            items = job.originals; selection = Set(job.items.map(\.id)); connected = true
+            fetched = nil; offset = 0
+            destination = job.destination; remoteAlbums = job.targetAlbums; remoteAlbumID = job.albumID; newAlbumName = job.newAlbumName
+            resumedPreparation = job; backgroundPreparation = nil; showPreparation = false; showUpload = true
+            statusMessage = M("Preparo recuperado. Confira o destino e confirme o envio.")
+            return true
+        } catch { job.status = PFMessage.error(error); return false }
+    }
     func exportSelected() async {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
         panel.prompt = L("Exportar aqui")
@@ -738,16 +828,36 @@ struct AlbumItem: Identifiable {
         let followContext = uploadFollowReview
         busy = true; uploading = true; progress = 0; stopRequested = false
         uploadMetrics = PFUploadMetrics()
-        defer { uploading = false; busy = false }
+        var consumingPreparedFiles = false
+        defer { uploading = false; busy = false; if consumingPreparedFiles { discardPreparedFiles() } }
         do {
             let permissions = PFTransferConnection.uploadPermissions(addingToAlbum: destination != .timeline, creatingAlbum: destination == .new, applyingReview: chosen.contains { edits[$0.id]?.hasChanges == true })
             try await validateTransfer(requiredPermissions: permissions)
             guard let resolved = transferConnection else { throw BridgeError(message: M("Valide a conta para transferir.")) }
             try validateUploadFollowBeforeSend(followContext)
+            if let prepared = resumedPreparation {
+                try validatePreparedContext(prepared)
+                if destination == .existing {
+                    let available = try await IMClient(address: resolved.address, credential: resolved.credential).albums()
+                    guard available.contains(where: { $0.id == remoteAlbumID && ($0.ownerID == resolved.userID || $0.writerIDs.contains(resolved.userID)) }) else {
+                        throw BridgeError(message: M("O álbum preparado não está disponível para edição nesta conta."))
+                    }
+                }
+                try validatePreparedContext(prepared)
+                try Task.checkCancellation()
+                if stopRequested { throw CancellationError() }
+            }
             // Freeze endpoint, account and key through every resource in this batch.
             let client = try uploadClientFactory(resolved.address, resolved.credential.key)
             let userID = resolved.userID
             let transferProfile = profile
+            // Establish owned local storage before creating any remote album.
+            let staging = workspace.appendingPathComponent("staging", isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let history = workspace.appendingPathComponent("history", isDirectory: true)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            // Only this batch's staging is owned here. Never remove older staging or originals.
+            defer { try? FileManager.default.removeItem(at: staging) }
+            try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             var targetAlbumID: String?
             if destination == .existing {
                 guard remoteAlbums.contains(where: { $0.id == remoteAlbumID }) else { throw BridgeError(message: M("Atualize e selecione um álbum de destino.")) }
@@ -757,12 +867,7 @@ struct AlbumItem: Identifiable {
                 remoteAlbums.append(album); remoteAlbumID = album.id
                 destination = .existing; targetAlbumID = album.id
             }
-            let staging = workspace.appendingPathComponent("staging", isDirectory: true).appendingPathComponent(UUID().uuidString, isDirectory: true)
-            let history = workspace.appendingPathComponent("history", isDirectory: true)
-            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            try FileManager.default.createDirectory(at: history, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            // Only this batch's staging is owned here. Never remove older staging or originals.
-            defer { try? FileManager.default.removeItem(at: staging) }
+            consumingPreparedFiles = resumedPreparation != nil
             var scheduledIDs: Set<String> = []
             let batch = chosen.filter { scheduledIDs.insert($0.id).inserted }
             var nextPosition = 0
@@ -778,7 +883,7 @@ struct AlbumItem: Identifiable {
                     let started = ProcessInfo.processInfo.systemUptime
                     do {
                         _ = try PFUploadFileIO.checkCapacity(fileSizes: [], availableBytes: PFUploadFileIO.availableCapacity(at: staging))
-                        let files = try await prepare(item, root: staging)
+                        let files = try await prepare(item, root: staging, usePreparedCache: true)
                         var resources: [PFPreparedUploadResource] = []
                         for (index, resource, file, sidecar) in files {
                             statusMessage = M("Calculando hash de \(resource.originalFilename)…")
@@ -981,6 +1086,12 @@ struct ContentView: View {
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 pageHeader.padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 18)
+                if let preparation = model.backgroundPreparation {
+                    PFPreparationBanner(job: preparation, showing: $model.showPreparation, busy: model.busy,
+                        cancel: { model.cancelBackgroundPreparation() }, resume: {
+                            Task { if await model.resumeBackgroundPreparation() { navigation.settings = false; navigation.reverse = false } }
+                        }).padding(.horizontal, 24).padding(.bottom, 12)
+                }
                 if navigation.settings {
                     PFSettingsView(model: model, themeRaw: $themeRaw, glassEnabled: $glassEnabled)
                 } else if navigation.reverse {
@@ -1002,6 +1113,10 @@ struct ContentView: View {
         .environment(\.pfGlassEnabled, glassEnabled)
         .environment(\.locale, PFLocalization.locale)
         .onAppear { PFAppearanceController.apply(selectedTheme) }
+        .onDisappear { model.shutdownPreparation() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            model.shutdownPreparation()
+        }
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
         .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
@@ -1037,6 +1152,9 @@ struct ContentView: View {
         }
         .confirmationDialog(L("Enviar \(model.selection.count) itens para o Immich?"), isPresented: $model.showUpload, titleVisibility: .visible) {
             Button(L("Enviar com originais e XMP")) { Task { await model.sendSelected() } }
+            if model.canPrepareInBackground {
+                Button(L("Preparar em segundo plano")) { model.startBackgroundPreparation() }
+            }
         } message: {
             Text(L("Destino: \(model.transferAddress) · \(model.transferAccountLabel) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação."))
         }
@@ -1125,7 +1243,7 @@ struct ContentView: View {
                 PFSectionHeading(L("Origem"), systemImage: model.sourceName == nil ? "photo.stack" : "folder")
                 if let source = model.sourceName { Text(source).font(.callout.weight(.medium)).lineLimit(2) }
                 else {
-                    Picker(L("Álbum do Fotos"), selection: $model.album) { ForEach(model.albums) { Text($0.displayTitle).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
+                    Picker(L("Álbum do Fotos"), selection: Binding(get: { model.album }, set: { model.album = $0; model.loadAlbum() })) { ForEach(model.albums) { Text($0.displayTitle).tag($0.id) } }.id(PFLocalization.languageCode).labelsHidden().frame(maxWidth: .infinity).controlSize(.large)
                 }
                 Toggle(L("Baixar originais do iCloud"), isOn: $model.allowCloud).font(.caption).disabled(model.sourceName != nil)
                 if model.sourceName == nil {
@@ -1145,7 +1263,7 @@ struct ContentView: View {
                     .popover(isPresented: $navigation.showingUploadFollow, arrowEdge: .bottom) { uploadFollowSettings }
                 }
             }
-        }.disabled(model.busy).onChange(of: model.album) { model.loadAlbum() }
+        }.disabled(model.busy)
     }
     private var uploadFollowSettings: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1266,6 +1384,7 @@ struct ContentView: View {
             if model.busy {
                 Button(model.scanning ? L("Parar análise") : L("Pausar após itens em andamento")) { model.stopRequested = true; model.cancelScan() }
             } else {
+                if model.hasPreparedFiles { Button(L("Descartar preparo")) { model.discardPreparedFiles() } }
                 Button(L("Exportar XMP…"), systemImage: "square.and.arrow.up") { Task { await model.exportSelected() } }.disabled(model.selection.isEmpty)
                 Button(L("Enviar selecionados"), systemImage: "arrow.up") { model.showUpload = true }.buttonStyle(.bordered).disabled(!model.canSend)
             }
