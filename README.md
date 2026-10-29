@@ -13,13 +13,13 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 1.0.7 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 1.0.8 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. Installation and usage instructions are also available in the [Portuguese README](README.pt-BR.md).
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
+The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8).
 
 ### Photos → Immich tracking
 
@@ -43,7 +43,7 @@ The upload pipeline prepares small windows of up to eight complete media items w
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7).
+The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8).
 
 ## Transfer accounts and connection availability
 
@@ -75,9 +75,9 @@ After a new Immich → Photos import, the app checks that the created item is vi
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 1.0.7 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.7/Ponte-Fotos-1.0.7-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 1.0.8 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.8/Ponte-Fotos-1.0.8-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.7) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
@@ -186,7 +186,7 @@ Validation pins the account UUID, not a cryptographic server identity. Configure
 
 Originals retain their bytes; an XMP sidecar carries dates and locations from the library/review. Preparation does not modify the source file. An existing XMP sidecar from a folder is merged while preserving additional fields.
 
-For Live Photos from Apple Photos, the motion video is uploaded first and associated with the main image. External images and videos become one reviewable Live Photo unit only when their internal content identifiers match uniquely and PhotoKit accepts the pair. Both filenames are shown in Review and both resources are available in the media diagnostic. Missing, conflicting, ambiguous or incompatible metadata leaves files independent with an explanation; names and timestamps never establish a pair. Both originals and any XMP sidecars are checked again during preparation; changes require a fresh scan. The video is uploaded first and is not submitted again as an independent selection. A pre-existing static image or different remote motion association blocks reuse for review instead of silently changing that asset. PhotoKit acceptance proves local loading, not visual fidelity or Immich playback. Associated RAW and JPEG files are preserved as distinct resources without automatic stacking.
+For Live Photos from Apple Photos, the motion video is uploaded first and associated with the main image. External images and videos become one reviewable Live Photo unit only when their internal content identifiers match uniquely and PhotoKit accepts the pair. Both filenames are shown in Review and both resources are available in the media diagnostic. Missing, conflicting, ambiguous or incompatible metadata leaves files independent with an explanation; names and timestamps never establish a pair. Both originals and any XMP sidecars are checked again during preparation; changes require a fresh scan. The video is uploaded first with hidden visibility, so it is never initially published as a standalone timeline item. Only the Live Photo still uses normal timeline visibility. The app checks that the motion resource is hidden before reporting the pair as verified. It is not submitted again as an independent selection. A pre-existing static image or different remote motion association blocks reuse for review instead of silently changing that asset. PhotoKit acceptance proves local loading, not visual fidelity or Immich playback. Associated RAW and JPEG files are preserved as distinct resources without automatic stacking.
 
 **Pause after this item** finishes the current resource set. History and checksums help reuse previously uploaded resources that are still valid. Interruptions can leave pending or uncertain results: check the server before retrying.
 
@@ -286,7 +286,7 @@ The repository contains the application source, build resources, usage instructi
 
 ## Project status
 
-Version 1.0.7 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
+Version 1.0.8 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
 This is an independent project with no official affiliation with Apple or Immich. Licensed under the [MIT License](LICENSE).
 
