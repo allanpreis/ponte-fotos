@@ -13,13 +13,13 @@
 
 A native macOS app that connects Apple Photos and Immich in both directions. Upload originals from Photos or folders to Immich, import Immich albums into Photos, and review dates and locations. It also provides tools to organize your server library.
 
-**Version: 1.0.8 · macOS 14 or later · Apple Silicon · Immich 3.x**
+**Version: 1.0.9 · macOS 14 or later · Apple Silicon · Immich 3.x**
 
 **Languages:** the app supports English and Brazilian Portuguese. It follows your macOS language by default, with English as the fallback for other languages. Choose **Settings → Appearance → App language** to use **System**, **English**, or **Português (Brasil)**. On first launch, **System** is selected. Changes apply immediately and are saved for future launches. Installation and usage instructions are also available in the [Portuguese README](README.pt-BR.md).
 
 The app is written in Swift and SwiftUI, uses macOS frameworks, and requires no project-operated cloud services, Node.js, Docker, or external Swift packages. An Immich server is required for connection, uploads, imports, and library management; local export and file review work without one.
 
-The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8).
+The app combines account-specific transfers, availability-based URL selection, media diagnostics and post-import metadata checks. It reports format, preview availability, image color properties and video PQ/HLG signaling without treating them as proof of complete HDR compatibility. Temporary read buffers stay bounded while hashing and packaging large originals. [Release notes](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.9).
 
 ### Photos → Immich tracking
 
@@ -43,7 +43,7 @@ The upload pipeline prepares small windows of up to eight complete media items w
 
 Counters distinguish verified items, newly uploaded resources and reused resources. Per-phase local measurements support further optimization; they are not bandwidth telemetry. Network changes and failures pause between complete items without replaying the batch automatically. The header now says only **Local URL** or **Remote URL**, keeping the diagnostic in settings.
 
-The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8).
+The scheduler processes at most two complete media items at a time. Items sharing a resource hash run separately; units above 16 MiB of prepared multipart payload run alone. A pause waits for active items, including every Live Photo resource, before stopping. Progress counts completed units, independent of completion order. Duplicate source rows are scheduled once by identity. These bounds are deliberate; they are not a promise of real-server speedup. Photos export now reports native iCloud download progress and distinguishes export from hashing. A request with no advancing progress or data for two minutes is cancelled with a retryable error; pausing cancels local preparation without interrupting an already-uploading media unit. Exported chunks are written directly to a private temporary file, then committed only after success. Ready videos and Live Photo units begin upload without waiting for the rest of the preparation window. Whole-Photos-batch size prediction and large real-server throughput/memory validation remain limited; this does not accelerate the iCloud connection itself. [Validation and limits](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.9).
 
 ## Transfer accounts and connection availability
 
@@ -75,9 +75,9 @@ After a new Immich → Photos import, the app checks that the created item is vi
 
 ## 📦 Install a release
 
-Download [Ponte Fotos 1.0.8 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.8/Ponte-Fotos-1.0.8-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
+Download [Ponte Fotos 1.0.9 for Apple Silicon](https://github.com/allanpreis/ponte-fotos/releases/download/v1.0.9/Ponte-Fotos-1.0.9-arm64.zip), extract it, and move **Ponte Fotos.app** to your user's Applications folder. Quit the previous version before replacing it. The package has a local ad hoc signature; it does not yet have a Developer ID signature or notarization. You do not need to disable macOS protections.
 
-[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.8) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
+[🚀 Release and downloads](https://github.com/allanpreis/ponte-fotos/releases/tag/v1.0.9) · [📝 Release history](https://github.com/allanpreis/ponte-fotos/releases)
 
 ## Appearance and settings
 
@@ -286,7 +286,7 @@ The repository contains the application source, build resources, usage instructi
 
 ## Project status
 
-Version 1.0.8 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
+Version 1.0.9 consolidates the current workflows, with local signing and automated tests. The GitHub build workflow checks compilation, bundle metadata, signature and arm64 architecture; behavioral tests are run separately. The version number does not certify the unvalidated scenarios described above. Back up your library and server, and start with small batches before using tools that change album membership or move copies to the trash.
 
 This is an independent project with no official affiliation with Apple or Immich. Licensed under the [MIT License](LICENSE).
 
