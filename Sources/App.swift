@@ -108,7 +108,12 @@ struct AlbumItem: Identifiable {
     @Published var serverReady = false
     @Published var connectionSaved = false
     @Published var allowCloud = true
-    @Published var stopRequested = false
+    private var photosExportTask: Task<Void, Error>?
+    private var activeExportID: UUID?
+    private var activeExportProgress = 0.0
+    @Published var stopRequested = false {
+        didSet { if stopRequested { photosExportTask?.cancel() } }
+    }
     @Published var scanning = false
     private var scanTask: Task<ExternalScanResult, Never>?
     @Published var sourceName: String? {
@@ -646,14 +651,25 @@ struct AlbumItem: Identifiable {
         }
     }
     func exportResource(_ resource: PHAssetResource, to url: URL) async throws {
-        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-        let options = PHAssetResourceRequestOptions(); options.isNetworkAccessAllowed = allowCloud
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            PHAssetResourceManager.default().writeData(for: resource, toFile: url, options: options) { error in
-                if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+        let exportID = UUID(), name = resource.originalFilename
+        activeExportID = exportID
+        activeExportProgress = 0
+        statusMessage = M("Exportando original do Fotos: \(name)…")
+        let cloud = allowCloud
+        let task = Task { [weak self] in
+            try await TransferFileIO.exportPhotosResource(resource, to: url, allowCloud: cloud) { [weak self] fraction in
+                Task { @MainActor [weak self] in
+                    guard let self, self.activeExportID == exportID, fraction > self.activeExportProgress else { return }
+                    self.activeExportProgress = fraction
+                    self.statusMessage = M("Baixando do iCloud: \(name) · \(Int(fraction * 100))%")
+                }
             }
         }
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        photosExportTask = task
+        defer {
+            if activeExportID == exportID { activeExportID = nil; photosExportTask = nil }
+        }
+        try await withTaskCancellationHandler(operation: { try await task.value }, onCancel: { task.cancel() })
     }
     func prepare(_ item: PhotoItem, root: URL) async throws -> [(Int, ResourceDescriptor, URL, URL)] {
         guard item.metadata.date != nil else { throw BridgeError(message: M("Sem data de captura: preencha na revisão antes de enviar.")) }
@@ -765,6 +781,7 @@ struct AlbumItem: Identifiable {
                         let files = try await prepare(item, root: staging)
                         var resources: [PFPreparedUploadResource] = []
                         for (index, resource, file, sidecar) in files {
+                            statusMessage = M("Calculando hash de \(resource.originalFilename)…")
                             let checksum = try await TransferFileIO.checksum(file)
                             let bytes = try PFUploadFileIO.size(of: file)
                             let (sum, overflow) = windowBytes.addingReportingOverflow(bytes)
@@ -783,7 +800,14 @@ struct AlbumItem: Identifiable {
                         window.append(PFPreparedUploadItem(position: position, item: item, resources: resources, folder: staging.appendingPathComponent(item.id.replacingOccurrences(of: "/", with: "_")), multipartBytes: multipartBytes))
                         uploadMetrics?.preparationSeconds += ProcessInfo.processInfo.systemUptime - started
                         nextPosition += 1
+                        // Start sending a ready video/Live unit immediately instead of
+                        // waiting for the remaining preparation window (and iCloud).
+                        if item.live || item.external?.isVideo == true || item.resources.contains(where: { $0.type == .video }) { break }
                     } catch {
+                        if stopRequested && error is CancellationError {
+                            resultsMessages[item.id] = M("Preparação pausada. O original não foi enviado.")
+                            break
+                        }
                         resultsMessages[item.id] = M("Falha: \(PFMessage.error(error))")
                         stopRequested = true
                     }
