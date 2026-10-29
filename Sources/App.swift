@@ -1245,14 +1245,12 @@ struct ContentView: View {
         }
     }
 
-    var body: some View {
+    private var workspaceLifecycle: some View {
         workspace
         .background(PFTheme.background).tint(PFTheme.accent)
         .environment(\.pfGlassEnabled, glassEnabled)
         .environment(\.locale, PFLocalization.locale)
-        .onAppear { [automation] in PFAppearanceController.apply(selectedTheme); automation.startAutomatic(model: model)
-            model.stopAlbumAutomation = { [weak automation] scope, photos, immich in automation?.disablePair(scope: scope, photosID: photos, immichID: immich) }
-        }
+        .onAppear(perform: activateWorkspace)
         .onDisappear { model.shutdownPreparation() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             model.shutdownPreparation(); automation.shutdown()
@@ -1265,6 +1263,10 @@ struct ContentView: View {
         .onChange(of: model.networkRevision) { _, _ in automation.pauseIfRunning() }
         .onChange(of: themeRaw) { _, _ in PFAppearanceController.apply(selectedTheme) }
         .frame(minWidth: 900, minHeight: 650)
+    }
+
+    var body: some View {
+        workspaceLifecycle
         .onChange(of: model.profile) { previous, _ in reverseImport.invalidate(); model.connectionSettingsChanged(previous: previous); model.prepareManagementSession() }
         .onChange(of: model.selectedTransferAccountID) { _, _ in reverseImport.invalidate(); model.transferAccountChanged() }
         .onChange(of: model.networkRevision) { _, _ in reverseImport.requestPauseAfterItem() }
@@ -1308,6 +1310,16 @@ struct ContentView: View {
         } message: {
             Text(L("Destino: \(model.transferAddress) · \(model.transferAccountLabel) → \(model.destinationLabel). Live Photos incluem vídeo; RAW inclui os recursos originais disponíveis. Revisões manuais salvas serão aplicadas também às fotos já existentes no Immich. A prévia mostra horários no fuso deste Mac; o fuso histórico da captura ainda precisa de validação."))
         }
+    }
+
+    private func activateWorkspace() {
+        PFAppearanceController.apply(selectedTheme)
+        let coordinator = automation
+        let stop: (String, String, String) -> Void = { [weak coordinator] (scope: String, photos: String, immich: String) in
+            coordinator?.disablePair(scope: scope, photosID: photos, immichID: immich)
+        }
+        model.stopAlbumAutomation = stop
+        coordinator.startAutomatic(model: model)
     }
 
     private var sidebar: some View {
