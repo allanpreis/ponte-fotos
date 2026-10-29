@@ -413,7 +413,7 @@ struct AlbumItem: Identifiable {
                             if !isPair && !albumIDs.contains(record.result.id) { completed = false; break }
                             guard try await client.matchesHistory(assetID: record.result.id, checksum: record.checksum, userID: connection.userID) else { completed = false; break }
                             let remote = try await client.info(record.result.id)
-                            if !metadata(for: item).verify(remote, liveVideoID: item.resources.indices.contains(record.resourceIndex) && item.resources[record.resourceIndex].type == .photo ? paired : nil) { completed = false; break }
+                            if !metadata(for: item).verify(remote, liveVideoID: item.resources.indices.contains(record.resourceIndex) && item.resources[record.resourceIndex].type == .photo ? paired : nil, isLiveMotion: isPair) { completed = false; break }
                         }
                     }
                 }
@@ -846,7 +846,7 @@ struct AlbumItem: Identifiable {
                 } else {
                     statusMessage = M("Enviando \(resource.originalFilename)…")
                     let started = ProcessInfo.processInfo.systemUptime
-                    result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil, checksum: checksum)
+                    result = try await client.upload(file: file, sidecar: xmp, metadata: item.metadata, liveVideoID: resource.type == .photo ? videoID : nil, checksum: checksum, isLiveMotion: resource.type == .pairedVideo)
                     uploadMetrics?.transferSeconds += ProcessInfo.processInfo.systemUptime - started
                     if result.status == "duplicate" {
                         guard try await client.matchesHistory(assetID: result.id, checksum: checksum, userID: userID, liveVideoID: resource.type == .photo ? videoID : nil) else {
@@ -871,7 +871,7 @@ struct AlbumItem: Identifiable {
                 let verificationStarted = ProcessInfo.processInfo.systemUptime
                 for attempt in 0..<6 {
                     let remote = try await client.info(result.id)
-                    if item.metadata.verify(remote, liveVideoID: resource.type == .photo ? videoID : nil) { verified = true; break }
+                    if item.metadata.verify(remote, liveVideoID: resource.type == .photo ? videoID : nil, isLiveMotion: resource.type == .pairedVideo) { verified = true; break }
                     if attempt < 5 { try await Task.sleep(nanoseconds: 2_000_000_000) }
                 }
                 uploadMetrics?.verificationSeconds += ProcessInfo.processInfo.systemUptime - verificationStarted

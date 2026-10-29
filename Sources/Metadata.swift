@@ -22,7 +22,8 @@ struct CaptureMetadata: Codable {
         let absolute = abs(value), degrees = Int(abs(value))
         return String(format: "%d,%.8f%@", locale: Locale(identifier: "en_US_POSIX"), degrees, (absolute - Double(degrees)) * 60, value < 0 ? negative : positive)
     }
-    func verify(_ remote: RemoteAsset, liveVideoID: String?) -> Bool {
+    func verify(_ remote: RemoteAsset, liveVideoID: String?, isLiveMotion: Bool = false) -> Bool {
+        if isLiveMotion && remote.visibility != "hidden" { return false }
         guard let date, let captured = Self.parse(remote.fileCreatedAt), abs(date.timeIntervalSince(captured)) < 1 else { return false }
         if let latitude, let longitude {
             guard let lat = remote.exifInfo?.latitude, let lon = remote.exifInfo?.longitude,
@@ -42,6 +43,7 @@ struct RemoteAsset: Decodable {
     let fileCreatedAt: String
     let exifInfo: Exif?
     let livePhotoVideoId: String?
+    var visibility: String? = nil
 }
 struct UploadResult: Codable { let id: String; let status: String }
 

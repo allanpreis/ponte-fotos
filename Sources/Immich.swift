@@ -150,9 +150,9 @@ struct ImmichClient {
         }) {}
         return Data(hash.finalize()).base64EncodedString()
     }
-    func upload(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?, checksum: String? = nil) async throws -> UploadResult {
+    func upload(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?, checksum: String? = nil, isLiveMotion: Bool = false) async throws -> UploadResult {
         let prepared = try await PFUploadFileIO.prepare(file: file, sidecar: sidecar, metadata: metadata,
-                                                       liveVideoID: liveVideoID, checksum: checksum)
+                                                       liveVideoID: liveVideoID, checksum: checksum, isLiveMotion: isLiveMotion)
         defer { try? FileManager.default.removeItem(at: prepared.body) }
         try Task.checkCancellation()
         var r = request("assets", method: "POST")
@@ -252,7 +252,7 @@ enum PFUploadFileIO {
         }
         return checksum
     }
-    static func prepare(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?, checksum: String? = nil,
+    static func prepare(file: URL, sidecar: URL, metadata: CaptureMetadata, liveVideoID: String?, checksum: String? = nil, isLiveMotion: Bool = false,
                         directory: URL = FileManager.default.temporaryDirectory,
                         hash: @escaping @Sendable (URL) throws -> String = { try ImmichClient.checksum($0) }) async throws -> Prepared {
         let task = Task.detached(priority: .utility) {
@@ -261,7 +261,7 @@ enum PFUploadFileIO {
             let digest = try validatedChecksum(checksum ?? hash(file))
             let boundary = "Ponte-\(UUID().uuidString)"
             let fields = [("fileCreatedAt", CaptureMetadata.iso(date)), ("fileModifiedAt", CaptureMetadata.iso(date)),
-                          ("isFavorite", String(metadata.favorite))] + (liveVideoID.map { [("livePhotoVideoId", $0)] } ?? [])
+                          ("isFavorite", String(metadata.favorite))] + (isLiveMotion ? [("visibility", "hidden")] : []) + (liveVideoID.map { [("livePhotoVideoId", $0)] } ?? [])
             let parts = [("assetData", file, "application/octet-stream"), ("sidecarData", sidecar, "application/xml")]
             func field(_ name: String, _ value: String) -> Data {
                 Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8)
