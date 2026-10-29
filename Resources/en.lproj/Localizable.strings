@@ -755,3 +755,51 @@
 "O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente." = "Photos provided no data or progress for 2 minutes. Preparation was stopped. Check the original download in Photos and try again.";
 
 "O Fotos retornou um original vazio. A preparação foi interrompida." = "Photos returned an empty original. Preparation was stopped.";
+
+"O Fotos ficou 15 minutos sem entregar dados nem progresso. A preparação foi interrompida; confira o original no Fotos e tente novamente." = "Photos provided no data or progress for 15 minutes. Preparation was stopped; check the original in Photos and try again.";
+
+"Fotos/iCloud sem avanço há 2 minutos. Continuamos aguardando; você pode pausar." = "Photos/iCloud has made no progress for 2 minutes. Still waiting; you can pause.";
+
+"Preparando originais…" = "Preparing originals…";
+
+"Originais prontos. Volte ao envio para conferir e confirmar." = "Originals are ready. Return to upload to review and confirm.";
+
+"Preparação cancelada." = "Preparation cancelled.";
+
+"Conta, seleção ou destino mudou. Volte à operação preparada ou descarte o preparo." = "The account, selection or destination changed. Return to the prepared operation or discard preparation.";
+
+"A revisão mudou durante a preparação. Descarte o preparo e prepare novamente." = "The review changed during preparation. Discard preparation and prepare again.";
+
+"Selecione a conexão original para voltar ao envio preparado." = "Select the original connection to return to the prepared upload.";
+
+"Selecione e valide a conta original para voltar ao envio preparado." = "Select and validate the original account to return to the prepared upload.";
+
+"Preparo recuperado. Confira o destino e confirme o envio." = "Preparation restored. Review the destination and confirm upload.";
+
+"O álbum preparado não está disponível para edição nesta conta." = "The prepared album is not available for editing with this account.";
+
+"Preparar em segundo plano" = "Prepare in background";
+
+"Um original ou arquivo preparado mudou. Descarte o preparo e prepare novamente." = "An original or prepared file changed. Discard preparation and prepare again.";
+
+"Originais prontos para enviar" = "Originals ready to upload";
+
+"Preparação em segundo plano" = "Background preparation";
+
+"Ver preparo" = "View preparation";
+
+"%@ de %@ itens preparados" = "%@ of %@ items prepared";
+
+"espaço temporário usado" = "temporary disk space used";
+
+"Você pode fechar este painel e usar o app. Mantenha o app aberto. O envio só começa após sua confirmação." = "You can close this panel and use the app. Keep the app open. Upload starts only after your confirmation.";
+
+"Descartar preparo" = "Discard preparation";
+
+"Cancelar preparo" = "Cancel preparation";
+
+"Voltar ao envio" = "Return to upload";
+
+"Conta: %@" = "Account: %@";
+
+"espaço dos itens preparados" = "space used by prepared items";
