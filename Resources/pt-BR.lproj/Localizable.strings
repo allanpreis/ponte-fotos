@@ -743,3 +743,15 @@
 "Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente." = "Os bytes reexportados do Fotos não correspondem ao original do Immich. O item permanece pendente.";
 
 "Reexportando e conferindo os originais no Fotos…" = "Reexportando e conferindo os originais no Fotos…";
+
+"Exportando original do Fotos: %@…" = "Exportando original do Fotos: %@…";
+
+"Baixando do iCloud: %@ · %@%" = "Baixando do iCloud: %@ · %@%";
+
+"Calculando hash de %@…" = "Calculando hash de %@…";
+
+"Preparação pausada. O original não foi enviado." = "Preparação pausada. O original não foi enviado.";
+
+"O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente." = "O Fotos não entregou dados nem progresso por 2 minutos. A preparação foi interrompida. Confira o download do original no Fotos e tente novamente.";
+
+"O Fotos retornou um original vazio. A preparação foi interrompida." = "O Fotos retornou um original vazio. A preparação foi interrompida.";
